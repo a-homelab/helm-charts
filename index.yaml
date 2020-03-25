@@ -3,12 +3,12 @@ entries:
   unms:
   - apiVersion: v2
     appVersion: 1.1.6
-    created: "2020-03-25T12:49:29.4292368-05:00"
+    created: "2020-03-25T12:51:03.864051-05:00"
     description: A Helm chart for Ubiquiti UNMS
-    digest: 439fbc7fe59ae8ec60d3b3153431e6b4d6f907916d7e0c8876dd9571b5103e29
+    digest: b5ad39ea774128000f3608bb6fd2119c500f4866835167e44595215708c47048
     name: unms
     type: application
     urls:
     - unms/unms-0.0.1.tgz
     version: 0.0.1
-generated: "2020-03-25T12:49:29.4250236-05:00"
+generated: "2020-03-25T12:51:03.8600659-05:00"
