@@ -3,12 +3,12 @@ entries:
   unms:
   - apiVersion: v2
     appVersion: 1.16.0
-    created: "2020-03-25T12:05:24.8996389-05:00"
+    created: "2020-03-25T12:05:37.0755957-05:00"
     description: A Helm chart for Kubernetes
-    digest: b25149a0ca7c0fd6aabf1d6f1c2a2209e4090d571937cfb0a5d0bebae88b99a5
+    digest: a6a7d2de27de055d9ba1903bae4e353d55c370ea63e5a32eecdbab7aba8a5cf6
     name: unms
     type: application
     urls:
     - unms/unms-0.1.0.tgz
     version: 0.1.0
-generated: "2020-03-25T12:05:24.8957746-05:00"
+generated: "2020-03-25T12:05:37.0714823-05:00"
