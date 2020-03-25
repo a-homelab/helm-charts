@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
-for chart_dir in charts/*/; do
+
+CHARTS_DIR=charts
+DIST_DIR=dist/charts
+
+for chart_dir in $CHARTS_DIR/*/; do
     chart=$(basename $chart_dir)
     echo "Packaging $chart..."
     set -x
-    helm package $chart_dir -d dist/charts/$chart
+    helm package $chart_dir -d $DIST_DIR/$chart
     set +x
 done
 
 echo "Creating chart index..."
 set -x
-helm repo index dist/charts
+helm repo index $DIST_DIR
 set +x
 
 echo "Deploying chart to Github Pages..."
 
 set -x
-git add dist/charts
-git commit -m "Update charts"
-git subtree push --prefix dist/charts origin gh-pages
+(cd $DIST_DIR; \
+    git add --all; \
+    git commit -m "Update charts")
+git push origin gh-pages
 set +x
