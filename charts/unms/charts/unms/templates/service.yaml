@@ -7,9 +7,17 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - name: http
+      port: 8081
       protocol: TCP
-      name: http
+    - name: http-ws
+      port: 8082
+      protocol: TCP
+    - name: http-shell
+      port: 8083
+      protocol: TCP
+    - name: http-api
+      port: 8084
+      protocol: TCP
   selector:
     {{- include "unms.selectorLabels" . | nindent 4 }}

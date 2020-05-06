@@ -1,6 +1,6 @@
 apiVersion: v2
-name: unms
-description: A Helm chart for Ubiquiti UNMS
+name: netflow
+description: Netflow component for UNMS
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -19,16 +19,3 @@ version: 0.0.1
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application.
 appVersion: 1.1.6
-
-dependencies:
-  - name: redis
-    version: 10.5.13
-    repository: https://charts.bitnami.com/bitnami
-  
-  - name: postgresql
-    version: 8.6.9
-    repository: https://charts.bitnami.com/bitnami
-  
-  - name: rabbitmq
-    version: 6.19.2
-    repository: https://charts.bitnami.com/bitnami

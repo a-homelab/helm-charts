@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "unms.fullname" . }}
+  labels:
+    {{- include "unms.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "unms.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "unms.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "unms.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Values.global.unms.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+            - name: http-ws
+              containerPort: 8082
+              protocol: TCP
+            - name: http-shell
+              containerPort: 8083
+              protocol: TCP
+            - name: http-api
+              containerPort: 8084
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name | quote }}
+              value: {{ $value | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: unms-data
+              mountPath: /home/app/unms/data
+      
+      initContainers:
+        {{ include "common.initContainersWaitForServices" . | nindent 8 }}
+        - name: chown-volume
+          image: busybox
+          command:
+            - sh
+            - -c
+            - chown -R {{ .Values.env.UNMS_USER_ID }}:{{ .Values.env.UNMS_USER_ID }} /home/app/unms/data
+          volumeMounts:
+            - name: unms-data
+              mountPath: /home/app/unms/data
+          
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      volumes:
+        - name: unms-data
+        {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+          {{- if .Values.persistence.existingClaim }}
+            claimName: {{ .Values.persistence.existingClaim }}
+          {{- else }}
+            claimName: {{ include "unms.fullname" . }}
+          {{- end }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}

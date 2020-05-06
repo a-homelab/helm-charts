@@ -19,8 +19,8 @@ set +x
 echo "Deploying chart to Github Pages..."
 
 set -x
-(cd $DIST_DIR; \
-    git add --all; \
-    git commit -m "Update charts")
-git push origin gh-pages
+cd $DIST_DIR && \
+    git add --all && \
+    git commit -m "Update charts" && \
+    git push origin gh-pages
 set +x

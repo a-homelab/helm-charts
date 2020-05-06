@@ -1,0 +1,107 @@
+# Default values for ucrm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: ubnt/unms-crm
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: no
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# Environment variables
+env:
+  RABBITMQ_HOST: unms-rabbitmq
+  RABBITMQ_USER: guest
+  RABBITMQ_PASSWORD: guest
+  POSTGRES_HOST: unms-postgresql
+  POSTGRES_USER: ucrm
+  POSTGRES_PASSWORD: ucrm
+  POSTGRES_SCHEMA: ucrm
+  POSTGRES_DB: unms
+  MAILER_ADDRESS: "127.1.0.1"
+  MAILER_ADDRESS_USERNAME: username
+  MAILER_ADDRESS_PASSWORD: password
+  SECRET: test-secret
+  SUSPEND_PORT: "81"
+  PUBLIC_HTTPS_PORT: "443"
+  UCRM_USER: unms
+  UNMS_VERSION: "1.1.6"
+  UNMS_HOST: unms
+  UNMS_PORT: "8081"
+  UNMS_TOKEN: test-secret
+  UNMS_BASE_URL: /v2.1
+  UNMS_POSTGRES_SCHEMA: unms
+  UNMS_RABBITMQ_PORT: "5672"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+persistence:
+  enabled: yes
+  ## database data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: "-"
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  annotations: {}

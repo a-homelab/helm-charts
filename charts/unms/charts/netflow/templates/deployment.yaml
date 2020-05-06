@@ -1,46 +1,53 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "unms.fullname" . }}
+  name: {{ include "netflow.fullname" . }}
   labels:
-    {{- include "unms.labels" . | nindent 4 }}
+    {{- include "netflow.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "unms.selectorLabels" . | nindent 6 }}
+      {{- include "netflow.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "unms.selectorLabels" . | nindent 8 }}
+        {{- include "netflow.selectorLabels" . | nindent 8 }}
     spec:
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
     {{- end }}
-      serviceAccountName: {{ include "unms.serviceAccountName" . }}
+      serviceAccountName: {{ include "netflow.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Values.global.unms.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - name: http
-              containerPort: 80
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
+            - name: udp
+              containerPort: 2055
+              protocol: UDP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            {{- range $name, $value := .Values.env }}
+            - name: {{ $name | quote }}
+              value: {{ $value | quote }}
+            {{- end }}
+      initContainers:
+        {{ include "common.initContainersWaitForServices" . | nindent 8 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
