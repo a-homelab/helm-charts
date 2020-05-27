@@ -1,0 +1,280 @@
+version: '2'
+
+networks:
+  public:
+    ${IPAM_PUBLIC}
+  internal:
+    internal: true
+    ${IPAM_PRIVATE}
+
+services:
+  fluentd:
+    container_name: unms-fluentd
+    image: ${DOCKER_IMAGE}-fluentd:${DOCKER_TAG}
+    restart: always
+    networks:
+      - public
+    ports:
+      - 127.0.0.1:24224:24224
+    volumes:
+      - ${DATA_DIR}/logs:/fluentd/log
+    environment:
+      - FLUENTD_UID=${USER_ID}
+
+  siridb:
+    container_name: unms-siridb
+    image: ${DOCKER_IMAGE}-siridb:${DOCKER_TAG}
+    user: "${USER_ID}"
+    restart: always
+    depends_on:
+      - fluentd
+    networks:
+      - internal
+    volumes:
+      - ${DATA_DIR}/siridb:/var/lib/siridb
+    logging:
+      driver: fluentd
+      options:
+        tag: siridb
+        fluentd-async-connect: "true"
+
+  redis:
+    container_name: unms-redis
+    image: redis:5.0.5-alpine
+    user: "${USER_ID}"
+    restart: always
+    depends_on:
+      - fluentd
+    networks:
+      - internal
+    volumes:
+      - ${DATA_DIR}/redis:/data/db
+    logging:
+      driver: fluentd
+      options:
+        tag: redis
+        fluentd-async-connect: "true"
+    command: redis-server --appendonly yes --dir /data/db/
+
+  # we still run postgres as root with stepdown to uid 70 until this issue is fixed
+  # https://github.com/docker-library/postgres/issues/264
+  # and until it's not required to expose host's /etc/passwd to the container
+  # https://hub.docker.com/_/postgres/ (see "Arbitrary --user Notes")
+  postgres:
+    container_name: unms-postgres
+    image: postgres:9.6.12-alpine
+    command: postgres -c deadlock_timeout=5000 -c max_connections=150
+    restart: always
+    depends_on:
+      - fluentd
+    networks:
+      - internal
+    volumes:
+      - ${CONFIG_DIR}/postgres:/docker-entrypoint-initdb.d
+      - ${DATA_DIR}/postgres:/var/lib/postgresql/data/pgdata
+    logging:
+      driver: fluentd
+      options:
+        tag: postgres
+        fluentd-async-connect: "true"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - UNMS_POSTGRES_DB=${UNMS_POSTGRES_DB}
+      - UNMS_POSTGRES_SCHEMA=${UNMS_POSTGRES_SCHEMA}
+      - UNMS_POSTGRES_USER=${UNMS_POSTGRES_USER}
+      - UNMS_POSTGRES_PASSWORD=${UNMS_POSTGRES_PASSWORD}
+      - UCRM_POSTGRES_DB=${UCRM_POSTGRES_DB}
+      - UCRM_POSTGRES_SCHEMA=${UCRM_POSTGRES_SCHEMA}
+      - UCRM_POSTGRES_USER=${UCRM_POSTGRES_USER}
+      - UCRM_POSTGRES_PASSWORD=${UCRM_POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+
+  rabbitmq:
+    container_name: unms-rabbitmq
+    image: rabbitmq:3.7.14-alpine
+    user: "${USER_ID}"
+    restart: always
+    depends_on:
+      - fluentd
+    networks:
+      - internal
+    hostname: rabbitmq
+    volumes:
+      - ${DATA_DIR}/rabbitmq:/var/lib/rabbitmq
+    logging:
+      driver: fluentd
+      options:
+        tag: rabbitmq
+        fluentd-async-connect: "true"
+    environment:
+      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit channel_max 4096
+
+  unms:
+    container_name: unms
+    image: ${DOCKER_IMAGE}:${DOCKER_TAG}
+    restart: always
+    depends_on:
+      - fluentd
+      - redis
+      - siridb
+      - postgres
+      - rabbitmq
+      - nginx
+      - ucrm
+    networks:
+      - public
+      - internal
+    volumes:
+      - ${DATA_DIR}:/home/app/unms/data
+    logging:
+      driver: fluentd
+      options:
+        tag: unms
+        fluentd-async-connect: "true"
+    environment:
+      - UNMS_USER_ID=${USER_ID}
+      - DEMO=${DEMO}
+      - NODE_ENV=${NODE_ENV}
+      - HTTP_PORT=${UNMS_HTTP_PORT}
+      - WS_PORT=${UNMS_WS_PORT}
+      - WS_SHELL_PORT=${UNMS_WS_SHELL_PORT}
+      - UNMS_WS_API_PORT=${UNMS_WS_API_PORT}
+      - UNMS_NETFLOW_PORT=${NETFLOW_PORT}
+      - SSL_CERT=${SSL_CERT}
+      - PUBLIC_HTTPS_PORT=${PUBLIC_HTTPS_PORT}
+      - PUBLIC_WS_PORT=${PUBLIC_WS_PORT}
+      - NGINX_HTTPS_PORT=${HTTPS_PORT}
+      - NGINX_WS_PORT=${WS_PORT}
+      - SUSPEND_PORT=${SUSPEND_PORT}
+      - HOST_TAG=${HOST_TAG}
+      - BRANCH=${BRANCH}
+      - http_proxy=${http_proxy}
+      - HTTP_PROXY=${HTTP_PROXY}
+      - https_proxy=${https_proxy}
+      - HTTPS_PROXY=${HTTPS_PROXY}
+      - no_proxy=${no_proxy}
+      - NO_PROXY=${NO_PROXY}
+      - SECURE_LINK_SECRET=${SECURE_LINK_SECRET}
+      - CLUSTER_SIZE=${CLUSTER_SIZE}
+      - UNMS_PG_PASSWORD=${UNMS_POSTGRES_PASSWORD}
+      - UNMS_PG_USER=${UNMS_POSTGRES_USER}
+      - UNMS_PG_DB=${UNMS_POSTGRES_DB}
+      - UNMS_PG_SCHEMA=${UNMS_POSTGRES_SCHEMA}
+      - UNMS_TOKEN=${UNMS_TOKEN}
+      - UNMS_CLI_TOKEN=${UNMS_CLI_TOKEN}
+      - UNMS_DEPLOYMENT=${UNMS_DEPLOYMENT}
+      - UNMS_FEATURES=${UNMS_FEATURES}
+      - USE_LOCAL_DISCOVERY=${USE_LOCAL_DISCOVERY}
+    ${ENV_FILES_UNMS}
+    cap_add:
+      - NET_ADMIN
+
+  ucrm:
+    container_name: ucrm
+    image: ${UCRM_DOCKER_IMAGE}:${UCRM_DOCKER_TAG}
+    restart: always
+    volumes:
+      - ${DATA_DIR}/ucrm:/data
+    command: server_with_migrate
+    depends_on:
+      - fluentd
+      - postgres
+      - rabbitmq
+      - nginx
+    networks:
+      - public
+      - internal
+    logging:
+      driver: fluentd
+      options:
+        tag: ucrm
+        fluentd-async-connect: "true"
+    environment:
+      - POSTGRES_HOST=unms-postgres
+      - POSTGRES_PASSWORD=${UCRM_POSTGRES_PASSWORD}
+      - POSTGRES_SCHEMA=${UCRM_POSTGRES_SCHEMA}
+      - POSTGRES_USER=${UCRM_POSTGRES_USER}
+      - POSTGRES_DB=${UCRM_POSTGRES_DB}
+      - MAILER_ADDRESS=${UCRM_MAILER_ADDRESS}
+      - MAILER_ADDRESS_USERNAME=${UCRM_MAILER_USERNAME}
+      - MAILER_ADDRESS_PASSWORD=${UCRM_MAILER_PASSWORD}
+      - SECRET=${UCRM_SECRET}
+      - SUSPEND_PORT=${SUSPEND_PORT}
+      - PUBLIC_HTTPS_PORT=${PUBLIC_HTTPS_PORT}
+      - UCRM_USER=${UCRM_USER}
+      - UNMS_VERSION=${UNMS_VERSION}
+      - UNMS_HOST=unms
+      - UNMS_PORT=${UNMS_HTTP_PORT}
+      - UNMS_TOKEN=${UNMS_TOKEN}
+      - UNMS_BASE_URL=/v2.1
+      - UNMS_POSTGRES_SCHEMA=${UNMS_POSTGRES_SCHEMA}
+    ${ENV_FILES_UCRM}
+
+  nginx:
+    image: ${DOCKER_IMAGE}-nginx:${DOCKER_TAG}
+    container_name: unms-nginx
+    restart: always
+    ports:
+      - ${HTTP_PORT}:${HTTP_PORT}
+      - ${HTTPS_PORT}:${HTTPS_PORT}
+      - ${SUSPEND_PORT}:${SUSPEND_PORT}
+      ${WS_PORT_MAPPING}
+    networks:
+      - public
+      - internal
+    volumes:
+      ${CERT_DIR_MAPPING_NGINX}
+      ${USERCERT_DIR_MAPPING_NGINX}
+      - ${DATA_DIR}/firmwares:/www/firmwares
+    depends_on:
+      - fluentd
+    logging:
+      driver: fluentd
+      options:
+        tag: nginx
+        fluentd-async-connect: "true"
+    environment:
+      - NGINX_UID=${USER_ID}
+      - SSL_CERT=${SSL_CERT}
+      - SSL_CERT_KEY=${SSL_CERT_KEY}
+      - SSL_CERT_CA=${SSL_CERT_CA}
+      - HTTP_PORT=${HTTP_PORT}
+      - HTTPS_PORT=${HTTPS_PORT}
+      - SUSPEND_PORT=${SUSPEND_PORT}
+      - WS_PORT=${WS_PORT}
+      - UNMS_HTTP_PORT=${UNMS_HTTP_PORT}
+      - UNMS_WS_PORT=${UNMS_WS_PORT}
+      - UNMS_WS_SHELL_PORT=${UNMS_WS_SHELL_PORT}
+      - UNMS_WS_API_PORT=${UNMS_WS_API_PORT}
+      - UNMS_IP_WHITELIST=${UNMS_IP_WHITELIST}
+      - PUBLIC_HTTPS_PORT=${PUBLIC_HTTPS_PORT}
+      - SECURE_LINK_SECRET=${SECURE_LINK_SECRET}
+
+  netflow:
+    image: ${DOCKER_IMAGE}-netflow:${DOCKER_TAG}
+    container_name: unms-netflow
+    user: "${USER_ID}"
+    restart: always
+    ports:
+      - ${NETFLOW_PORT}:${NETFLOW_PORT}/udp
+    networks:
+      - internal
+      - public
+    depends_on:
+      - fluentd
+      - postgres
+      - rabbitmq
+      - redis
+    logging:
+      driver: fluentd
+      options:
+        tag: netflow
+        fluentd-async-connect: "true"
+    environment:
+      - UNMS_NETFLOW_PORT=${NETFLOW_PORT}
+      - UNMS_PG_PASSWORD=${UNMS_POSTGRES_PASSWORD}
+      - UNMS_PG_USER=${UNMS_POSTGRES_USER}
+      - UNMS_PG_DB=${UNMS_POSTGRES_DB}
+      - UNMS_PG_SCHEMA=${UNMS_POSTGRES_SCHEMA}
+    ${ENV_FILES_NETFLOW}

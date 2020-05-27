@@ -4,7 +4,7 @@
 global:
   unms:
     image:
-      tag: 1.1.6
+      tag: 1.1.7
   
   ucrm:
     image:

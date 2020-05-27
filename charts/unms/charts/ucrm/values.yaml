@@ -78,7 +78,7 @@ env:
   SUSPEND_PORT: "81"
   PUBLIC_HTTPS_PORT: "443"
   UCRM_USER: unms
-  UNMS_VERSION: "1.1.6"
+  UNMS_VERSION: "1.1.7"
   UNMS_HOST: unms
   UNMS_PORT: "8081"
   UNMS_TOKEN: test-secret
