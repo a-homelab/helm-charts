@@ -63,7 +63,7 @@ services:
   postgres:
     container_name: unms-postgres
     image: postgres:9.6.12-alpine
-    command: postgres -c deadlock_timeout=5000 -c max_connections=150
+    command: postgres -c deadlock_timeout=5000 -c max_connections=570
     restart: always
     depends_on:
       - fluentd

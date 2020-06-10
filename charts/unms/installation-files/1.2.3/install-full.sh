@@ -63,7 +63,7 @@ export SECURE_LINK_SECRET="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold
 
 # UCRM variables
 export UCRM_DOCKER_IMAGE="ubnt/unms-crm"
-export UCRM_VERSION="3.2.0"
+export UCRM_VERSION="3.2.3"
 export UCRM_POSTGRES_PASSWORD="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold -w 48 | head -n 1 || true)"
 export UCRM_SECRET="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold -w 48 | head -n 1 || true)"
 export UCRM_USER="${USERNAME}"
@@ -306,7 +306,7 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --workers)
       echo "Setting CLUSTER_SIZE=$2"
-      [[ "${2}" =~ ^[1-8]$ ]] || [[ "${2}" = "auto" ]] || fail "--workers argument must be a number in range 1-8 or 'auto'."
+      [[ "${2}" =~ ^[1-9]$|^[1-4][0-9]$|^50$ ]] || [[ "${2}" = "auto" ]] || fail "--workers argument must be a number in range 1-50 or 'auto'."
       CLUSTER_SIZE="$2"
       shift # past argument value
       ;;
@@ -1510,6 +1510,7 @@ remove_old_images() {
   remove_old_image "unms-netflow" "${DOCKER_IMAGE}-netflow"
   remove_old_image "unms-nginx" "${DOCKER_IMAGE}-nginx"
   remove_old_image "unms-fluentd" "${DOCKER_IMAGE}-fluentd"
+  remove_old_image "unms-siridb" "${DOCKER_IMAGE}-siridb"
   remove_old_image "ucrm" "${UCRM_DOCKER_IMAGE}"
 }
 

@@ -109,6 +109,9 @@ env:
   UNMS_FEATURES: ""
   USE_LOCAL_DISCOVERY: "true"
 
+  UNMS_SIRIDB_HOST: unms-siridb
+  UNMS_SIRIDB_PORT: "9000"
+
 nodeSelector: {}
 
 tolerations: []

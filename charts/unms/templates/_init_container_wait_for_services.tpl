@@ -25,7 +25,7 @@
             sleep 5;
         done
 
-- name: wait-for-rabbitmq-ready
+- name: wait-for-redis-ready
   image: bitnami/redis:{{ .Values.global.redis.image.tag }}
   command:
     - /bin/sh
@@ -37,4 +37,19 @@
             echo "Waiting for Redis..."
             sleep 5;
         done
+
+- name: wait-for-siridb-ready
+  image: busybox:1.31.1-glibc
+  command:
+    - /bin/sh
+  args:
+    - -c
+    - |
+        until nc -z unms-siridb 9000;
+        do
+            echo "Waiting for SiriDB..."
+            sleep 5;
+        done
+
+
 {{- end -}}

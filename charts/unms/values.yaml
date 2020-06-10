@@ -4,11 +4,11 @@
 global:
   unms:
     image:
-      tag: 1.1.7
+      tag: 1.2.3
   
   ucrm:
     image:
-      tag: 3.1.6
+      tag: 3.2.3
 
   postgresql:
     image:
