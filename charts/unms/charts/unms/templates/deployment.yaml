@@ -91,6 +91,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+      enableServiceLinks: no
       volumes:
         - name: unms-data
         {{- if .Values.persistence.enabled }}

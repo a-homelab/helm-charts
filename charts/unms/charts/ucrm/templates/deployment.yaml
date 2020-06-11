@@ -73,6 +73,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
     {{- end }}
+      enableServiceLinks: no
       volumes:
         - name: ucrm-data
         {{- if .Values.persistence.enabled }}
