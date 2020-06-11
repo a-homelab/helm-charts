@@ -66,25 +66,32 @@ env:
   RABBITMQ_HOST: unms-rabbitmq
   RABBITMQ_USER: guest
   RABBITMQ_PASSWORD: guest
+  UNMS_RABBITMQ_PORT: "5672"
+
   POSTGRES_HOST: unms-postgresql
   POSTGRES_USER: ucrm
   POSTGRES_PASSWORD: ucrm
   POSTGRES_SCHEMA: ucrm
   POSTGRES_DB: unms
+  UNMS_POSTGRES_SCHEMA: unms
+
   MAILER_ADDRESS: "127.1.0.1"
   MAILER_ADDRESS_USERNAME: username
   MAILER_ADDRESS_PASSWORD: password
-  SECRET: test-secret
-  SUSPEND_PORT: "81"
-  PUBLIC_HTTPS_PORT: "443"
+
   UCRM_USER: unms
   UNMS_VERSION: "1.2.3"
   UNMS_HOST: unms
   UNMS_PORT: "8081"
   UNMS_TOKEN: test-secret
   UNMS_BASE_URL: /v2.1
-  UNMS_POSTGRES_SCHEMA: unms
-  UNMS_RABBITMQ_PORT: "5672"
+  
+  UNMS_SIRIDB_HOST: unms-siridb
+  UNMS_SIRIDB_PORT: "9000"
+
+  SECRET: test-secret
+  SUSPEND_PORT: "81"
+  PUBLIC_HTTPS_PORT: "443"
 
 nodeSelector: {}
 

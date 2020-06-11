@@ -88,26 +88,35 @@ env:
   # NO_PROXY: ${NO_PROXY}
   SECURE_LINK_SECRET: test-secret
   CLUSTER_SIZE: auto
+  
+  UNMS_TOKEN: test-secret
+  UNMS_DEPLOYMENT: ""
+  UNMS_FEATURES: ""
+  USE_LOCAL_DISCOVERY: "true"
+
+  UCRM_HOST: unms-ucrm
+  UCRM_PORT: "80"
+
+  UNMS_NGINX_HOST: unms-nginx
+  UNMS_NGINX_PORT: "12345"
+
   UNMS_PG_HOST: unms-postgresql
   UNMS_PG_USER: unms
   UNMS_PG_PASSWORD: unms
   UNMS_PG_DB: unms
   UNMS_PG_SCHEMA: unms
   PGPASSWORD: postgres
+
   UNMS_RABBITMQ_HOST: unms-rabbitmq
   UNMS_RABBITMQ_PORT: "5672"
   # UNMS_RABBITMQ_USER: guest
   # UNMS_RABBITMQ_PASSWORD: guest
-  UCRM_HOST: unms-ucrm
-  UCRM_PORT: "80"
+
   UNMS_REDISDB_HOST: unms-redis-master
   UNMS_REDISDB_PORT: "6379"
+
   UNMS_FLUENTD_HOST: unms-fluentd
   UNMS_FLUENTD_PORT: "24224"
-  UNMS_TOKEN: test-secret
-  UNMS_DEPLOYMENT: ""
-  UNMS_FEATURES: ""
-  USE_LOCAL_DISCOVERY: "true"
 
   UNMS_SIRIDB_HOST: unms-siridb
   UNMS_SIRIDB_PORT: "9000"

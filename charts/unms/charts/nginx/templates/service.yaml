@@ -13,5 +13,8 @@ spec:
     - name: https
       port: 443
       protocol: TCP
+    - name: http-nginx-api
+      port: 12345
+      protocol: TCP
   selector:
     {{- include "nginx.selectorLabels" . | nindent 4 }}
