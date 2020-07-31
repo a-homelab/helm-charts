@@ -9,7 +9,8 @@ platform:
 
 steps:
   - name: greeting
-    image: busybox
+    image: alpine/helm
     commands:
       - echo hello world
       - echo here
+      - git status
