@@ -89,6 +89,9 @@ env:
   UNMS_SIRIDB_HOST: unms-siridb
   UNMS_SIRIDB_PORT: "9000"
 
+  NETFLOW_HOST: unms-netflow
+  NETFLOW_PORT: "2055"
+
   SECRET: test-secret
   SUSPEND_PORT: "81"
   PUBLIC_HTTPS_PORT: "443"
