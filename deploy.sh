@@ -3,12 +3,11 @@
 CHARTS_DIR=charts
 DIST_DIR=dist/charts
 
-helm dependency update
-
 for chart_dir in $CHARTS_DIR/*/; do
     chart=$(basename $chart_dir)
     echo "Packaging $chart..."
     set -x
+    helm dependency update
     helm package $chart_dir -d $DIST_DIR/$chart
     set +x
 done
