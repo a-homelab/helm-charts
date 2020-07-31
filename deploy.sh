@@ -3,6 +3,8 @@
 CHARTS_DIR=charts
 DIST_DIR=dist/charts
 
+helm dependency update
+
 for chart_dir in $CHARTS_DIR/*/; do
     chart=$(basename $chart_dir)
     echo "Packaging $chart..."
