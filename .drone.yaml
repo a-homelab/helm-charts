@@ -1,6 +1,6 @@
 ---
 kind: pipeline
-type: exec
+type: kubernetes
 name: default
 
 platform:
@@ -9,6 +9,7 @@ platform:
 
 steps:
   - name: greeting
+    image: busybox
     commands:
       - echo hello world
       - echo here
