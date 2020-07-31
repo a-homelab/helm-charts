@@ -7,7 +7,7 @@ for chart_dir in $CHARTS_DIR/*/; do
     chart=$(basename $chart_dir)
     echo "Packaging $chart..."
     set -x
-    helm dependency update
+    ( cd $chart_dir && helm dependency update )
     helm package $chart_dir -d $DIST_DIR/$chart
     set +x
 done
