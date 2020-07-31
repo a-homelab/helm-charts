@@ -11,6 +11,7 @@ steps:
   - name: greeting
     image: alpine/helm
     commands:
+      - apk update && apk upgrade && apk add --no-cache git
       - echo hello world
       - echo here
       - git status
