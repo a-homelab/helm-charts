@@ -11,5 +11,5 @@ steps:
   - name: Publish chart
     image: alpine/helm
     commands:
-      - apk update && apk upgrade && apk add --no-cache git
+      - apk update && apk upgrade && apk add --no-cache git bash
       - ./deploy.sh
