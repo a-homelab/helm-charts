@@ -2,13 +2,16 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 global:
+  persistence:
+    unmsPvcName: &unms-pvc-name unms-data
+
   unms:
     image:
-      tag: 1.2.3
+      tag: 1.2.6
   
   ucrm:
     image:
-      tag: 3.2.3
+      tag: 3.2.6
 
   postgresql:
     image:
@@ -17,6 +20,23 @@ global:
   redis:
     image:
       tag: 5.0.8-debian-10-r17
+
+persistence:
+  enabled: yes
+  pvcName: *unms-pvc-name
+  ## database data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  storageClass: "csi-cephfs"
+  accessMode: ReadWriteMany
+  size: 30Gi
+  annotations: {}
+
+
 
 postgresql:
   image:

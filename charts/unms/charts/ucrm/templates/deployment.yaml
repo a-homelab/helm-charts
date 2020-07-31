@@ -57,8 +57,9 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
           volumeMounts:
-            - name: ucrm-data
+            - name: unms-data
               mountPath: /data
+              subPath: ucrm
       initContainers:
         {{ include "common.initContainersWaitForServices" . | nindent 8 }}
       {{- with .Values.nodeSelector }}
@@ -75,14 +76,17 @@ spec:
     {{- end }}
       enableServiceLinks: no
       volumes:
-        - name: ucrm-data
-        {{- if .Values.persistence.enabled }}
+        - name: unms-data
           persistentVolumeClaim:
-          {{- if .Values.persistence.existingClaim }}
-            claimName: {{ .Values.persistence.existingClaim }}
-          {{- else }}
-            claimName: {{ include "ucrm.fullname" . }}
-          {{- end }}
-        {{- else }}
-          emptyDir: {}
-        {{- end }}
+            claimName: {{ .Values.global.persistence.unmsPvcName }}
+        # - name: ucrm-data
+        # {{- if .Values.persistence.enabled }}
+        #   persistentVolumeClaim:
+        #   {{- if .Values.persistence.existingClaim }}
+        #     claimName: {{ .Values.persistence.existingClaim }}
+        #   {{- else }}
+        #     claimName: {{ include "ucrm.fullname" . }}
+        #   {{- end }}
+        # {{- else }}
+        #   emptyDir: {}
+        # {{- end }}
