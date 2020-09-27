@@ -31,7 +31,7 @@ persistence:
   ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
   ##   GKE, AWS & OpenStack)
   ##
-  storageClass: "csi-cephfs"
+  storageClass: "rook-cephfs"
   accessMode: ReadWriteMany
   size: 30Gi
   annotations: {}
