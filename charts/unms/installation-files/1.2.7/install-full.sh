@@ -100,6 +100,7 @@ export UPDATING="false"
 export NO_AUTO_UPDATE="false"
 export NO_OVERCOMMIT_MEMORY="false"
 export USE_LOCAL_DISCOVERY="true"
+export USE_ALTERNATIVE_CERT_DIR="false"
 export BRANCH="master"
 export SUBNET="172.18.251.0/24"
 export CLUSTER_SIZE="auto"
@@ -198,6 +199,10 @@ while [[ "$#" -gt 0 ]]; do
     --use-local-images)
       echo "Setting USE_LOCAL_IMAGES=true"
       USE_LOCAL_IMAGES="true"
+      ;;
+    --use-alt-cert-dir)
+      echo "Setting USE_ALTERNATIVE_CERT_DIR=true"
+      USE_ALTERNATIVE_CERT_DIR="true"
       ;;
     -v|--version)
       echo "Setting VERSION=$2"
@@ -1292,9 +1297,26 @@ create_data_volumes() {
 
   echo "Creating data volumes in '${DATA_DIR}'."
 
+  local defaultNginxCertDir="${DATA_DIR}/cert"
+  local alternativeNginxCertDir="${HOME_DIR}/cert"
+  local nginxCertDir
+  if [ "${USE_ALTERNATIVE_CERT_DIR}" = "true" ]; then
+    nginxCertDir="${alternativeNginxCertDir}"
+    if [ -e "${defaultNginxCertDir}" ]; then
+     test ! -e "${alternativeNginxCertDir}" || fail "Both '${alternativeNginxCertDir}' and '${alternativeNginxCertDir}' exist."
+     mv "${defaultNginxCertDir}" "${alternativeNginxCertDir}" || fail "Failed to move cert dir '${defaultNginxCertDir}' to '${alternativeNginxCertDir}'."
+    fi
+  else
+    nginxCertDir="${defaultNginxCertDir}"
+    if [ -e "${alternativeNginxCertDir}" ]; then
+      test ! -e "${defaultNginxCertDir}" || fail "Both '${alternativeNginxCertDir}' and '${defaultNginxCertDir}' exist."
+      mv "${alternativeNginxCertDir}" "${defaultNginxCertDir}" || fail "Failed to move cert dir '${alternativeNginxCertDir}' to '${defaultNginxCertDir}'."
+    fi
+  fi
+
   volumes=(
     "${DATA_DIR}"
-    "${DATA_DIR}/cert"
+    "${nginxCertDir}"
     "${DATA_DIR}/redis"
     "${DATA_DIR}/siridb"
     "${DATA_DIR}/rabbitmq"
@@ -1309,7 +1331,7 @@ create_data_volumes() {
 
   # always mount ~unms/data/cert as /cert
   # mount either an external cert dir or ~unms/data/cert as /usercert
-  CERT_DIR_MAPPING_NGINX="- ${DATA_DIR}/cert:/cert"
+  CERT_DIR_MAPPING_NGINX="- ${nginxCertDir}:/cert"
   if [ -z "${SSL_CERT_DIR}" ]; then
     USERCERT_DIR_MAPPING_NGINX=""
   else
@@ -1364,6 +1386,7 @@ UCRM_SECRET="${UCRM_SECRET}"
 POSTGRES_USER="${POSTGRES_USER}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
 USE_LOCAL_DISCOVERY="${USE_LOCAL_DISCOVERY}"
+USE_ALTERNATIVE_CERT_DIR="${USE_ALTERNATIVE_CERT_DIR}"
 UNMS_FEATURES="${UNMS_FEATURES}"
 EOL
   then

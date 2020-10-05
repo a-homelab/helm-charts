@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-UNMS_VERSION=${UNMS_VERSION:-1.2.6}
+UNMS_VERSION=${UNMS_VERSION:-1.2.7}
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 curl https://unms.com/v1/master/unms-${UNMS_VERSION}.tar.gz -o /tmp/unms-${UNMS_VERSION}.tar.gz

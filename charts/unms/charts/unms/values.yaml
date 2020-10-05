@@ -121,6 +121,8 @@ env:
   UNMS_SIRIDB_HOST: unms-siridb
   UNMS_SIRIDB_PORT: "9000"
 
+  USE_ALTERNATIVE_CERT_DIR: "false"
+
 nodeSelector: {}
 
 tolerations: []

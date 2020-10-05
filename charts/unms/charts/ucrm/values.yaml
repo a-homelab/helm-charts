@@ -80,7 +80,7 @@ env:
   MAILER_ADDRESS_PASSWORD: password
 
   UCRM_USER: unms
-  UNMS_VERSION: "1.2.6"
+  UNMS_VERSION: "1.2.7"
   UNMS_HOST: unms
   UNMS_PORT: "8081"
   UNMS_TOKEN: test-secret
