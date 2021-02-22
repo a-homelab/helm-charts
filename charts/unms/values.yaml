@@ -7,11 +7,11 @@ global:
 
   unms:
     image:
-      tag: 1.2.7
+      tag: 1.3.7
   
   ucrm:
     image:
-      tag: 3.2.7
+      tag: 3.3.7
 
   postgresql:
     image:
@@ -87,6 +87,16 @@ rabbitmq:
 
 redis:
   usePassword: no
+  master:
+    # Don't disable commands needed for migration
+    disableCommands: []
+      # - FLUSHDB
+      # - FLUSHALL
+  slave:
+    # Don't disable commands needed for migration
+    disableCommands: []
+      # - FLUSHDB
+      # - FLUSHALL
 
 
 replicaCount: 1

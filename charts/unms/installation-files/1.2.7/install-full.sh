@@ -63,7 +63,7 @@ export SECURE_LINK_SECRET="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold
 
 # UCRM variables
 export UCRM_DOCKER_IMAGE="ubnt/unms-crm"
-export UCRM_VERSION="3.2.7"
+export UCRM_VERSION="3.3.7"
 export UCRM_POSTGRES_PASSWORD="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold -w 48 | head -n 1 || true)"
 export UCRM_SECRET="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold -w 48 | head -n 1 || true)"
 export UCRM_USER="${USERNAME}"

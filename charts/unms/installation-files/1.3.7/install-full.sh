@@ -40,7 +40,7 @@ if [ "${SCRIPT_DIR}" = "${APP_DIR}" ]; then
   exit 1
 fi
 
-# UNMS variables
+# NMS variables
 export UNMS_HTTP_PORT="8081"
 export UNMS_WS_PORT="8082"
 export UNMS_WS_SHELL_PORT="8083"
@@ -61,7 +61,7 @@ export ALTERNATIVE_SUSPEND_PORT="8081"
 export ALTERNATIVE_NETFLOW_PORT="2056"
 export SECURE_LINK_SECRET="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold -w 100 | head -n 1 || true)"
 
-# UCRM variables
+# CRM variables
 export UCRM_DOCKER_IMAGE="ubnt/unms-crm"
 export UCRM_VERSION="3.3.7"
 export UCRM_POSTGRES_PASSWORD="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold -w 48 | head -n 1 || true)"
@@ -100,6 +100,7 @@ export UPDATING="false"
 export NO_AUTO_UPDATE="false"
 export NO_OVERCOMMIT_MEMORY="false"
 export USE_LOCAL_DISCOVERY="true"
+export USE_ALTERNATIVE_CERT_DIR="false"
 export BRANCH="master"
 export SUBNET="172.18.251.0/24"
 export CLUSTER_SIZE="auto"
@@ -110,6 +111,7 @@ export USERCERT_DIR_MAPPING_NGINX=""
 export POSTGRES_USER="postgres"
 export POSTGRES_PASSWORD="$(LC_CTYPE=C tr -dc "a-zA-Z0-9" < /dev/urandom | fold -w 48 | head -n 1 || true)"
 export CURRENT_VERSION="$(cat "${METADATA_FILE}" 2>/dev/null | grep '^version=' | sed 's/version=//'|| true)"
+export MIN_CURRENT_VERSION="0.0.0"
 export DELETE_CRM_DATA="false"
 export ENV_DIR=
 export ENV_FILES_UNMS=
@@ -137,7 +139,7 @@ read_previous_config() {
   # read WS port settings from existing running container
   # they were not saved to config file in versions <=0.7.18
   if ! oldEnv="$(docker inspect --format '{{ .Config.Env }}' unms)"; then
-    echo "Couldn't read WS port config from existing UNMS container"
+    echo "Couldn't read WS port config from existing UISP container"
   else
     WS_PORT="$(docker ps --filter "name=unms$" --filter "status=running" --format "{{.Ports}}" | sed -E "s/.*0.0.0.0:([0-9]+)->8444.*|.*/\1/")"
     echo "Setting WS_PORT=${WS_PORT}"
@@ -198,6 +200,10 @@ while [[ "$#" -gt 0 ]]; do
     --use-local-images)
       echo "Setting USE_LOCAL_IMAGES=true"
       USE_LOCAL_IMAGES="true"
+      ;;
+    --use-alt-cert-dir)
+      echo "Setting USE_ALTERNATIVE_CERT_DIR=true"
+      USE_ALTERNATIVE_CERT_DIR="true"
       ;;
     -v|--version)
       echo "Setting VERSION=$2"
@@ -500,7 +506,7 @@ check_system() {
       ;;
     *)
       echo >&2 "Unsupported platform '${architecture}'."
-      echo >&2 "UNMS supports: x86_64/amd64."
+      echo >&2 "UISP supports: x86_64/amd64."
       exit 1
       ;;
   esac
@@ -597,7 +603,7 @@ check_system() {
   DIST_VERSION="${dist_version:-}"
   if [ "${UNATTENDED}" = "false" ] && [ "${SUPPORTED_DISTRO}" = "false" ]; then
     echo "Your distribution '${lsb_dist} ${dist_version:-}' is not supported."
-    echo "We recommend that you install UNMS on Ubuntu 18.04, Debian 9 or newer."
+    echo "We recommend that you install UISP on Ubuntu 18.04, Debian 9 or newer."
     confirm "Would you like to continue with the installation anyway?" || exit 1
   else
     echo "Distribution: '${lsb_dist} ${dist_version:-}'"
@@ -616,13 +622,13 @@ check_system() {
 
     if [[ "${memory}" -lt 1000000 ]]; then
       echo >&2 "ERROR: Your system has only ${memoryUnit} of RAM."
-      echo >&2 "UNMS requires at least 1 GB of RAM to run and 2 GB is recommended. Installation aborted."
+      echo >&2 "UISP requires at least 1 GB of RAM to run and 2 GB is recommended. Installation aborted."
       exit 1
     fi
 
     if [[ "${memory}" -lt 2000000 ]]; then
       echo >&2 "WARNING: Your system has only ${memoryUnit} RAM."
-      echo >&2 "We recommend at least 2 GB RAM to run UNMS without problems."
+      echo >&2 "We recommend at least 2 GB RAM to run UISP without problems."
     fi
   fi
 }
@@ -648,6 +654,11 @@ check_update_allowed() {
     echo "Updating from CRM testing version. All CRM data will be deleted."
     confirm "Would you like to continue with the installation?" || exit 1
     export DELETE_CRM_DATA="true"
+  fi
+
+  if ! semver_equal_or_newer "${CURRENT_VERSION}" "${MIN_CURRENT_VERSION}"; then
+    fail "Cannot update to version ${VERSION}. Current version ${CURRENT_VERSION} is too old. Please update to ${MIN_CURRENT_VERSION} with
+    'sudo ${APP_DIR}/unms-cli update --version ${MIN_CURRENT_VERSION}'"
   fi
 }
 
@@ -689,7 +700,7 @@ check_free_space() {
     minRequiredSpace=500 # MB
   fi
   if [[ "${freeSpace}" -lt "${minRequiredSpace}" ]]; then
-    echo >&2 "There is not enough disk space available to safely install UNMS. At least ${minRequiredSpace} MB is required."
+    echo >&2 "There is not enough disk space available to safely install UISP. At least ${minRequiredSpace} MB is required."
     echo >&2 "You have ${freeSpace} MB of available disk space in ${dockerRootDir}"
     echo >&2 -e "\n----------------\n"
     echo >&2 "We recommend running \"docker system prune\" once in a while to clean unused containers, images, etc."
@@ -707,7 +718,7 @@ install_docker() {
     else
       echo "Download and install Docker"
       (
-        unset VERSION # we use this for UNMS version, docker thinks it is the docker version
+        unset VERSION # we use this for UISP version, docker thinks it is the docker version
         export CHANNEL="stable"
         curl -fsSL https://get.docker.com/ | sh
       )
@@ -724,7 +735,7 @@ install_docker() {
   DOCKER_VERSION=$(docker -v | sed 's/.*version \([0-9.]*\).*/\1/');
   if ! version_equal_or_newer "${DOCKER_VERSION}" "${MIN_DOCKER_VERSION}" ; then
     if [ "${UNATTENDED}" = "false" ] && [ "${SUPPORTED_DISTRO}" = "true" ] && [ "${EUID}" -eq 0 ]; then
-      if confirm "Docker version ${DOCKER_VERSION} is not supported. Would you like to update docker automatically? This action will affect all docker services on this computer, not just UNMS."; then
+      if confirm "Docker version ${DOCKER_VERSION} is not supported. Would you like to update docker automatically? This action will affect all docker services on this computer, not just UISP."; then
         case "${DISTRO}" in
           ubuntu|debian)
             if realpath "$(which docker)" | grep snap > /dev/null 2>&1; then
@@ -976,7 +987,7 @@ fix_postgres() {
   start_postgres
 
   if [ "${isPreUcrmVersion}" = "true" ]; then
-    # Previous versions of UNMS used 'postgres' user without password. New versions will use 'unms' user with password
+    # Previous versions of UISP used 'postgres' user without password. New versions will use 'unms' user with password
     # and the 'postgres' user will be password protected.
     # Update passwords.
     echo "Setting password for Postgres DB."
@@ -1004,7 +1015,7 @@ fix_postgres() {
 
   if [ "${isPreUcrmVersion}" = "true" ] || [ "${isEarlyUcrmVersion}" = "true" ]; then
     # Move unms tables from public schema to unms schema
-    echo "Checking exitence of unms schema."
+    echo "Checking existence of unms schema."
     if ! exec_psql_command "\dn" | cut -d \| -f 1 | grep -qw unms; then
       echo "Changing Postgres DB schemas."
       exec_psql_command "ALTER SCHEMA public RENAME TO ${UNMS_POSTGRES_SCHEMA}" > /dev/null || fail "Failed to rename public schema to '${UNMS_POSTGRES_SCHEMA}'."
@@ -1087,7 +1098,7 @@ enable_crm() {
 
 remove_old_restore_files() {
   # Make sure that restore dir does not exist. We are now applying any backup in this directory during start
-  # of UNMS container. Under normal circumstances this directory should be empty or not exist at all.
+  # of UISP container. Under normal circumstances this directory should be empty or not exist at all.
   test -d "${RESTORE_DIR}" || return 0 # nothing to delete
   rm "${RESTORE_DIR}" -rf || echo "WARNING: Failed to clear restore directory '${RESTORE_DIR}'."
 }
@@ -1166,6 +1177,7 @@ create_docker_compose_file() {
   fi
 
   envsubst < "${TMP_INSTALL_DIR}/${DOCKER_COMPOSE_TEMPLATE_FILENAME}" > "${TMP_INSTALL_DIR}/${DOCKER_COMPOSE_FILENAME}" || fail "Failed to create docker-compose.yml"
+  sed -i '/.*=$/d' "${TMP_INSTALL_DIR}/${DOCKER_COMPOSE_FILENAME}" || fail "Failed to remove empty env variables."
 }
 
 login_to_dockerhub() {
@@ -1191,18 +1203,21 @@ pull_docker_images() {
 }
 
 stop_docker_containers() {
-  if [ -f "${DOCKER_COMPOSE_PATH}" ] && [ -n "$(docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" ps -q)" ]; then
-    echo "Stopping docker containers."
-    if version_equal_or_newer "${DOCKER_COMPOSE_VERSION}" "1.18.0" ; then
-      docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" down --timeout 60 && RC=$? || RC=$?
-    else
-      docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" down && RC=$? || RC=$?
-    fi
-    if [ "${RC}" -gt 0 ]; then
-      # Failed to stop UNMS. Try to restart it before exiting.
-      docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" up -d unms netflow  || true
-      fail "Failed to stop docker containers. This usually happens due to problem in docker service. Try restarting docker
+  if [ -f "${DOCKER_COMPOSE_PATH}" ]; then
+    runningContainers="$(docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" ps -q)" || fail "Failed to get running containers."
+    if [ -n "${runningContainers}" ]; then
+      echo "Stopping docker containers."
+      if version_equal_or_newer "${DOCKER_COMPOSE_VERSION}" "1.18.0" ; then
+        docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" down --timeout 60 && RC=$? || RC=$?
+      else
+        docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" down && RC=$? || RC=$?
+      fi
+      if [ "${RC}" -gt 0 ]; then
+        # Failed to stop UISP. Try to restart it before exiting.
+        docker-compose -p unms -f "${DOCKER_COMPOSE_PATH}" up -d unms netflow  || true
+        fail "Failed to stop docker containers. This usually happens due to problem in docker service. Try restarting docker
 service with 'sudo systemctl restart docker' and then retry the installation."
+      fi
     fi
   fi
 }
@@ -1250,13 +1265,13 @@ check_free_ports() {
   echo "Checking available ports"
   while ! try_to_bind_port "${HTTP_PORT}" "tcp"; do
     test "${UNATTENDED}" = "false" || fail "Port ${HTTP_PORT} is in use."
-    read -r -p "Port ${HTTP_PORT} is already in use, please choose a different HTTP port for UNMS. [${ALTERNATIVE_HTTP_PORT}]: " HTTP_PORT
+    read -r -p "Port ${HTTP_PORT} is already in use, please choose a different HTTP port for UISP. [${ALTERNATIVE_HTTP_PORT}]: " HTTP_PORT
     HTTP_PORT=${HTTP_PORT:-$ALTERNATIVE_HTTP_PORT}
   done
 
   while ! try_to_bind_port "${HTTPS_PORT}" "tcp"; do
     test "${UNATTENDED}" = "false" || fail "Port ${HTTPS_PORT} is in use."
-    read -r -p "Port ${HTTPS_PORT} is already in use, please choose a different HTTPS port for UNMS. [${ALTERNATIVE_HTTPS_PORT}]: " HTTPS_PORT
+    read -r -p "Port ${HTTPS_PORT} is already in use, please choose a different HTTPS port for UISP. [${ALTERNATIVE_HTTPS_PORT}]: " HTTPS_PORT
     HTTPS_PORT=${HTTPS_PORT:-$ALTERNATIVE_HTTPS_PORT}
   done
 
@@ -1266,7 +1281,7 @@ check_free_ports() {
       SUSPEND_PORT="${ALTERNATIVE_SUSPEND_PORT}"
       break
     else
-      read -r -p "Port ${SUSPEND_PORT} is already in use, please choose a different Suspension port for UNMS. [${ALTERNATIVE_SUSPEND_PORT}]: " SUSPEND_PORT
+      read -r -p "Port ${SUSPEND_PORT} is already in use, please choose a different Suspension port for UISP. [${ALTERNATIVE_SUSPEND_PORT}]: " SUSPEND_PORT
       SUSPEND_PORT=${SUSPEND_PORT:-$ALTERNATIVE_SUSPEND_PORT}
     fi
   done
@@ -1277,7 +1292,7 @@ check_free_ports() {
       NETFLOW_PORT="${ALTERNATIVE_NETFLOW_PORT}"
       break
     else
-      read -r -p "Port ${NETFLOW_PORT} is already in use, please choose a different NetFlow port for UNMS. [${ALTERNATIVE_NETFLOW_PORT}]: " NETFLOW_PORT
+      read -r -p "Port ${NETFLOW_PORT} is already in use, please choose a different NetFlow port for UISP. [${ALTERNATIVE_NETFLOW_PORT}]: " NETFLOW_PORT
       NETFLOW_PORT=${NETFLOW_PORT:-$ALTERNATIVE_NETFLOW_PORT}
     fi
   done
@@ -1292,11 +1307,29 @@ create_data_volumes() {
 
   echo "Creating data volumes in '${DATA_DIR}'."
 
+  local defaultNginxCertDir="${DATA_DIR}/cert"
+  local alternativeNginxCertDir="${HOME_DIR}/cert"
+  local nginxCertDir
+  if [ "${USE_ALTERNATIVE_CERT_DIR}" = "true" ]; then
+    nginxCertDir="${alternativeNginxCertDir}"
+    if [ -e "${defaultNginxCertDir}" ]; then
+     test ! -e "${alternativeNginxCertDir}" || fail "Both '${alternativeNginxCertDir}' and '${alternativeNginxCertDir}' exist."
+     mv "${defaultNginxCertDir}" "${alternativeNginxCertDir}" || fail "Failed to move cert dir '${defaultNginxCertDir}' to '${alternativeNginxCertDir}'."
+    fi
+  else
+    nginxCertDir="${defaultNginxCertDir}"
+    if [ -e "${alternativeNginxCertDir}" ]; then
+      test ! -e "${defaultNginxCertDir}" || fail "Both '${alternativeNginxCertDir}' and '${defaultNginxCertDir}' exist."
+      mv "${alternativeNginxCertDir}" "${defaultNginxCertDir}" || fail "Failed to move cert dir '${alternativeNginxCertDir}' to '${defaultNginxCertDir}'."
+    fi
+  fi
+
   volumes=(
     "${DATA_DIR}"
-    "${DATA_DIR}/cert"
+    "${nginxCertDir}"
     "${DATA_DIR}/redis"
     "${DATA_DIR}/siridb"
+    "${DATA_DIR}/siridb-cores"
     "${DATA_DIR}/rabbitmq"
   )
 
@@ -1309,7 +1342,7 @@ create_data_volumes() {
 
   # always mount ~unms/data/cert as /cert
   # mount either an external cert dir or ~unms/data/cert as /usercert
-  CERT_DIR_MAPPING_NGINX="- ${DATA_DIR}/cert:/cert"
+  CERT_DIR_MAPPING_NGINX="- ${nginxCertDir}:/cert"
   if [ -z "${SSL_CERT_DIR}" ]; then
     USERCERT_DIR_MAPPING_NGINX=""
   else
@@ -1364,6 +1397,7 @@ UCRM_SECRET="${UCRM_SECRET}"
 POSTGRES_USER="${POSTGRES_USER}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
 USE_LOCAL_DISCOVERY="${USE_LOCAL_DISCOVERY}"
+USE_ALTERNATIVE_CERT_DIR="${USE_ALTERNATIVE_CERT_DIR}"
 UNMS_FEATURES="${UNMS_FEATURES}"
 EOL
   then
@@ -1386,7 +1420,7 @@ setup_auto_update() {
       echo "* * * * * ${USERNAME} ${updateScript} --cron > /dev/null 2>&1 || true" > /etc/cron.d/unms-update
 
       if (crontab -l -u "${USERNAME}" | grep "update.sh --cron"); then
-        # The per-user crontab was used in previous versions of UNMS. Now we are using the global crontab.
+        # The per-user crontab was used in previous versions of UISP. Now we are using the global crontab.
         # Remove the update script from per-user crontab. There should be no other records by default but
         # user may have set up some custom job so remove just the update script.
         crontab -l -u "${USERNAME}" | grep -v "update.sh --cron" || true | crontab -u "${USERNAME}" -
@@ -1396,7 +1430,7 @@ setup_auto_update() {
 
 cat > /etc/systemd/system/unms-update.service <<EOL
 [Unit]
-Description=Auto update UNMS
+Description=Auto update UISP
 
 [Service]
 User=${USERNAME}
@@ -1422,7 +1456,7 @@ EOL
         fi
 
       else
-        echo >&2 "Failed to enable auto update. UNMS requires either Crontab or systemd timers."
+        echo >&2 "Failed to enable auto update. UISP requires either Crontab or systemd timers."
         exit 1
       fi
     fi
@@ -1464,10 +1498,6 @@ change_owner() {
     echo >&2 "Failed to change permissions on ${APP_DIR}/unms-cli"
     exit 1
   fi
-}
-
-reset_udp_connections() {
-  docker run --net=host --privileged --rm ubnt/ucrm-conntrack -D -p udp --dport="${NETFLOW_PORT}" || true
 }
 
 start_docker_containers() {
@@ -1515,7 +1545,7 @@ remove_old_images() {
 }
 
 confirm_success() {
-  echo "Waiting for UNMS to start"
+  echo "Waiting for UISP to start"
   n=0
   until [ ${n} -ge 10 ]
   do
@@ -1532,9 +1562,9 @@ confirm_success() {
   docker ps
 
   if [ "${unmsRunning}" = true ]; then
-    echo "UNMS is running"
+    echo "UISP is running"
   else
-    fail "UNMS is NOT running"
+    fail "UISP is NOT running"
   fi
 }
 
@@ -1568,7 +1598,6 @@ save_config
 setup_auto_update
 delete_old_firmwares
 change_owner
-reset_udp_connections
 start_docker_containers
 remove_old_images
 confirm_success

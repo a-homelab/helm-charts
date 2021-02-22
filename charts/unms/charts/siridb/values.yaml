@@ -28,10 +28,10 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
+securityContext:
+  capabilities:
+    add:
+      - SYS_PTRACE
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
