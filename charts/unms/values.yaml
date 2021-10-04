@@ -11,7 +11,7 @@ global:
   
   ucrm:
     image:
-      tag: 3.3.7
+      tag: 3.3.11
 
   postgresql:
     image:
