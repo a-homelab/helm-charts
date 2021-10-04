@@ -19,7 +19,7 @@ global:
   
   redis:
     image:
-      tag: 5.0.8-debian-10-r17
+      tag: 5.0.13-debian-10-r72
 
 persistence:
   enabled: yes
@@ -86,13 +86,17 @@ rabbitmq:
     password: guest
 
 redis:
-  usePassword: no
+  architecture: replication
+  auth:
+    enabled: false
   master:
+    podAntiAffinityPreset: hard
     # Don't disable commands needed for migration
     disableCommands: []
       # - FLUSHDB
       # - FLUSHALL
-  slave:
+  replica:
+    podAntiAffinityPreset: hard
     # Don't disable commands needed for migration
     disableCommands: []
       # - FLUSHDB
