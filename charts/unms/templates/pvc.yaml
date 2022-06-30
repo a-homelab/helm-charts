@@ -5,6 +5,7 @@ metadata:
   name: {{ .Values.persistence.pvcName }}
   labels:
     {{- include "unms.labels" . | nindent 4 }}
+    excluded-from-alerts: "true"
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode | quote }}
