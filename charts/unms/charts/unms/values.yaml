@@ -111,6 +111,7 @@ env:
   UNMS_RABBITMQ_PORT: "5672"
   UNMS_RABBITMQ_USER: unms
   UNMS_RABBITMQ_PASSWORD: unms
+  RABBITMQ_URL: amqp://unms:unms@unms-rabbitmq:5672/
 
   UNMS_REDISDB_HOST: unms-redis-master
   UNMS_REDISDB_PORT: "6379"
