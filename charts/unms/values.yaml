@@ -85,8 +85,8 @@ postgresql:
 
 rabbitmq:
   auth:
-    username: unms
-    password: unms
+    username: guest
+    password: guest
 
 redis:
   architecture: replication

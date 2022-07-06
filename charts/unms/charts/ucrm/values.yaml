@@ -64,8 +64,8 @@ resources: {}
 # Environment variables
 env:
   RABBITMQ_HOST: unms-rabbitmq
-  RABBITMQ_USER: unms
-  RABBITMQ_PASSWORD: unms
+  RABBITMQ_USER: guest
+  RABBITMQ_PASSWORD: guest
   UNMS_RABBITMQ_PORT: "5672"
 
   POSTGRES_HOST: unms-postgresql
