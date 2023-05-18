@@ -97,8 +97,10 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+            {{- if .Values.persistence.enabled }}
             - name: data
               mountPath: /data
+            {{- end }}
             {{- if .Values.ldaps.enabled }}
             - name: ldaps-certs
               mountPath: /etc/ldaps-certs
