@@ -114,6 +114,14 @@ resources: {}
   #   cpu: 100m
   #   memory: 128Mi
 
+persistence:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  # Use an existing claim rather than creating one
+  existingClaimName: ""
+
 autoscaling:
   enabled: false
   minReplicas: 1
