@@ -56,6 +56,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.userPasswordSecret.secretName | quote }}
                   key: {{ .Values.userPasswordSecret.key | quote }}
+            - name: LLDAP_SERVER_KEY_SEED
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keySeedSecret.secretName | quote }}
+                  key: {{ .Values.keySeedSecret.key | quote }}
             {{- if .Values.externalDatabase.enabled }}
             - name: LLDAP_DATABASE_URL
               value: {{ .Values.externalDatabase.url }}
