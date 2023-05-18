@@ -108,6 +108,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
       volumes:
+        {{- if .Values.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             {{- if .Values.persistence.existingClaimName }}
@@ -115,6 +116,7 @@ spec:
             {{- else }}
              claimName: {{ include "lldap.fullname" . }}-data
             {{- end }}
+        {{- end }}
         {{- if .Values.ldaps.enabled }}
         - name: ldaps-certs
           secret:
