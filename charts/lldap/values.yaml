@@ -8,13 +8,15 @@ jwtSecret:
   # Key inside secret
   key: jwt
 
+baseDn: dc=example,dc=com
+userDn: admin
+userEmail: admin@example.com
+
 userPasswordSecret:
   # Name of existing secret
   secretName: ""
   # Key inside secret
   key: password
-
-baseDn: dc=example,dc=com
 
 ldaps:
   enabled: false

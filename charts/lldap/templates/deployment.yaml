@@ -45,13 +45,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.jwtSecret.secretName | quote }}
                   key: {{ .Values.jwtSecret.key | quote }}
+            - name: LLDAP_LDAP_BASE_DN
+              value: {{ .Values.baseDn | quote }}
+            - name: LLDAP_LDAP_USER_DN
+              value: {{ .Values.userDn | quote }}
+            - name: LLDAP_LDAP_USER_EMAIL
+              value: {{ .Values.userEmail | quote }}
             - name: LLDAP_LDAP_USER_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.userPasswordSecret.secretName | quote }}
                   key: {{ .Values.userPasswordSecret.key | quote }}
-            - name: LLDAP_LDAP_BASE_DN
-              value: {{ .Values.baseDn | quote }}
             {{- if .Values.externalDatabase.enabled -}}
             - name: LLDAP_DATABASE_URL
               value: {{ .Values.externalDatabase.url }}
