@@ -23,7 +23,7 @@ ldaps:
   secretName: ""
   cert: tls.crt
   key: tls.key
-  # ca: ca.crt
+  ca: ca.crt
 
 # Use external database rather than built-in sqlite
 externalDatabase:
@@ -126,3 +126,14 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+extraVolumes: []
+  # - name: db-tls
+  #   secret:
+  #     secretName: postgres-tls
+  #     defaultMode: 0400
+
+extraVolumeMounts: []
+  # - name: db-tls
+  #   mountPath: /etc/postgres-tls
+  #   readOnly: true

@@ -96,10 +96,16 @@ spec:
               mountPath: /etc/ldaps-certs
               readOnly: true
             {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: vaultwarden-data
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- if .Values.ldaps.enabled -}}
         - name: ldaps-certs
           secret:
