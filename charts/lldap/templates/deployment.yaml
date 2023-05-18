@@ -70,6 +70,9 @@ spec:
             - name: LLDAP_LDAPS_OPTIONS__KEY_FILE
               value: /etc/ldaps-certs/key.pem
             {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           ports:
             - name: ldap
               containerPort: {{ .Values.service.ldap.port }}
@@ -107,9 +110,6 @@ spec:
             {{- else }}
              claimName: {{ include "lldap.fullname" . }}-data
             {{- end }}
-        {{- with .Values.extraVolumes }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
         {{- if .Values.ldaps.enabled }}
         - name: ldaps-certs
           secret:
@@ -122,6 +122,9 @@ spec:
               - key: {{ .Values.ldaps.ca | quote }}
                 path: ca.pem
             defaultMode: 0400
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

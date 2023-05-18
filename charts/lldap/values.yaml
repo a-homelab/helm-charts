@@ -135,6 +135,10 @@ tolerations: []
 
 affinity: {}
 
+extraEnv: []
+  # - name: PGPASSFILE
+  #   value: /etc/pgpass/.pgpass
+
 extraVolumes: []
   # - name: db-tls
   #   secret:
