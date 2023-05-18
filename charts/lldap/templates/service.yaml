@@ -12,7 +12,7 @@ spec:
       protocol: TCP
       appProtocol: tcp
       name: ldap
-    {{- if .Values.ldaps.enabled -}}
+    {{- if .Values.ldaps.enabled }}
     - port: {{ .Values.service.ldaps.port }}
       targetPort: ldaps
       protocol: TCP

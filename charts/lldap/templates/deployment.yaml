@@ -56,11 +56,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.userPasswordSecret.secretName | quote }}
                   key: {{ .Values.userPasswordSecret.key | quote }}
-            {{- if .Values.externalDatabase.enabled -}}
+            {{- if .Values.externalDatabase.enabled }}
             - name: LLDAP_DATABASE_URL
               value: {{ .Values.externalDatabase.url }}
             {{- end }}
-            {{- if .Values.ldaps.enabled -}}
+            {{- if .Values.ldaps.enabled }}
             - name: LLDAP_LDAPS_OPTIONS__ENABLED
               value: "true"
             - name: LLDAP_LDAPS_OPTIONS__PORT
@@ -74,7 +74,7 @@ spec:
             - name: ldap
               containerPort: {{ .Values.service.ldap.port }}
               protocol: TCP
-            {{- if .Values.ldaps.enabled -}}
+            {{- if .Values.ldaps.enabled }}
             - name: ldaps
               containerPort: {{ .Values.service.ldaps.port }}
               protocol: TCP
@@ -91,7 +91,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-            {{- if .Values.ldaps.enabled -}}
+            {{- if .Values.ldaps.enabled }}
             - name: ldaps-certs
               mountPath: /etc/ldaps-certs
               readOnly: true
@@ -106,16 +106,16 @@ spec:
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        {{- if .Values.ldaps.enabled -}}
+        {{- if .Values.ldaps.enabled }}
         - name: ldaps-certs
           secret:
-            secretName: {{ .Values.ldaps.secretName }}
+            secretName: {{ .Values.ldaps.secretName | quote }}
             items:
-              - key: {{ .Values.ldaps.cert }}
+              - key: {{ .Values.ldaps.cert | quote }}
                 path: cert.pem
-              - key: {{ .Values.ldaps.key }}
+              - key: {{ .Values.ldaps.key | quote }}
                 path: key.pem
-              - key: {{ .Values.ldaps.ca }}
+              - key: {{ .Values.ldaps.ca | quote }}
                 path: ca.pem
             defaultMode: 0400
         {{- end }}
