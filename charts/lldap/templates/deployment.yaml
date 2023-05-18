@@ -111,11 +111,11 @@ spec:
           secret:
             secretName: {{ .Values.ldaps.secretName }}
             items:
-              - key: {{ .Values.ldaps.secretName.cert }}
+              - key: {{ .Values.ldaps.cert }}
                 path: cert.pem
-              - key: {{ .Values.ldaps.secretName.key }}
+              - key: {{ .Values.ldaps.key }}
                 path: key.pem
-              - key: {{ .Values.ldaps.secretName.ca }}
+              - key: {{ .Values.ldaps.ca }}
                 path: ca.pem
             defaultMode: 0400
         {{- end }}
