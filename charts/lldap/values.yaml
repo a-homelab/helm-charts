@@ -22,7 +22,7 @@ keySeedSecret:
   # Name of existing secret
   secretName: ""
   # Key inside secret
-  key: password
+  key: seed
 
 ldaps:
   enabled: false
