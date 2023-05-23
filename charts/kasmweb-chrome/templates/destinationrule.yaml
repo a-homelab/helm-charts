@@ -9,8 +9,8 @@ spec:
     loadBalancer:
       simple: ROUND_ROBIN
     portLevelSettings:
-        - port:
-            number: {{ .Values.service.web.port }}
+      - port:
+          number: {{ .Values.service.web.port }}
         tls:
-            mode: SIMPLE
+          mode: SIMPLE
 {{- end }}
