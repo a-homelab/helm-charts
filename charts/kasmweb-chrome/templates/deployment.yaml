@@ -39,6 +39,8 @@ spec:
           env:
             - name: APP_ARGS
               value: --remote-debugging-port=0
+            - name: VNC_PW
+              value: password
           ports:
             - name: web
               containerPort: {{ .Values.service.web.port }}
