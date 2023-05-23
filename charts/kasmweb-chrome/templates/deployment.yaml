@@ -50,6 +50,7 @@ spec:
             httpGet:
               path: /
               port: web
+              scheme: HTTPS
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
