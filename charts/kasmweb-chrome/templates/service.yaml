@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kasmweb-chrome.fullname" . }}
+  labels:
+    {{- include "kasmweb-chrome.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.web.port }}
+      targetPort: web
+      protocol: TCP
+      appProtocol: http
+      name: http
+    - port: {{ .Values.service.cdp.port }}
+      targetPort: cdp
+      protocol: TCP
+      appProtocol: http
+      name: http
+  selector:
+    {{- include "kasmweb-chrome.selectorLabels" . | nindent 4 }}
