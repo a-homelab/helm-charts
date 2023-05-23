@@ -6,8 +6,6 @@ metadata:
 spec:
   host: {{ include "kasmweb-chrome.fullname" . }}
   trafficPolicy:
-    loadBalancer:
-      simple: ROUND_ROBIN
     portLevelSettings:
       - port:
           number: {{ .Values.service.web.port }}
