@@ -11,11 +11,11 @@ spec:
       targetPort: web
       protocol: TCP
       appProtocol: http
-      name: http
+      name: web
     - port: {{ .Values.service.cdp.port }}
       targetPort: cdp
       protocol: TCP
       appProtocol: http
-      name: http
+      name: cdp
   selector:
     {{- include "kasmweb-chrome.selectorLabels" . | nindent 4 }}
