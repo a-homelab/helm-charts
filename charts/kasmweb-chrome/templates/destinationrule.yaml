@@ -1,0 +1,16 @@
+{{- if .Values.httpRoute.enabled -}}
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "kasmweb-chrome.fullname" . }}
+spec:
+  host: {{ include "kasmweb-chrome.fullname" . }}
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    portLevelSettings:
+        - port:
+            number: {{ .Values.service.web.port }}
+        tls:
+            mode: SIMPLE
+{{- end }}
