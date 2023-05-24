@@ -11,4 +11,5 @@ spec:
           number: {{ .Values.service.web.port }}
         tls:
           mode: SIMPLE
+        insecureSkipVerify: true
 {{- end }}
