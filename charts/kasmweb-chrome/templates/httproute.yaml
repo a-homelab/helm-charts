@@ -21,7 +21,7 @@ spec:
     - filters:
         - type: RequestHeaderModifier
           requestHeaderModifier:
-            add:
+            set:
               - name: Authorization
                 value: Basic a2FzbV91c2VyOnBhc3N3b3JkCg==
       backendRefs:
