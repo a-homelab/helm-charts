@@ -18,7 +18,13 @@ spec:
   hostnames:
     - {{ .Values.httpRoute.hostname | quote }}
   rules:
-    - backendRefs:
+    - filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: Authorization
+                value: Basic a2FzbV91c2VyOnBhc3N3b3JkCg==
+      backendRefs:
         - name: {{ include "kasmweb-chrome.fullname" . }}
           port: {{ .Values.service.web.port }}
 {{- end }}
