@@ -41,6 +41,10 @@ spec:
               value: --remote-debugging-port=0
             - name: VNC_PW
               value: password
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
           ports:
             - name: web
               containerPort: {{ .Values.service.web.port }}
