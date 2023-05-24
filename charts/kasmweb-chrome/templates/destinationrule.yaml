@@ -4,7 +4,7 @@ kind: DestinationRule
 metadata:
   name: {{ include "kasmweb-chrome.fullname" . }}
 spec:
-  host: {{ include "kasmweb-chrome.fullname" . }}
+  host: {{ include "kasmweb-chrome.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
   trafficPolicy:
     portLevelSettings:
       - port:
