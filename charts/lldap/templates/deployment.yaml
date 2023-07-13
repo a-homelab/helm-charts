@@ -56,7 +56,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.userPasswordSecret.secretName | quote }}
                   key: {{ .Values.userPasswordSecret.key | quote }}
-            - name: LLDAP_KEY_SEED
+            - name: LLDAP_SERVER_KEY_SEED
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.keySeedSecret.secretName | quote }}
