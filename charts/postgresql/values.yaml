@@ -1,0 +1,48 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/cloudnative-pg/postgresql
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "15.3"
+
+# Postgres client username. Must match `username` key in `userCredsSecretName` secret
+clientUsername: null
+
+# Name of k8s secret containing `username` and `password` keys
+userCredsSecretName: null
+
+# Name of k8s secret containing `username` and `password` keys
+superuserCredsSecretName: null
+
+# Postgres database name
+databaseName: null
+
+# Storage size
+storageSize: 10Gi
+
+# Storage class
+storageClass: rook-ceph-block-ssd
+
+backup:
+  storageClassName: rook-ceph-bucket-ssd
+
+certificateIssuerRef:
+  name: apps-ca-issuer
+  kind: ClusterIssuer
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi

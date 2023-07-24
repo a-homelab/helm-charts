@@ -1,0 +1,7 @@
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: "{{ include "postgresql.fullname" . }}-backup-bucket"
+spec:
+  bucketName: "{{ include "postgresql.fullname" . }}-backup"
+  storageClassName: {{ .Values.backup.storageClassName | quote }}

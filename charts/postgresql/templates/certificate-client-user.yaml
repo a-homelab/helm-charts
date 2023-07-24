@@ -1,0 +1,27 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{{ include "postgresql.fullname" . }}-client-user-tls"
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  secretName: "{{ include "postgresql.fullname" . }}-client-user-tls"
+  duration: 2160h0m0s # 90d
+  renewBefore: 360h0m0s # 15d
+  revisionHistoryLimit: 10
+  subject:
+    organizations:
+      - benfu-me
+  privateKey:
+    algorithm: Ed25519
+    encoding: PKCS8
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+  commonName: {{ required ".Values.clientUsername" .Values.clientUsername | quote }}
+  dnsNames:
+    - {{ required ".Values.clientUsername" .Values.clientUsername | quote }}
+  issuerRef:
+    {{- toYaml .Values.certificateIssuerRef | nindent 4 }}
