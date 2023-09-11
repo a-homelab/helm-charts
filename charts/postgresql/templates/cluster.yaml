@@ -31,6 +31,9 @@ spec:
     serverCASecret: lldap-postgres-server-tls
     clientCASecret: lldap-postgres-client-tls
     replicationTLSSecret: lldap-postgres-client-tls
+  
+  primaryUpdateStrategy: unsupervised 
+  primaryUpdateMethod: restart
 
   {{- with .Values.imagePullSecrets }}
   imagePullSecrets:
@@ -50,6 +53,7 @@ spec:
     {{- toYaml .Values.resources | nindent 4 }}
   
   backup:
+    target: prefer-standby
     barmanObjectStore:
       destinationPath: "s3://{{ include "postgresql.fullname" . }}-backup/"
       endpointURL: http://rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc
@@ -64,6 +68,10 @@ spec:
         compression: gzip
         maxParallel: 8
     retentionPolicy: 30d
+  
+  replicationSlots:
+    highAvailability:
+      enabled: true
   
   monitoring:
     enablePodMonitor: true
