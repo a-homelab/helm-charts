@@ -2,6 +2,7 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ include "postgresql.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -27,10 +28,10 @@ spec:
     name: {{ required ".Values.superuserCredsSecretName" .Values.superuserCredsSecretName | quote }}
 
   certificates:
-    serverTLSSecret: lldap-postgres-server-tls
-    serverCASecret: lldap-postgres-server-tls
-    clientCASecret: lldap-postgres-client-tls
-    replicationTLSSecret: lldap-postgres-client-tls
+    serverTLSSecret: "{{ include "postgresql.fullname" . }}-server-tls"
+    serverCASecret: "{{ include "postgresql.fullname" . }}-server-tls"
+    clientCASecret: "{{ include "postgresql.fullname" . }}-client-replica-tls"
+    replicationTLSSecret: "{{ include "postgresql.fullname" . }}-client-replica-tls"
   
   primaryUpdateStrategy: unsupervised 
   primaryUpdateMethod: restart
