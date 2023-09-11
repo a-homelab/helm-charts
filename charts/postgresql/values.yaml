@@ -18,6 +18,10 @@ superuserCredsSecretName: null
 # Postgres database name
 databaseName: null
 
+initdb:
+  localeCType: C
+  localeCollate: C
+
 # Storage size
 storageSize: 10Gi
 

@@ -23,6 +23,8 @@ spec:
       owner: {{ required ".Values.clientUsername" .Values.clientUsername | quote }}
       secret:
         name: {{ required ".Values.userCredsSecretName" .Values.userCredsSecretName | quote }}
+      localeCType: {{ .Values.initdb.localeCType | quote }}
+      localeCollate: {{ .Values.initdb.localeCollate | quote }}
   
   superuserSecret:
     name: {{ required ".Values.superuserCredsSecretName" .Values.superuserCredsSecretName | quote }}
