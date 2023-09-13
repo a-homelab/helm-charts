@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ntfy.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "ntfy.labels" . | nindent 4 }}
+data:
+  # https://github.com/binwiederhier/ntfy/blob/main/server/server.yml
+  server.yml: |-
+    {{- if .Values.httpRoute.enabled }}
+    base-url: https://{{ .Values.httpRoute.hostname | quote }}
+    {{- end }}
+
+    listen-http: ":8080"
+    
+    cache-file: /var/cache/ntfy/cache.db
+
+    attachment-cache-dir: /var/cache/ntfy/attachments
+
+    upstream-base-url: https://ntfy.sh
