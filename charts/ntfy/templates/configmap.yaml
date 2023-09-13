@@ -9,10 +9,10 @@ data:
   # https://github.com/binwiederhier/ntfy/blob/main/server/server.yml
   server.yml: |-
     {{- if .Values.httpRoute.enabled }}
-    base-url: https://{{ .Values.httpRoute.hostname | quote }}
+    base-url: "https://{{ .Values.httpRoute.hostname }}"
     {{- end }}
 
-    listen-http: ":8080"
+    listen-http: ":{{ .Values.service.port }}"
     
     cache-file: /var/cache/ntfy/cache.db
 
