@@ -38,7 +38,6 @@ spec:
           env:
             - name: TZ
               value: UTC
-            - name: 
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
