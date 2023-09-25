@@ -48,7 +48,10 @@ securityContext: {}
 
 service:
   type: ClusterIP
-  port: 80
+  # Labels to add to the service
+  labels: {}
+  # Annotations to add to the service
+  annotations: {}
 
 httpRoute:
   enabled: false
