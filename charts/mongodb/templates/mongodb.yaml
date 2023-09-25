@@ -93,18 +93,18 @@ spec:
                   {{- include "mongodb.selectorLabels" . | nindent 18 }}
               nodeTaintsPolicy: Honor
       volumeClaimTemplates:
-        - spec:
-            metadata:
-              name: data-volume
+        - metadata:
+            name: data-volume
+          spec:
             accessModes:
               {{ toYaml .Values.persistence.dataVolume.accessModes | nindent 14 }}
             storageClassName: {{ .Values.persistence.dataVolume.storageClassName | quote }}
             resources:
               requests:
                 storage: {{ .Values.persistence.dataVolume.size | quote }}
-        - spec:
-            metadata:
-              name: logs-volume
+        - metadata:
+            name: logs-volume
+          spec:
             accessModes:
               {{ toYaml .Values.persistence.logsVolume.accessModes | nindent 14 }}
             storageClassName: {{ .Values.persistence.logsVolume.storageClassName | quote }}
