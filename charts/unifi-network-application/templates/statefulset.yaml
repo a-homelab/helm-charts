@@ -92,15 +92,18 @@ spec:
             - name: syslog
               protocol: TCP
               containerPort: 5514
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
+          startupProbe:
+            tcpSocket:
+              port: controller
+            failureThreshold: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
           readinessProbe:
-            httpGet:
-              path: /
-              port: gui
-              scheme: HTTPS
+            tcpSocket:
+              port: controller
+            failureThreshold: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
