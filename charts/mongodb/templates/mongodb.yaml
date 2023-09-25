@@ -1,0 +1,104 @@
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
+metadata:
+  name: {{ include "mongodb.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  members: {{ .Values.members }}
+  type: ReplicaSet
+  version: {{ .Values.version }}
+
+  security:
+    {{- if .Values.tls.enabled }}
+    tls:
+      enabled: true
+      certificateKeySecretRef:
+        name: "{{ include "mongodb.fullname" . }}-server-tls"
+      caCertificateSecretRef:
+        name: "{{ include "mongodb.fullname" . }}-server-tls"
+    {{- end }}
+
+    authentication:
+      modes:
+        - SCRAM
+
+  users:
+    - name: {{ required ".Values.adminUserName is required" .Values.adminUserName | quote }}
+      db: admin
+      passwordSecretRef:
+        name: {{ required ".Values.adminPasswordSecretName is required" .Values.adminPasswordSecretName | quote }}
+      connectionStringSecretName: "{{ include "mongodb.fullname" . }}-client-admin-creds"
+      scramCredentialsSecretName: "{{ include "mongodb.fullname" . }}-client-admin-scram-creds"
+      roles:
+        - name: clusterAdmin
+          db: admin
+        - name: userAdminAnyDatabase
+          db: admin
+        - name: readWriteAnyDatabase
+          db: admin
+        - name: dbAdminAnyDatabase
+          db: admin
+    {{- with .Values.users }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  
+  statefulSet:
+    spec:
+      selector:
+        matchLabels:
+          {{- include "mongodb.selectorLabels" . | nindent 10 }}
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "mongodb.selectorLabels" . | nindent 12 }}
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "mongodb.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: mongod
+              resources:
+                {{- toYaml .Values.containers.mongod.resources | nindent 16 }}
+            - name: mongodb-agent
+              resources:
+                {{- toYaml .Values.containers.mongodbAgent.resources | nindent 16 }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: DoNotSchedule
+              labelSelector:
+                matchLabels:
+                  {{- include "mongodb.selectorLabels" . | nindent 18 }}
+              nodeTaintsPolicy: Honor
+      volumeClaimTemplates:
+        - metadata:
+            name: "{{ include "mongodb.fullname" . }}-data"
+          spec:
+            accessModes:
+              {{ toYaml .Values.persistence.accessModes | nindent 14 }}
+            storageClassName: {{ .Values.persistence.storageClassName | quote }}
+            resources:
+              requests:
+                storage: {{ .Values.persistence.size | quote }}

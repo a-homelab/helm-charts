@@ -1,0 +1,30 @@
+{{- if .Values.tls.enabled -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{{ include "mongodb.fullname" . }}-client-admin-tls"
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  secretName: "{{ include "mongodb.fullname" . }}-client-admin-tls"
+  duration: 2160h0m0s # 90d
+  renewBefore: 360h0m0s # 15d
+  revisionHistoryLimit: 10
+  subject:
+    organizations:
+      - benfu-me
+  privateKey:
+    algorithm: Ed25519
+    encoding: PKCS8
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+  commonName: {{ required ".Values.adminUserName is required" .Values.adminUserName | quote }}
+  dnsNames:
+    - {{ required ".Values.adminUserName is required" .Values.adminUserName | quote }}
+  issuerRef:
+    {{- toYaml .Values.certificateIssuerRef | nindent 4 }}
+{{- end }}

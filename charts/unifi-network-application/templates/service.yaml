@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "unifi-network-application.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "unifi-network-application.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: http-controller
+      targetPort: controller
+      protocol: TCP
+      port: 8080
+    - name: https-gui
+      targetPort: gui
+      protocol: TCP
+      port: 8443
+    - name: http-guest
+      targetPort: guest-http
+      protocol: TCP
+      port: 8880
+    - name: https-guest
+      targetPort: guest-https
+      protocol: TCP
+      port: 8843
+    - name: tcp-speedtest
+      targetPort: speedtest
+      protocol: TCP
+      port: 6789
+    - name: tcp-syslog
+      targetPort: syslog
+      protocol: TCP
+      port: 5514
+    - name: udp-stun
+      targetPort: stun 
+      protocol: UDP
+      port: 3478
+    - name: udp-discovery
+      targetPort: discovery
+      protocol: UDP
+      port: 10001
+    - name: udp-l2
+      targetPort: l2
+      protocol: UDP
+      port: 1900
+  selector:
+    {{- include "unifi-network-application.selectorLabels" . | nindent 4 }}
