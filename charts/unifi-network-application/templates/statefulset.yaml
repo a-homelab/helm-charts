@@ -93,14 +93,18 @@ spec:
               protocol: TCP
               containerPort: 5514
           startupProbe:
-            tcpSocket:
+            httpGet:
+              path: /
               port: controller
-            failureThreshold: 30
+              scheme: HTTP
+            failureThreshold: 10
             periodSeconds: 10
             timeoutSeconds: 3
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /
               port: controller
+              scheme: HTTP
             failureThreshold: 10
             periodSeconds: 10
             timeoutSeconds: 3
