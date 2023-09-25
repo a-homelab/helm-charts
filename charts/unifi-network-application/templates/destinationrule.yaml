@@ -11,5 +11,5 @@ spec:
           number: 8443
         tls:
           mode: SIMPLE
-        insecureSkipVerify: true
+          insecureSkipVerify: true
 {{- end }}
