@@ -29,12 +29,20 @@ users: []
 #       db: admin
 #   scramCredentialsSecretName: my-scram
 
-# Data volume
 persistence:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: ""
-  size: 10Gi
+  # Data volume
+  dataVolume:
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: ""
+    size: 10Gi
+  
+  # Logs volume
+  logsVolume:
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: ""
+    size: 10Gi
 
 imagePullSecrets: []
 nameOverride: ""
