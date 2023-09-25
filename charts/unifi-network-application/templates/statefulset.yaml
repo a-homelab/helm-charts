@@ -60,9 +60,9 @@ spec:
               value: {{ .Values.mongodb.dbName | quote }}
             {{- with .Values.memoryLimit }}
             - name: MEM_LIMIT
-              value: "{{ . | quote }}"
+              value: {{ . | quote }}
             - name: MEM_STARTUP
-              value: "{{ . | quote }}"
+              value: {{ . | quote }}
             {{- end }}
           ports:
             - name: stun
