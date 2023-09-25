@@ -99,7 +99,8 @@ spec:
           readinessProbe:
             httpGet:
               path: /
-              port: http
+              port: gui
+              scheme: HTTPS
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
