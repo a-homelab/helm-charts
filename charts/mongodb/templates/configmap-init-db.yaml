@@ -17,6 +17,6 @@ data:
     echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
     apt-get update && apt-get install -y mongodb-mongosh
 
-    mongosh --file /etc/initdb/init-db.js
+    mongosh "${MONGODB_URL}" --file /etc/initdb/init-db.js
 
   init-db.js: {{- toYaml .Values.initdbScript | indent 2 }}
