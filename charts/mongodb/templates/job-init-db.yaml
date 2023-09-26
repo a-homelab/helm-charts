@@ -15,7 +15,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      serviceAccountName: "{{ include "mongodb.fullname" . }}-mongodb"
+      serviceAccountName: {{ include "mongodb.fullname" . }}
       terminationGracePeriodSeconds: 0
       containers:
         - name: mongo-init-db
