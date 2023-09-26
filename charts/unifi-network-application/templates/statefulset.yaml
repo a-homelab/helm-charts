@@ -96,34 +96,26 @@ spec:
             - name: syslog
               protocol: TCP
               containerPort: 5514
-          # startupProbe:
-          #   httpGet:
-          #     path: /
-          #     port: controller
-          #     scheme: HTTP
-          #   failureThreshold: 10
-          #   periodSeconds: 10
-          #   timeoutSeconds: 3
-          # readinessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: controller
-          #     scheme: HTTP
-          #   failureThreshold: 10
-          #   periodSeconds: 10
-          #   timeoutSeconds: 3
+          {{- if .Values.probes.startup.enabled }}
           startupProbe:
-            tcpSocket:
+            httpGet:
+              path: /
               port: controller
+              scheme: HTTP
             failureThreshold: 10
             periodSeconds: 10
             timeoutSeconds: 3
+          {{- end }}
+          {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /
               port: controller
+              scheme: HTTP
             failureThreshold: 10
             periodSeconds: 10
             timeoutSeconds: 3
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:

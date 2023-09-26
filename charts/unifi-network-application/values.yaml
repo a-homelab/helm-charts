@@ -37,6 +37,12 @@ statefulsetAnnotations: {}
 
 podAnnotations: {}
 
+probes:
+  startup:
+    enabled: true
+  readiness:
+    enabled: true
+
 podSecurityContext: {}
   # fsGroup: 2000
 
