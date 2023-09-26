@@ -29,10 +29,9 @@ users: []
 #       db: admin
 #   scramCredentialsSecretName: my-scram
 
-initdb:
-  script: |-
-    db = connect(process.env["MONGODB_URL"]);
-    printjson(db.adminCommand('listDatabases'));
+initdbScript: |-
+  db = connect(process.env["MONGODB_URL"]);
+  printjson(db.adminCommand('listDatabases'));
 
 persistence:
   # Data volume
