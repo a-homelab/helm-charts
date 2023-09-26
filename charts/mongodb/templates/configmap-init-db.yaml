@@ -19,4 +19,4 @@ data:
 
     mongosh --file /etc/initdb/init-db.js
 
-  init-db.js: {{ .Values.initdbScript }}
+  init-db.js: {{ toYaml .Values.initdbScript }}
