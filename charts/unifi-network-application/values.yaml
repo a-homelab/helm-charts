@@ -60,6 +60,8 @@ service:
   labels: {}
   # Annotations to add to the service
   annotations: {}
+  externalTrafficPolicy: ""
+  loadBalancerIP: ""
 
 httpRoute:
   enabled: false
