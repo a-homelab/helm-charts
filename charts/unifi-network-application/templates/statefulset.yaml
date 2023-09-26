@@ -99,7 +99,7 @@ spec:
           {{- if .Values.probes.startup.enabled }}
           startupProbe:
             httpGet:
-              path: /
+              path: /status
               port: controller
               scheme: HTTP
             failureThreshold: 10
@@ -109,7 +109,7 @@ spec:
           {{- if .Values.probes.readiness.enabled }}
           readinessProbe:
             httpGet:
-              path: /
+              path: /status
               port: controller
               scheme: HTTP
             failureThreshold: 10
