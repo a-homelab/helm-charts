@@ -33,17 +33,17 @@ spec:
             - name: MONGODB_URL
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "mongodb.fullname" . }}-mongodb-client-admin-creds"
+                  name: "{{ include "mongodb.fullname" . }}-client-admin-creds"
                   key: connectionString.standard
             - name: MONGODB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "mongodb.fullname" . }}-mongodb-client-admin-creds"
+                  name: "{{ include "mongodb.fullname" . }}-client-admin-creds"
                   key: username
             - name: MONGODB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "mongodb.fullname" . }}-mongodb-client-admin-creds"
+                  name: "{{ include "mongodb.fullname" . }}-client-admin-creds"
                   key: password
           volumeMounts:
             - name: init-scripts
