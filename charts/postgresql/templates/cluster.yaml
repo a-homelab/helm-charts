@@ -47,10 +47,19 @@ spec:
     storageClass: {{ .Values.storageClass | quote }}
     size: {{ .Values.storageSize | quote }}
   
-  affinity:
-    enablePodAntiAffinity: true
-    topologyKey: kubernetes.io/hostname
-    podAntiAffinityType: preferred
+  # affinity:
+  #   enablePodAntiAffinity: true
+  #   topologyKey: kubernetes.io/hostname
+  #   podAntiAffinityType: preferred
+  
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "postgresql.labels" . | nindent 10 }}
+      nodeTaintsPolicy: Honor
   
   resources:
     {{- toYaml .Values.resources | nindent 4 }}
