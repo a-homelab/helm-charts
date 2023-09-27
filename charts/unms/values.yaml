@@ -42,8 +42,8 @@ postgresql:
   image:
     tag: *postgresql-tag
   
-  diagnosticMode:
-    enabled: true
+  # diagnosticMode:
+  #   enabled: true
 
   auth:
     enablePostgresUser: true
