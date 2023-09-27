@@ -41,6 +41,9 @@ persistence:
 postgresql:
   image:
     tag: *postgresql-tag
+  
+  diagnosticMode:
+    enabled: true
 
   auth:
     enablePostgresUser: true
