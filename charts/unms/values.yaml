@@ -15,7 +15,7 @@ global:
 
   postgresql:
     image:
-      tag: &postgresql-tag 9.6.17-debian-10-r45
+      tag: &postgresql-tag 13.12.0-debian-11-r46
   
   redis:
     image:
