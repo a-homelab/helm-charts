@@ -25,18 +25,18 @@
             sleep 5;
         done
 
-- name: wait-for-redis-ready
-  image: bitnami/redis:{{ .Values.global.redis.image.tag }}
-  command:
-    - /bin/sh
-  args:
-    - -c
-    - |
-        until redis-cli -h unms-redis-master -p 6379 ping;
-        do
-            echo "Waiting for Redis..."
-            sleep 5;
-        done
+# - name: wait-for-redis-ready
+#   image: bitnami/redis:{{ .Values.global.redis.image.tag }}
+#   command:
+#     - /bin/sh
+#   args:
+#     - -c
+#     - |
+#         until redis-cli -h unms-redis-master -p 6379 ping;
+#         do
+#             echo "Waiting for Redis..."
+#             sleep 5;
+#         done
 
 - name: wait-for-siridb-ready
   image: busybox:1.31.1-glibc
