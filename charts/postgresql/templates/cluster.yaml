@@ -14,6 +14,10 @@ spec:
 
   imageName: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
   imagePullPolicy: {{ .Values.image.pullPolicy }}
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 
   instances: {{ .Values.replicaCount }}
   
@@ -37,11 +41,6 @@ spec:
   
   primaryUpdateStrategy: unsupervised 
   primaryUpdateMethod: restart
-
-  {{- with .Values.imagePullSecrets }}
-  imagePullSecrets:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   
   storage:
     storageClass: {{ .Values.storageClass | quote }}
