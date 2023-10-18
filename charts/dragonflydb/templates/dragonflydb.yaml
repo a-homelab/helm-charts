@@ -1,7 +1,7 @@
 apiVersion: dragonflydb.io/v1alpha1
 kind: Dragonfly
 metadata:
-  name: "{{ include "dragonflydb.fullname" . }}-server-tls"
+  name: {{ include "dragonflydb.fullname" . }}
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "dragonflydb.labels" . | nindent 4 }}
