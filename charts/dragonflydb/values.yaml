@@ -21,7 +21,7 @@ args: []
 env: []
 
 tls:
-  enabled: true
+  enabled: false
 
 authentication:
   # Name of existing secret reference
