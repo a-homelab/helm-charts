@@ -1,0 +1,30 @@
+{{- if .Values.tls.enabled -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{{ include "dragonflydb.fullname" . }}-server-tls"
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  secretName: "{{ include "dragonflydb.fullname" . }}-server-tls"
+  duration: 2160h0m0s # 90d
+  renewBefore: 360h0m0s # 15d
+  revisionHistoryLimit: 10
+  subject:
+    organizations:
+      - benfu-me
+  privateKey:
+    algorithm: Ed25519
+    encoding: PKCS8
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+  dnsNames:
+    - "{{ include "dragonflydb.fullname" . }}"
+    - "{{ include "dragonflydb.fullname" . }}.{{ .Release.Namespace }}"
+    - "{{ include "dragonflydb.fullname" . }}.{{ .Release.Namespace }}.svc"
+  issuerRef:
+    {{- toYaml .Values.certificateIssuerRef | nindent 4 }}
+{{- end }}

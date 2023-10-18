@@ -1,0 +1,62 @@
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: "{{ include "dragonflydb.fullname" . }}-server-tls"
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "dragonflydb.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+  serviceAccountName: {{ include "dragonflydb.serviceAccountName" . }}
+
+  {{- with .Values.args }}
+  args:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .Values.env }}
+  env:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- if .Values.tls.enabled }}
+  tlsSecretRef:
+    name: "{{ include "dragonflydb.fullname" . }}-server-tls"
+  {{- end }}
+
+  {{- if .Values.authentication }}
+  authentication:
+    {{- with .Values.authentication.passwordFromSecret }}
+    passwordFromSecret:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+    {{- if and .Values.tls.enabled .Values.authentication.clientCaCertSecret }}
+    clientCaCertSecret:
+      name: {{ .Values.authentication.clientCaCertSecret.name }}
+    {{- end }}
+  {{- end }}
+
+  {{- with .Values.snapshot }}
+  snapshot:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .Values.podAnnotations }}
+  podAnnotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+  
+  {{- with .Values.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
