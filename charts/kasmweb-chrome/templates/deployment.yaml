@@ -45,6 +45,10 @@ spec:
               value: all
             - name: NVIDIA_DRIVER_CAPABILITIES
               value: all
+            - name: KASM_EGL_CARD
+              value: /dev/dri/card1
+            - name: KASM_RENDERD
+              value: /dev/dri/renderD128
           ports:
             - name: web
               containerPort: {{ .Values.service.web.port }}
@@ -57,6 +61,18 @@ spec:
               port: web
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: dri-card
+              mountPath: /dev/dri/card1
+            - name: renderd
+              mountPath: /dev/dri/renderD128
+      volumes:
+        - name: dri-card
+          hostPath:
+            path: /dev/dri/card1
+        - name: renderd
+          hostPath:
+            path: /dev/dri/renderD128
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
