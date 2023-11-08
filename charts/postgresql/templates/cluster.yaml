@@ -20,6 +20,13 @@ spec:
   {{- end }}
 
   instances: {{ .Values.replicaCount }}
+
+  enableSuperuserAccess: {{ .Values.enableSuperuserAccess }}
+
+  {{- with .Values.postgresqlConfig }}
+  postgresql:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   
   bootstrap:
     initdb:
@@ -29,6 +36,14 @@ spec:
         name: {{ required ".Values.userCredsSecretName" .Values.userCredsSecretName | quote }}
       localeCType: {{ .Values.initdb.localeCType | quote }}
       localeCollate: {{ .Values.initdb.localeCollate | quote }}
+      {{- with .Values.initdb.postInitTemplateSQL }}
+      postInitTemplateSQL:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.initdb.postInitApplicationSQL }}
+      postInitApplicationSQL:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   
   superuserSecret:
     name: {{ required ".Values.superuserCredsSecretName" .Values.superuserCredsSecretName | quote }}

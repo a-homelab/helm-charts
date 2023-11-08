@@ -18,9 +18,17 @@ superuserCredsSecretName: null
 # Postgres database name
 databaseName: null
 
+enableSuperuserAccess: false
+
+# PostgreSQL configuration
+# https://cloudnative-pg.io/documentation/1.21/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PostgresConfiguration
+postgresqlConfig: {}
+
 initdb:
   localeCType: C
   localeCollate: C
+  postInitTemplateSQL: []
+  postInitApplicationSQL: []
 
 # Storage size
 storageSize: 10Gi

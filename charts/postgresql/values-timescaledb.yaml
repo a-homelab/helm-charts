@@ -1,0 +1,12 @@
+
+image:
+  repository: bennycooly/cloudnative-pg-timescaledb
+  tag: "15.4-debian-timescaledb-2.12.2"
+
+postgresqlConfig:
+  shared_preload_libraries:
+    - timescaledb
+
+initdb:
+  postInitApplicationSQL:
+    - CREATE EXTENSION IF NOT EXISTS timescaledb;
