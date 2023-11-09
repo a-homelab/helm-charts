@@ -1,0 +1,55 @@
+{{- define "codecov.pod.tpl" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+metadata:
+  {{- with $componentCtx.podAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "codecov.componentSelectorLabels" . | nindent 4 }}
+spec:
+  {{- with $componentCtx.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  serviceAccountName: {{ include "codecov.serviceAccountName" $rootCtx }}
+  securityContext:
+    {{- toYaml $componentCtx.podSecurityContext | nindent 4 }}
+  containers:
+    - {{- include "codecov.container.tpl" (list $rootCtx $componentName $componentCtx) | nindent 6 }}
+  {{- with $componentCtx.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $componentCtx.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $componentCtx.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $componentCtx.topologySpreadConstraints }}
+  topologySpreadConstraints:
+    {{- tpl . $rootCtx | nindent 4 }}
+  {{- end }}
+  volumes:
+    - name: config
+      configMap:
+        name: {{ include "codecov.fullname" $rootCtx }}
+        items:
+          - key: codecov.yml
+            path: codecov.yml
+    {{- with $componentCtx.extraVolumes }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end -}}
+
+{{- define "codecov.pod" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+{{- include "codecov.util.merge" (append . "codecov.pod.tpl") -}}
+{{- end -}}

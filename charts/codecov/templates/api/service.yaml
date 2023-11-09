@@ -1,0 +1,11 @@
+{{- define "codecov.api.service.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+
+{{- end -}}
+
+{{- $rootCtx := . -}}
+{{- $componentName := "api" -}}
+{{- $componentCtx := get .Values $componentName -}}
+{{- include "codecov.service" (list $rootCtx $componentName $componentCtx "codecov.api.service.overrides")}}

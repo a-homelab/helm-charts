@@ -1,0 +1,21 @@
+{{- define "codecov.worker.deployment.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ $rootCtx.Chart.Name }}
+          env:
+            - name: RUN_ENV
+              value: enterprise
+            {{- with $componentCtx.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+{{- end -}}
+
+{{- $rootCtx := . -}}
+{{- $componentName := "worker" -}}
+{{- $componentCtx := get .Values $componentName -}}
+{{- include "codecov.deployment" (list $rootCtx $componentName $componentCtx "codecov.worker.deployment.overrides")}}

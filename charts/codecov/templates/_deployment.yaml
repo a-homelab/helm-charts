@@ -1,0 +1,28 @@
+{{- define "codecov.deployment.tpl" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ include "codecov.fullname" $rootCtx }}-{{ $componentName }}"
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "codecov.componentLabels" . | nindent 4 }}
+spec:
+  {{- if not $componentCtx.autoscaling.enabled }}
+  replicas: {{ $componentCtx.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "codecov.componentSelectorLabels" . | nindent 6 }}
+  template:
+    {{- include "codecov.pod.tpl" (list $rootCtx $componentName $componentCtx) | nindent 4 -}}
+{{- end }}
+
+{{- define "codecov.deployment" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+{{- include "codecov.util.merge" (append . "codecov.deployment.tpl") -}}
+{{- end -}}

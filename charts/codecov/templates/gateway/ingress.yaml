@@ -1,0 +1,11 @@
+{{- define "codecov.gateway.ingress.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+
+{{- end -}}
+
+{{- $rootCtx := . -}}
+{{- $componentName := "gateway" -}}
+{{- $componentCtx := get .Values $componentName -}}
+{{- include "codecov.ingress" (list $rootCtx $componentName $componentCtx "codecov.gateway.ingress.overrides")}}

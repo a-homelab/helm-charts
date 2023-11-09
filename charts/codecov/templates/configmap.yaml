@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "codecov.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "codecov.labels" . | nindent 4 }}
+data:
+  codecov.yml: |
+    {{- tpl (mergeOverwrite (mustDeepCopy (.Files.Get "config/codecov.yml" | fromYaml)) (mustDeepCopy .Values.config) | toYaml) . | nindent 4 }}

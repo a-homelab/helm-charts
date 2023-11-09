@@ -1,0 +1,46 @@
+{{- define "codecov.container.tpl" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+name: {{ $rootCtx.Chart.Name }}
+securityContext:
+  {{- toYaml $componentCtx.securityContext | nindent 2 }}
+image: "{{ $componentCtx.image.repository }}:{{ $componentCtx.image.tag | default $rootCtx.Chart.AppVersion }}"
+imagePullPolicy: {{ $componentCtx.image.pullPolicy }}
+{{- with $componentCtx.extraEnv }}
+env:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with $componentCtx.extraEnvFrom }}
+envFrom:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+ports:
+  - name: http
+    containerPort: {{ $componentCtx.service.port }}
+    protocol: TCP
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+resources:
+  {{- toYaml $componentCtx.resources | nindent 2 }}
+volumeMounts:
+  - name: config
+    mountPath: /config/codecov.yml
+    subPath: codecov.yml
+  {{- with $componentCtx.extraVolumeMounts }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end -}}
+
+{{- define "codecov.container" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+{{- include "codecov.util.merge" (append . "codecov.container.tpl") -}}
+{{- end -}}

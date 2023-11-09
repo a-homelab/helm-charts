@@ -1,0 +1,28 @@
+{{- define "codecov.service.tpl" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ include "codecov.fullname" $rootCtx }}-{{ $componentName }}"
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "codecov.componentLabels" . | nindent 4 }}
+spec:
+  type: {{ $componentCtx.service.type }}
+  ports:
+    - port: {{ $componentCtx.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "codecov.componentSelectorLabels" . | nindent 4 }}
+{{- end }}
+
+{{- define "codecov.service" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+{{- include "codecov.util.merge" (append . "codecov.service.tpl") -}}
+{{- end -}}

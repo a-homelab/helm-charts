@@ -1,0 +1,40 @@
+{{- define "codecov.frontend.deployment.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+spec:
+  template:
+    {{- include "codecov.pod" (list $rootCtx $componentName $componentCtx "codecov.frontend.pod.overrides") | nindent 4 }}
+{{- end -}}
+
+{{- define "codecov.frontend.pod.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+spec:
+  containers:
+    - {{- include "codecov.container" (list $rootCtx $componentName $componentCtx "codecov.frontend.container.overrides") | nindent 6 }}
+{{- end -}}
+
+{{- define "codecov.frontend.container.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+env:
+  - name: CODECOV_BASE_HOST
+    value: {{ $componentCtx.baseHost }}
+  - name: CODECOV_API_HOST
+    value: {{ $componentCtx.apiHost }}
+  - name: CODECOV_API_PORT
+    value: {{ $componentCtx.apiPort }}
+  - name: CODECOV_SCHEME
+    value: {{ $componentCtx.scheme }}
+  {{- with $componentCtx.extraEnv }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+{{- end -}}
+
+{{- $rootCtx := . -}}
+{{- $componentName := "frontend" -}}
+{{- $componentCtx := get .Values $componentName -}}
+{{- include "codecov.deployment" (list $rootCtx $componentName $componentCtx "codecov.frontend.deployment.overrides") }}

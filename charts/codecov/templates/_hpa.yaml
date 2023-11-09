@@ -1,0 +1,41 @@
+{{- define "codecov.hpa.tpl" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+{{- if $componentCtx.autoscaling.enabled }}
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: "{{ include "codecov.fullname" $rootCtx }}-{{ $componentName }}"
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "codecov.componentLabels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: "{{ include "codecov.fullname" $rootCtx }}-{{ $componentName }}"
+  minReplicas: {{ $componentCtx.autoscaling.minReplicas }}
+  maxReplicas: {{ $componentCtx.autoscaling.maxReplicas }}
+  metrics:
+    {{- if $componentCtx.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ $componentCtx.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $componentCtx.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ $componentCtx.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "codecov.hpa" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+{{- include "codecov.util.merge" (append . "codecov.hpa.tpl") -}}
+{{- end -}}
