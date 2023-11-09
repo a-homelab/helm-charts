@@ -7,10 +7,87 @@ securityContext:
   {{- toYaml $componentCtx.securityContext | nindent 2 }}
 image: "{{ $componentCtx.image.repository }}:{{ $componentCtx.image.tag | default $rootCtx.Chart.AppVersion }}"
 imagePullPolicy: {{ $componentCtx.image.pullPolicy }}
-{{- with $componentCtx.extraEnv }}
 env:
+  # Common environment variables for all components
+  - name: SETUP__HTTP__COOKIE_SECRET
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.cookieSecretSecretName }}
+        name: {{ $rootCtx.Values.cookieSecretSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-cookie-secret"
+        {{- end }}
+        key: cookieSecret
+  - name: SERVICES__DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.databaseUrlSecretName }}
+        name: {{ $rootCtx.Values.databaseUrlSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-database-url"
+        {{- end }}
+        key: url
+  - name: SERVICES__TIMESERIES_DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.timescaledbUrlSecretName }}
+        name: {{ $rootCtx.Values.timescaledbUrlSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-timescaledb-url"
+        {{- end }}
+        key: url
+  - name: SERVICES__REDIS_URL
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.redisUrlSecretName }}
+        name: {{ $rootCtx.Values.redisUrlSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-redis-url"
+        {{- end }}
+        key: url
+  {{- if $rootCtx.Values.oauth.enabled }}
+  - name: "{{ $rootCtx.Values.oauth.provider | upper }}__CLIENT_ID"
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.oauth.clientCredentialsSecretName }}
+        name: {{ $rootCtx.Values.oauth.clientCredentialsSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-oauth-client-credentials"
+        {{- end }}
+        key: clientId
+  - name: "{{ $rootCtx.Values.oauth.provider | upper }}__CLIENT_SECRET"
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.oauth.clientCredentialsSecretName }}
+        name: {{ $rootCtx.Values.oauth.clientCredentialsSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-oauth-client-credentials"
+        {{- end }}
+        key: clientSecret
+  {{- end }}
+  {{- if and $rootCtx.Values.minio.enabled $rootCtx.Values.minio.accessKeyAuth.enabled }}
+  - name: SERVICES__MINIO__ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.minio.accessKeyAuth.accessCredentialsSecretName }}
+        name: {{ $rootCtx.Values.minio.accessKeyAuth.accessCredentialsSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-minio-credentials"
+        {{- end }}
+        key: accessKeyId
+  - name: SERVICES__MINIO__SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        {{- if $rootCtx.Values.minio.accessKeyAuth.accessCredentialsSecretName }}
+        name: {{ $rootCtx.Values.minio.accessKeyAuth.accessCredentialsSecretName | quote }}
+        {{- else }}
+        name: "{{ include "codecov.fullname" $rootCtx }}-minio-credentials"
+        {{- end }}
+        key: secretAccessKey
+  {{- end }}
+  {{- with $componentCtx.extraEnv }}
   {{- toYaml . | nindent 2 }}
-{{- end }}
+  {{- end }}
 {{- with $componentCtx.extraEnvFrom }}
 envFrom:
   {{- toYaml . | nindent 2 }}

@@ -7,6 +7,79 @@ config:
   github:
     client_id: "{{ .Values.gateway.replicaCount }}"
 
+# HTTP cookie secret
+# https://docs.codecov.com/docs/configuration#cookie-secret
+cookieSecret: ""
+# Reference to an existing secret in the same namespace
+# The secret key should be set to `cookieSecret`
+cookieSecretSecretName: ""
+
+# Database URL
+# https://docs.codecov.com/docs/configuration#database
+# Used for validation during template rendering
+databaseUrlRegexMatch: '^postgres:\/\/([\w\-]*):?([\w\-]*)@([\w\-\.]+):?(\d+)\/?([\w\-]+)$'
+
+databaseUrl: "postgres://user:password@host:5432/db_name"
+# Reference to an existing secret in the same namespace
+# The secret key should be set to `url`
+databaseUrlSecretName: ""
+
+# TimescaleDB URL
+# https://docs.codecov.com/docs/implementing-flags-with-timescaledb
+# Used for validation during template rendering
+timescaledbUrlRegexMatch: '^postgres:\/\/([\w\-]*):?([\w\-]*)@([\w\-\.]+):?(\d+)\/?([\w\-]+)$'
+
+timescaledbUrl: "postgres://user:password@host:5432/db_name"
+# Reference to an existing secret in the same namespace
+# The secret key should be set to `url`
+timescaledbUrlSecretName: ""
+
+# Redis URL
+# https://docs.codecov.com/docs/configuration#redis
+# Used for validation during template rendering
+redisUrlRegexMatch: '^redis:\/\/([\w\-]*)?:?([\w\-]*)?@?([\w\-\.]+):?(\d+)\/?([\w\-]+)$'
+
+redisUrl: "redis://user:password@host:6379/db_name"
+# Reference to an existing secret in the same namespace
+# The secret key should be set to `url`
+redisUrlSecretName: ""
+
+# MinIO setup
+# https://docs.codecov.com/docs/installing-codecov-self-hosted#prerequisites-to-installing-codecov-self-hosted
+minio:
+  enabled: false
+
+  accessKeyAuth:
+    enabled: false
+
+    # MinIO credentials
+    accessKeyId: ""
+    secretAccessKey: ""
+
+    # Reference to an existing secret in the same namespace
+    # The secret keys should be `accessKeyId` and `secretAccessKey`
+    accessCredentialsSecretName: ""
+
+# OAuth login setup
+# https://docs.codecov.com/docs/set-up-oauth-login
+oauth:
+  enabled: false
+  # Must be one of:
+  # - github
+  # - github_enterprise
+  # - bitbucket
+  # - bitbucket_server
+  # - gitlab_enterprise
+  provider: github
+
+  # OAuth credentials
+  clientId: ""
+  clientSecret: ""
+
+  # Reference to an existing secret in the same namespace
+  # The secret keys should be `clientId` and `clientSecret`
+  clientCredentialsSecretName: ""
+
 gateway:
   replicaCount: 1
 

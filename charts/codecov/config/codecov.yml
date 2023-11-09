@@ -13,14 +13,15 @@ setup:
       username: "<your-user>"
   # Replace with a random string
   # https://docs.codecov.io/docs/configuration#section-cookie-secret
-  http:
-    cookie_secret: "<your-cookie-secret>"
+  # http:
+  #   cookie_secret: "<your-cookie-secret>"
   timeseries:
     enabled: true
-github:
-  client_id: "<client-id>"
-  client_secret: "<client-secret>"
-  global_upload_token: "<upload-token>"
+# https://docs.codecov.com/docs/set-up-oauth-login
+# github:
+#   client_id: "<client-id>"
+#   client_secret: "<client-secret>"
+#   global_upload_token: "<upload-token>"
 services:
   redis_url: "redis://redis:6379"
   database_url: "postgres://postgres:testpassword@postgres:5432/postgres"
