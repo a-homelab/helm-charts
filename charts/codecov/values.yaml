@@ -61,12 +61,11 @@ minio:
     secretAccessKey: ""
 
     # Reference to an existing secret in the same namespace
-    # The secret keys should be `accessKeyId` and `secretAccessKey`
     accessCredentialsSecretName: ""
     # The secret key for the existing secret
-    accessCredentialsAccessKeyIdSecretKey: ""
+    accessCredentialsAccessKeyIdSecretKey: accessKeyId
     # The secret key for the existing secret
-    accessCredentialsSecretAccessKeySecretKey: ""
+    accessCredentialsSecretAccessKeySecretKey: secretAccessKey
 
 # OAuth login setup
 # https://docs.codecov.com/docs/set-up-oauth-login
@@ -85,12 +84,11 @@ oauth:
   clientSecret: ""
 
   # Reference to an existing secret in the same namespace
-  # The secret keys should be `clientId` and `clientSecret`
   clientCredentialsSecretName: ""
   # The secret key for the existing secret
-  clientCredentialsClientIdSecretKey: ""
+  clientCredentialsClientIdSecretKey: clientId
   # The secret key for the existing secret
-  clientCredentialsClientSecretSecretKey: ""
+  clientCredentialsClientSecretSecretKey: clientSecret
 
 gateway:
   replicaCount: 1
