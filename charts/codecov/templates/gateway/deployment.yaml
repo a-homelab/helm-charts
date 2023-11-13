@@ -21,6 +21,12 @@ spec:
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
 env:
+  - name: CODECOV_API_HOST
+    value: "{{ include "codecov.fullname" $rootCtx }}-api"
+  - name: CODECOV_IA_HOST
+    value: "{{ include "codecov.fullname" $rootCtx }}-api"
+  - name: CODECOV_FRONTEND_HOST
+    value: "{{ include "codecov.fullname" $rootCtx }}-frontend"
   {{- if $rootCtx.Values.minio.enabled }}
   - name: CODECOV_GATEWAY_MINIO_ENABLED
     value: "true"
