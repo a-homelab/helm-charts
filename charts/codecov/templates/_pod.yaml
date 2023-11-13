@@ -3,10 +3,11 @@
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
 metadata:
-  {{- with $componentCtx.podAnnotations }}
   annotations:
+    checksum/config: {{ tpl (mergeOverwrite (mustDeepCopy ($rootCtx.Files.Get "config/codecov.yml" | fromYaml)) (mustDeepCopy $rootCtx.Values.config) | toYaml) $rootCtx | sha256sum }}
+    {{- with $componentCtx.podAnnotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
   labels:
     {{- include "codecov.componentSelectorLabels" . | nindent 4 }}
 spec:
