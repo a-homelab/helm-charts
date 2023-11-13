@@ -22,13 +22,13 @@ spec:
 {{- $componentCtx := index . 2 -}}
 env:
   - name: CODECOV_BASE_HOST
-    value: {{ $componentCtx.baseHost }}
+    value: {{ $componentCtx.baseHost | quote }}
   - name: CODECOV_API_HOST
-    value: {{ $componentCtx.apiHost }}
+    value: {{ $componentCtx.apiHost | quote }}
   - name: CODECOV_API_PORT
-    value: {{ $componentCtx.apiPort }}
+    value: {{ $componentCtx.apiPort | quote }}
   - name: CODECOV_SCHEME
-    value: {{ $componentCtx.scheme }}
+    value: {{ $componentCtx.scheme | quote }}
   {{- include "codecov.common.env" . | nindent 2 }}
   {{- with $componentCtx.extraEnv }}
   {{- toYaml . | nindent 2 }}
