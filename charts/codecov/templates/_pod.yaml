@@ -15,6 +15,7 @@ spec:
   imagePullSecrets:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  enableServiceLinks: false
   serviceAccountName: "{{ include "codecov.serviceAccountName" $rootCtx }}-{{ $componentName }}"
   securityContext:
     {{- toYaml $componentCtx.podSecurityContext | nindent 4 }}
