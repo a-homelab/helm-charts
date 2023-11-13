@@ -29,7 +29,6 @@ env:
     value: {{ $componentCtx.apiPort | quote }}
   - name: CODECOV_SCHEME
     value: {{ $componentCtx.scheme | quote }}
-  {{- include "codecov.common.env" . | nindent 2 }}
   {{- with $componentCtx.extraEnv }}
   {{- toYaml . | nindent 2 }}
   {{- end }}
