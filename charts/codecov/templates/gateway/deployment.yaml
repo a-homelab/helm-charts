@@ -20,7 +20,15 @@ spec:
 {{- $rootCtx := first . -}}
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
-
+env:
+  {{- if $rootCtx.Values.minio.enabled }}
+  - name: CODECOV_GATEWAY_MINIO_ENABLED
+    value: "true"
+  {{- end }}
+  {{- include "codecov.common.env" . | nindent 2 }}
+  {{- with $componentCtx.extraEnv }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
 {{- end -}}
 
 {{- $rootCtx := . -}}
