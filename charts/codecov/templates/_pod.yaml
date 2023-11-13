@@ -14,7 +14,7 @@ spec:
   imagePullSecrets:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  serviceAccountName: {{ include "codecov.serviceAccountName" $rootCtx }}
+  serviceAccountName: "{{ include "codecov.serviceAccountName" $rootCtx }}-{{ $componentName }}"
   securityContext:
     {{- toYaml $componentCtx.podSecurityContext | nindent 4 }}
   containers:
