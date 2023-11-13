@@ -11,8 +11,9 @@ config:
 # https://docs.codecov.com/docs/configuration#cookie-secret
 cookieSecret: ""
 # Reference to an existing secret in the same namespace
-# The secret key should be set to `cookieSecret`
 cookieSecretSecretName: ""
+# The secret key for the existing secret
+cookieSecretSecretKey: cookieSecret
 
 # Database URL
 # https://docs.codecov.com/docs/configuration#database
@@ -21,8 +22,9 @@ databaseUrlRegexMatch: '^postgres:\/\/([\w\-]*):?([\w\-]*)@([\w\-\.]+):?(\d+)\/?
 
 databaseUrl: "postgres://user:password@host:5432/db_name"
 # Reference to an existing secret in the same namespace
-# The secret key should be set to `url`
 databaseUrlSecretName: ""
+# The secret key for the existing secret
+databaseUrlSecretKey: url
 
 # TimescaleDB URL
 # https://docs.codecov.com/docs/implementing-flags-with-timescaledb
@@ -31,8 +33,9 @@ timescaledbUrlRegexMatch: '^postgres:\/\/([\w\-]*):?([\w\-]*)@([\w\-\.]+):?(\d+)
 
 timescaledbUrl: "postgres://user:password@host:5432/db_name"
 # Reference to an existing secret in the same namespace
-# The secret key should be set to `url`
 timescaledbUrlSecretName: ""
+# The secret key for the existing secret
+timescaledbUrlSecretKey: url
 
 # Redis URL
 # https://docs.codecov.com/docs/configuration#redis
@@ -41,8 +44,9 @@ redisUrlRegexMatch: '^redis:\/\/([\w\-]*)?:?([\w\-]*)?@?([\w\-\.]+):?(\d+)\/?([\
 
 redisUrl: "redis://user:password@host:6379/db_name"
 # Reference to an existing secret in the same namespace
-# The secret key should be set to `url`
 redisUrlSecretName: ""
+# The secret key for the existing secret
+redisUrlSecretKey: url
 
 # MinIO setup
 # https://docs.codecov.com/docs/installing-codecov-self-hosted#prerequisites-to-installing-codecov-self-hosted
@@ -59,6 +63,10 @@ minio:
     # Reference to an existing secret in the same namespace
     # The secret keys should be `accessKeyId` and `secretAccessKey`
     accessCredentialsSecretName: ""
+    # The secret key for the existing secret
+    accessCredentialsAccessKeyIdSecretKey: ""
+    # The secret key for the existing secret
+    accessCredentialsSecretAccessKeySecretKey: ""
 
 # OAuth login setup
 # https://docs.codecov.com/docs/set-up-oauth-login
@@ -79,6 +87,10 @@ oauth:
   # Reference to an existing secret in the same namespace
   # The secret keys should be `clientId` and `clientSecret`
   clientCredentialsSecretName: ""
+  # The secret key for the existing secret
+  clientCredentialsClientIdSecretKey: ""
+  # The secret key for the existing secret
+  clientCredentialsClientSecretSecretKey: ""
 
 gateway:
   replicaCount: 1
