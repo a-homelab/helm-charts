@@ -37,5 +37,7 @@ spec:
 {{- $rootCtx := first . -}}
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
+{{- if $componentCtx.autoscaling.enabled }}
 {{- include "codecov.util.merge" (append . "codecov.hpa.tpl") -}}
+{{- end }}
 {{- end -}}

@@ -1,4 +1,4 @@
-{{- define "codecov.frontend.hpa.overrides" -}}
+{{- define "codecov.api.hpa.overrides" -}}
 {{- $rootCtx := first . -}}
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
@@ -6,6 +6,6 @@
 {{- end -}}
 
 {{- $rootCtx := . -}}
-{{- $componentName := "frontend" -}}
+{{- $componentName := "api" -}}
 {{- $componentCtx := get .Values $componentName -}}
-{{- include "codecov.hpa" (list $rootCtx $componentName $componentCtx "codecov.frontend.hpa.overrides")}}
+{{- include "codecov.hpa" (list $rootCtx $componentName $componentCtx "codecov.api.hpa.overrides")}}

@@ -64,5 +64,7 @@ spec:
 {{- $rootCtx := first . -}}
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
+{{- if $componentCtx.ingress.enabled -}}
 {{- include "codecov.util.merge" (append . "codecov.ingress.tpl") -}}
+{{- end }}
 {{- end -}}
