@@ -1,11 +1,9 @@
 
-config:
-  setup:
-    admins:
-      - service: github2
-        username: asdf
-  github:
-    client_id: "{{ .Values.gateway.replicaCount }}"
+config: {}
+  # setup:
+  #   admins:
+  #     - service: github2
+  #       username: asdf
 
 # HTTP cookie secret
 # https://docs.codecov.com/docs/configuration#cookie-secret
