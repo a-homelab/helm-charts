@@ -2,6 +2,24 @@
 {{- $rootCtx := first . -}}
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
+spec:
+  template:
+    {{- include "codecov.pod" (list $rootCtx $componentName $componentCtx "codecov.gateway.pod.overrides") | nindent 4 }}
+{{- end -}}
+
+{{- define "codecov.gateway.pod.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+spec:
+  containers:
+    - {{- include "codecov.container" (list $rootCtx $componentName $componentCtx "codecov.gateway.container.overrides") | nindent 6 }}
+{{- end -}}
+
+{{- define "codecov.gateway.container.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
 
 {{- end -}}
 

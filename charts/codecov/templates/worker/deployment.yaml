@@ -4,15 +4,29 @@
 {{- $componentCtx := index . 2 -}}
 spec:
   template:
-    spec:
-      containers:
-        - name: {{ $rootCtx.Chart.Name }}
-          env:
-            - name: RUN_ENV
-              value: enterprise
-            {{- with $componentCtx.extraEnv }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
+    {{- include "codecov.pod" (list $rootCtx $componentName $componentCtx "codecov.worker.pod.overrides") | nindent 4 }}
+{{- end -}}
+
+{{- define "codecov.worker.pod.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+spec:
+  containers:
+    - {{- include "codecov.container" (list $rootCtx $componentName $componentCtx "codecov.worker.container.overrides") | nindent 6 }}
+{{- end -}}
+
+{{- define "codecov.worker.container.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+env:
+  - name: RUN_ENV
+    value: enterprise
+  {{- include "codecov.common.env" . | nindent 2 }}
+  {{- with $componentCtx.extraEnv }}
+  {{- toYaml . | nindent 12 }}
+  {{- end }}
 {{- end -}}
 
 {{- $rootCtx := . -}}

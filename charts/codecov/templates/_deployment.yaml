@@ -17,7 +17,7 @@ spec:
     matchLabels:
       {{- include "codecov.componentSelectorLabels" . | nindent 6 }}
   template:
-    {{- include "codecov.pod.tpl" (list $rootCtx $componentName $componentCtx) | nindent 4 -}}
+    {{- include "codecov.pod.tpl" (list $rootCtx $componentName $componentCtx) | nindent 4 }}
 {{- end }}
 
 {{- define "codecov.deployment" -}}
