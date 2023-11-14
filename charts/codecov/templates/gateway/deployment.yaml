@@ -39,6 +39,14 @@ env:
   {{- with $componentCtx.extraEnv }}
   {{- toYaml . | nindent 2 }}
   {{- end }}
+livenessProbe:
+  httpGet:
+    path: /frontend_health
+    port: http
+readinessProbe:
+  httpGet:
+    path: /frontend_health
+    port: http
 {{- end -}}
 
 {{- $rootCtx := . -}}
