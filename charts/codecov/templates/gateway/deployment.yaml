@@ -30,7 +30,7 @@ env:
   - name: CODECOV_DEFAULT_PORT
     value: "8080"
   - name: CODECOV_DEFAULT_HOST_HEADER
-    value: "\\$http_host"
+    value: "%[req.hdr(Host)]"
   {{- if $rootCtx.Values.minio.enabled }}
   - name: CODECOV_GATEWAY_MINIO_ENABLED
     value: "true"
