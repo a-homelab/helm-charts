@@ -208,9 +208,13 @@ gateway:
       labelSelector:
         matchLabels:
           {{- include "codecov.componentSelectorLabels" (list $rootCtx $componentName $componentCtx) | nindent 6 }}
+      {{- if (semverCompare ">=1.27-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       matchLabelKeys:
         - pod-template-hash
+      {{- end }}
+      {{- if (semverCompare ">=1.26-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       nodeTaintsPolicy: Honor
+      {{- end }}
 
   extraVolumeMounts: []
 
@@ -303,9 +307,13 @@ frontend:
       labelSelector:
         matchLabels:
           {{- include "codecov.componentSelectorLabels" (list $rootCtx $componentName $componentCtx) | nindent 6 }}
+      {{- if (semverCompare ">=1.27-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       matchLabelKeys:
         - pod-template-hash
+      {{- end }}
+      {{- if (semverCompare ">=1.26-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       nodeTaintsPolicy: Honor
+      {{- end }}
 
   extraVolumeMounts: []
   
@@ -389,9 +397,13 @@ api:
       labelSelector:
         matchLabels:
           {{- include "codecov.componentSelectorLabels" (list $rootCtx $componentName $componentCtx) | nindent 6 }}
+      {{- if (semverCompare ">=1.27-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       matchLabelKeys:
         - pod-template-hash
+      {{- end }}
+      {{- if (semverCompare ">=1.26-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       nodeTaintsPolicy: Honor
+      {{- end }}
 
   extraVolumeMounts: []
   
@@ -475,9 +487,13 @@ worker:
       labelSelector:
         matchLabels:
           {{- include "codecov.componentSelectorLabels" (list $rootCtx $componentName $componentCtx) | nindent 6 }}
+      {{- if (semverCompare ">=1.27-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       matchLabelKeys:
         - pod-template-hash
+      {{- end }}
+      {{- if (semverCompare ">=1.26-0" $rootCtx.Capabilities.KubeVersion.GitVersion) }}
       nodeTaintsPolicy: Honor
+      {{- end }}
 
   extraVolumeMounts: []
   
