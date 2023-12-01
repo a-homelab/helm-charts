@@ -58,6 +58,21 @@
       name: "{{ include "codecov.fullname" $rootCtx }}-oauth-client-credentials"
       {{- end }}
       key: {{ $rootCtx.Values.oauth.clientCredentialsClientSecretSecretKey }}
+{{- if $rootCtx.Values.githubIntegration.enabled }}
+- name: "{{ $rootCtx.Values.oauth.provider | upper }}__WEBHOOK_SECRET"
+  valueFrom:
+    secretKeyRef:
+      {{- if $rootCtx.Values.githubIntegration.webhookSecretSecretName }}
+      name: {{ $rootCtx.Values.githubIntegration.webhookSecretSecretName | quote }}
+      {{- else }}
+      name: "{{ include "codecov.fullname" $rootCtx }}-github-webhook-secret"
+      {{- end }}
+      key: {{ $rootCtx.Values.githubIntegration.webhookSecretSecretKey }}
+- name: "{{ $rootCtx.Values.oauth.provider | upper }}__INTEGRATION__ID"
+  value: {{ required ".Values.githubIntegration.appId is required when Github integration is enabled" $rootCtx.Values.githubIntegration.appId | quote }}
+- name: "{{ $rootCtx.Values.oauth.provider | upper }}__INTEGRATION__PEM"
+  value: /config/github.pem
+{{- end }}
 {{- end }}
 {{- if and $rootCtx.Values.minio.enabled $rootCtx.Values.minio.accessKeyAuth.enabled }}
 - name: SERVICES__MINIO__ACCESS_KEY_ID
@@ -117,6 +132,12 @@ volumeMounts:
   - name: config
     mountPath: /config/codecov.yml
     subPath: codecov.yml
+  {{- if and $rootCtx.Values.oauth.enabled $rootCtx.Values.githubIntegration.enabled }}
+  - name: github-integration-pem
+    mountPath: /config/github.pem
+    subPath: github.pem
+    readOnly: true
+  {{- end }}
   {{- with $componentCtx.extraVolumeMounts }}
   {{- toYaml . | nindent 2 }}
   {{- end }}

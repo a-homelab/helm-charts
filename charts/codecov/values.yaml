@@ -88,6 +88,32 @@ oauth:
   # The secret key for the existing secret
   clientCredentialsClientSecretSecretKey: clientSecret
 
+# Github integration settings
+githubIntegration:
+  enabled: false
+  
+  # Github app webhook secret
+  # https://docs.codecov.com/docs/how-to-create-a-github-app-for-codecov-enterprise#creating-a-github-app-integration
+  webhookSecret: ""
+  # Reference to an existing secret in the same namespace
+  webhookSecretSecretName: ""
+  # The secret key for the existing secret
+  webhookSecretSecretKey: webhookSecret
+
+  # Github app ID
+  # https://docs.codecov.com/docs/how-to-create-a-github-app-for-codecov-enterprise#generate-and-add-a-pem-file-to-codecov
+  appId: ""
+
+  # Github app private key
+  # https://docs.codecov.com/docs/how-to-create-a-github-app-for-codecov-enterprise#generate-and-add-a-pem-file-to-codecov
+  privateKey: ""
+  # privateKey: |-
+  #   -----BEGIN RSA PRIVATE KEY-----
+  #   ...
+  #   -----END RSA PRIVATE KEY-----
+  # Reference to an existing secret in the same namespace
+  privateKeySecretName: ""
+
 gateway:
   replicaCount: 1
 

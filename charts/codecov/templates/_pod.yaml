@@ -44,6 +44,16 @@ spec:
         items:
           - key: codecov.yml
             path: codecov.yml
+    {{- if and $rootCtx.Values.oauth.enabled $rootCtx.Values.githubIntegration.enabled }}
+    - name: github-integration-pem
+      secret:
+        {{- if $rootCtx.Values.githubIntegration.privateKeySecretName }}
+        secretName: {{ $rootCtx.Values.githubIntegration.privateKeySecretName | quote }}
+        {{- else }}
+        secretName: "{{ include "codecov.fullname" $rootCtx }}-github-private-key"
+        {{- end }}
+        defaultMode: 0400
+    {{- end }}
     {{- with $componentCtx.extraVolumes }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
