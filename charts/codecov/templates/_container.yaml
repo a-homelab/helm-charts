@@ -73,6 +73,17 @@
 - name: "{{ $rootCtx.Values.oauth.provider | upper }}__INTEGRATION__PEM"
   value: /config/github.pem
 {{- end }}
+{{- if $rootCtx.Values.globalUploadToken.enabled }}
+- name: "{{ $rootCtx.Values.oauth.provider | upper }}__GLOBAL_UPLOAD_TOKEN"
+  valueFrom:
+    secretKeyRef:
+      {{- if $rootCtx.Values.globalUploadToken.tokenSecretName }}
+      name: {{ $rootCtx.Values.globalUploadToken.tokenSecretName | quote }}
+      {{- else }}
+      name: "{{ include "codecov.fullname" $rootCtx }}-global-upload-token"
+      {{- end }}
+      key: {{ $rootCtx.Values.globalUploadToken.tokenSecretKey }}
+{{- end }}
 {{- end }}
 {{- if and $rootCtx.Values.minio.enabled $rootCtx.Values.minio.accessKeyAuth.enabled }}
 - name: SERVICES__MINIO__ACCESS_KEY_ID

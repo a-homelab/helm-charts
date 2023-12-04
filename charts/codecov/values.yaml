@@ -114,6 +114,17 @@ githubIntegration:
   # Reference to an existing secret in the same namespace
   privateKeySecretName: ""
 
+# Global upload token, associated with the oauth provider
+# https://docs.codecov.com/docs/configuration#global-upload-tokens
+globalUploadToken:
+  enabled: false
+  token: ""
+  # Reference to an existing secret in the same namespace
+  tokenSecretName: ""
+  # The secret key for the existing secret
+  tokenSecretKey: token
+
+
 gateway:
   replicaCount: 1
 
