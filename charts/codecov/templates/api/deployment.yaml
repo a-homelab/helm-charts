@@ -12,8 +12,24 @@ spec:
 {{- $componentName := index . 1 -}}
 {{- $componentCtx := index . 2 -}}
 spec:
+  initContainers:
+    - {{- include "codecov.container" (list $rootCtx $componentName $componentCtx "codecov.api.initContainer.overrides") | nindent 6 }}
   containers:
     - {{- include "codecov.container" (list $rootCtx $componentName $componentCtx "codecov.api.container.overrides") | nindent 6 }}
+{{- end -}}
+
+{{- define "codecov.api.initContainer.overrides" -}}
+{{- $rootCtx := first . -}}
+{{- $componentName := index . 1 -}}
+{{- $componentCtx := index . 2 -}}
+name: codecov-timescale-migration
+command:
+  - python
+args:
+  - manage.py
+  - migrate
+  - --database
+  - timeseries
 {{- end -}}
 
 {{- define "codecov.api.container.overrides" -}}
