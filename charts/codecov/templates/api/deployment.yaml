@@ -30,6 +30,8 @@ args:
   - migrate
   - --database
   - timeseries
+livenessProbe: null
+readinessProbe: null
 {{- end -}}
 
 {{- define "codecov.api.container.overrides" -}}
