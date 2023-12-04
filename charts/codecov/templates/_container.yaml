@@ -118,10 +118,10 @@ ports:
   - name: http
     containerPort: {{ $componentCtx.service.port }}
     protocol: TCP
-livenessProbe:
-  httpGet:
-    path: /
-    port: http
+# livenessProbe:
+#   httpGet:
+#     path: /
+#     port: http
 readinessProbe:
   httpGet:
     path: /
