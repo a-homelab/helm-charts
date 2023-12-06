@@ -18,7 +18,7 @@ replicaCount: 1
 image:
   repository: lscr.io/linuxserver/unifi-network-application
   pullPolicy: IfNotPresent
-  tag: 7.5.187-ls11
+  tag: 8.0.7-ls18
 
 imagePullSecrets: []
 nameOverride: ""
