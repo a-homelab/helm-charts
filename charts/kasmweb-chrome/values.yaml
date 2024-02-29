@@ -28,8 +28,8 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext:
-  fsGroup: 1000
+# podSecurityContext:
+#   fsGroup: 1000
 
 securityContext:
   # capabilities:
