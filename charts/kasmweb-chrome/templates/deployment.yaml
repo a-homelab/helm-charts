@@ -61,18 +61,6 @@ spec:
               port: web
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          volumeMounts:
-            - name: dri-card
-              mountPath: /dev/dri/card1
-            - name: renderd
-              mountPath: /dev/dri/renderD128
-      volumes:
-        - name: dri-card
-          hostPath:
-            path: /dev/dri/card1
-        - name: renderd
-          hostPath:
-            path: /dev/dri/renderD128
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
