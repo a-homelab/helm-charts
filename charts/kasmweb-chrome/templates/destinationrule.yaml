@@ -5,7 +5,7 @@ metadata:
   name: {{ include "kasmweb-chrome.fullname" . }}
 spec:
   host: {{ include "kasmweb-chrome.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
-  trafficPolicy:
-    tls:
-      mode: SIMPLE
+  # trafficPolicy:
+  #   tls:
+  #     mode: SIMPLE
 {{- end }}
