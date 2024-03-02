@@ -18,11 +18,7 @@ spec:
   hostnames:
     - {{ .Values.httpRoute.hostname | quote }}
   rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      filters:
+    - filters:
         - type: RequestHeaderModifier
           requestHeaderModifier:
             set:
