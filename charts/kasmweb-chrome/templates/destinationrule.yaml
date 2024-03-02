@@ -6,9 +6,6 @@ metadata:
 spec:
   host: {{ include "kasmweb-chrome.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
   trafficPolicy:
-    portLevelSettings:
-      - port:
-          number: {{ .Values.service.web.port }}
-        tls:
-          mode: SIMPLE
+    tls:
+      mode: SIMPLE
 {{- end }}
