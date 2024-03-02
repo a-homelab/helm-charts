@@ -60,6 +60,9 @@ spec:
             httpGet:
               scheme: HTTPS
               port: web
+              httpHeaders:
+                - name: Authorization
+                  value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
