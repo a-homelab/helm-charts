@@ -8,7 +8,7 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.web.port }}
-      targetPort: web
+      targetPort: https-web
       protocol: TCP
       appProtocol: https
       name: web

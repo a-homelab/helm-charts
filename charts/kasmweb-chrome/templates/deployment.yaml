@@ -50,7 +50,7 @@ spec:
             - name: KASM_RENDERD
               value: /dev/dri/renderD128
           ports:
-            - name: web
+            - name: https-web
               containerPort: {{ .Values.service.web.port }}
               protocol: TCP
             - name: cdp
@@ -59,7 +59,7 @@ spec:
           readinessProbe:
             httpGet:
               scheme: HTTPS
-              port: web
+              port: https-web
               httpHeaders:
                 - name: Authorization
                   value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
