@@ -1,4 +1,4 @@
-{{- if .Values.httpRoute.enabled -}}
+{{- if and .Values.httpRoute.enabled (not .Values.disableSsl) -}}
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
