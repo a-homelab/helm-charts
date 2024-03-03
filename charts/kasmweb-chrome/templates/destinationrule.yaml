@@ -9,4 +9,5 @@ spec:
     tls:
       mode: SIMPLE
       insecureSkipVerify: true
+      sni: {{ .Values.httpRoute.hostname | quote }}
 {{- end }}
