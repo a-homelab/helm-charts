@@ -60,3 +60,14 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Web port based on ssl toggle
+*/}}
+{{- define "kasmweb-chrome.webPortName" -}}
+{{- if .Values.disableSsl }}
+"http-web"
+{{- else }}
+"https-web"
+{{- end }}
+{{- end }}

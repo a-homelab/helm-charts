@@ -36,6 +36,10 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.disableSsl }}
+          command:
+            - /custom-entrypoint/entrypoint-no-ssl.sh
+          {{- end }}
           env:
             - name: APP_ARGS
               value: --remote-debugging-port=0
@@ -50,7 +54,7 @@ spec:
             - name: KASM_RENDERD
               value: /dev/dri/renderD128
           ports:
-            - name: https-web
+            - name: {{ include "kasmweb-chrome.webPortName" . }}
               containerPort: {{ .Values.service.web.port }}
               protocol: TCP
             - name: cdp
@@ -58,13 +62,24 @@ spec:
               protocol: TCP
           readinessProbe:
             httpGet:
+              {{- if not .Values.disableSsl }}
               scheme: HTTPS
-              port: https-web
+              {{- end }}
+              port: {{ include "kasmweb-chrome.webPortName" . }}
               httpHeaders:
                 - name: Authorization
                   value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: entrypoint-no-ssl
+              mountPath: /custom-entrypoint/entrypoint-no-ssl.sh
+              subPath: entrypoint-no-ssl.sh
+      volumes:
+        - name: entrypoint-no-ssl
+          configMap:
+            name: "{{ include "kasmweb-chrome.fullname" . }}-entrypoint-disable-ssl"
+            defaultMode: 0755
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
