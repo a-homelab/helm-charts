@@ -10,7 +10,7 @@ spec:
     - port: {{ .Values.service.web.port }}
       targetPort: {{ include "kasmweb-chrome.webPortName" . }}
       protocol: TCP
-      appProtocol: https
+      appProtocol: http
       name: web
     - port: {{ .Values.service.cdp.port }}
       targetPort: cdp
