@@ -24,6 +24,11 @@ spec:
             set:
               - name: Authorization
                 value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Authorization
+                value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
       backendRefs:
         - name: {{ include "kasmweb-chrome.fullname" . }}
           port: {{ .Values.service.web.port }}
