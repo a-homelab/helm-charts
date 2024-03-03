@@ -18,7 +18,24 @@ spec:
   hostnames:
     - {{ .Values.httpRoute.hostname | quote }}
   rules:
-    - filters:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: Authorization
+                value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
+      backendRefs:
+        - name: {{ include "kasmweb-chrome.fullname" . }}
+          port: {{ .Values.service.web.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /websockify
+      filters:
         - type: RequestHeaderModifier
           requestHeaderModifier:
             set:
