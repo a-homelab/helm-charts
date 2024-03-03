@@ -4,7 +4,7 @@ metadata:
   name: "{{ include "kasmweb-chrome.fullname" . }}-entrypoint-disable-ssl"
   namespace: {{ .Release.Namespace | quote }}
   labels:
-    {{- include "codecov.labels" . | nindent 4 }}
+    {{- include "kasmweb-chrome.labels" . | nindent 4 }}
 data:
   entrypoint-no-ssl.sh: |-
     {{- .Files.Get "files/entrypoint-no-ssl.sh" | nindent 4 }}
