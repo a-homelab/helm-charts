@@ -36,10 +36,6 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.disableSsl }}
-          command:
-            - /custom-entrypoint/entrypoint-no-ssl.sh
-          {{- end }}
           env:
             - name: APP_ARGS
               value: --remote-debugging-port=0
