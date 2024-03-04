@@ -26,11 +26,11 @@ spec:
         - type: RequestHeaderModifier
           requestHeaderModifier:
             set:
-              - name: upgrade
+              - name: Upgrade
                 value: websocket
-              - name: connection
+              - name: Connection
                 value: upgrade
-              - name: authorization
+              - name: Authorization
                 value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
       backendRefs:
         - name: {{ include "kasmweb-chrome.fullname" . }}
