@@ -26,22 +26,26 @@ spec:
         - type: RequestHeaderModifier
           requestHeaderModifier:
             set:
-              - name: Authorization
+              - name: upgrade
+                value: websocket
+              - name: connection
+                value: upgrade
+              - name: authorization
                 value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
       backendRefs:
         - name: {{ include "kasmweb-chrome.fullname" . }}
           port: {{ .Values.service.web.port }}
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /websockify
-      filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            set:
-              - name: Authorization
-                value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
-      backendRefs:
-        - name: {{ include "kasmweb-chrome.fullname" . }}
-          port: {{ .Values.service.web.port }}
+    # - matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /websockify
+    #   filters:
+    #     - type: RequestHeaderModifier
+    #       requestHeaderModifier:
+    #         set:
+    #           - name: Authorization
+    #             value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
+    #   backendRefs:
+    #     - name: {{ include "kasmweb-chrome.fullname" . }}
+    #       port: {{ .Values.service.web.port }}
 {{- end }}
