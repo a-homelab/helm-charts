@@ -22,14 +22,14 @@ spec:
         - path:
             type: PathPrefix
             value: /
-      # filters:
-      #   - type: RequestHeaderModifier
-      #     requestHeaderModifier:
-      #       set:
-      #         - name: Upgrade
-      #           value: websocket
-      #         - name: Connection
-      #           value: upgrade
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: Upgrade
+                value: websocket
+              - name: Connection
+                value: upgrade
       #         - name: Authorization
       #           value: Basic a2FzbV91c2VyOnBhc3N3b3Jk
       backendRefs:
