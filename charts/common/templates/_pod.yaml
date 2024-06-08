@@ -1,0 +1,71 @@
+{{/*
+`common.pod.tpl` defines a pod definition.
+See: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#Pod
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .podValues: the portion of the Helm values map for the pod. Defaults to the root values (`.Values`)
+- (optional) .componentName: the component name if this is part of a multi-component app
+*/}}
+{{- define "common.pod.tpl" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $podValues := .templateValues | default $rootCtx.Values -}}
+{{- $componentName := .componentName | default "" -}}
+metadata:
+  annotations:
+    {{- with $podValues.podAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  labels:
+    {{- include "common.selectorLabels" $rootCtx | nindent 4 }}
+    {{- include "common.componentSelectorLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+spec:
+  {{- with $podValues.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  enableServiceLinks: false
+  serviceAccountName: {{ include "common.serviceAccountName" (dict "rootCtx" $rootCtx "serviceAccountValues" $podValues "componentName" $componentName) }}
+  securityContext:
+    {{- toYaml $podValues.podSecurityContext | nindent 4 }}
+  {{- with $podValues.initContainers }}
+  initContainers:
+    {{ tpl (toYaml .) $rootCtx | nindent 4 }}
+  {{- end }}
+  containers:
+    - {{- include "common.container.tpl" (dict "rootCtx" $rootCtx "templateValues" $podValues "componentName" $componentName) | nindent 6 }}
+  {{- with $podValues.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $podValues.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $podValues.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $podValues.topologySpreadConstraints }}
+  topologySpreadConstraints:
+    {{- tpl . $rootCtx | nindent 4 }}
+  {{- end }}
+  {{- with $podValues.volumes }}
+  volumes:
+    {{ tpl (toYaml .) $rootCtx | nindent 4 }}
+  {{- end }}
+{{- end -}}
+
+{{/*
+`common.pod` merges the pod definition in `common.pod.tpl` with overrides defined the helm values.
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .podValues: the portion of the Helm values map for the pod. Defaults to the root values (`.Values`)
+- (optional) .podOverrides: the template name of the pod overrides defined by the application chart
+*/}}
+{{- define "common.pod" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $podValues := .podValues | default $rootCtx.Values -}}
+{{- $podOverrides := .podOverrides | default "common.defaultEmptyOverrides" -}}
+{{- $componentName := .componentName | default "" -}}
+{{- include "common.util.merge" (dict "rootCtx" $rootCtx "templateValues" $podValues "sourceTemplate" "common.pod.tpl" "overridesTemplate" $podOverrides "componentName" $componentName) -}}
+{{- end -}}

@@ -1,0 +1,10 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://helm.benfu.me/container.schema.json",
+    "title": "Container",
+    "description": "Container configuration",
+    "type": "object",
+    "properties": {
+      
+    }
+  }

@@ -1,0 +1,46 @@
+{{/*
+`common.service.tpl` defines a service definition.
+See: https://kubernetes.io/docs/reference/kubernetes-api/service-resources/service-v1/#Service
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .serviceValues: the portion of the Helm values map for the service. Defaults to the root values (`.Values`)
+- (optional) .componentName: the component name if this is part of a multi-component app
+*/}}
+{{- define "common.service.tpl" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $serviceValues := .templateValues | default $rootCtx.Values -}}
+{{- $componentName := .componentName | default "" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName) }}
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "common.labels" $rootCtx | nindent 4 }}
+    {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+spec:
+  type: {{ $serviceValues.service.type }}
+  ports:
+    - port: {{ $serviceValues.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "common.selectorLabels" $rootCtx | nindent 4 }}
+    {{- include "common.componentSelectorLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+{{- end }}
+
+{{/*
+`common.service` merges the service definition in `common.service.tpl` with overrides defined the helm values.
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .serviceValues: the portion of the Helm values map for the service. Defaults to the root values (`.Values`)
+- (optional) .serviceOverrides: the template name of the service overrides defined by the application chart
+*/}}
+{{- define "common.service" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $serviceValues := .serviceValues | default $rootCtx.Values -}}
+{{- $serviceOverrides := .serviceOverrides | default "common.defaultEmptyOverrides" -}}
+{{- $componentName := .componentName | default "" -}}
+{{- include "common.util.merge" (dict "rootCtx" $rootCtx "templateValues" $serviceValues "sourceTemplate" "common.service.tpl" "overridesTemplate" $serviceOverrides "componentName" $componentName) -}}
+{{- end -}}
