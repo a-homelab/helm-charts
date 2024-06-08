@@ -23,12 +23,12 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Lint
-        run: helm lint charts/${{ matrix.chart }} --strict --debug
+        run: helm lint charts/${{ matrix.chart.chart }} --strict --debug
 
       - name: Build chart
         run: |-
           mkdir -p dist/
-          helm package charts/${{ matrix.chart }} --destination dist/
+          helm package charts/${{ matrix.chart.chart }} --destination dist/
       
       - name: Login to the internal helm registry
         run: |-
@@ -39,4 +39,4 @@ jobs:
 
       - name: Push chart
         run: |-
-          helm push dist/${{ matrix.chart }}-${{ matrix.chart.version }}.tgz oci://registry.benfu.me/helm-internal
+          helm push dist/${{ matrix.chart.chart }}-${{ matrix.chart.version }}.tgz oci://registry.benfu.me/helm-internal
