@@ -41,8 +41,16 @@ ports:
 livenessProbe:
   {{- toYaml . | nindent 2 }}
 {{- end }}
+{{- with $containerValues.livenessProbe }}
+livenessProbe:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 {{- with $containerValues.readinessProbe }}
 readinessProbe:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with $containerValues.startupProbe }}
+startupProbe:
   {{- toYaml . | nindent 2 }}
 {{- end }}
 resources:

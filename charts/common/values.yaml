@@ -45,7 +45,9 @@ env: []
 
 envFrom: []
 
+livenessProbe: {}
 readinessProbe: {}
+startupProbe: {}
 
 initContainers: []
 
