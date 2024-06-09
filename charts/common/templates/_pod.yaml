@@ -13,7 +13,7 @@ This takes a dict with the following keys:
 metadata:
   annotations:
     {{- with $podValues.podAnnotations }}
-    {{- toYaml . | nindent 4 }}
+    {{- tpl (toYaml .) $rootCtx | nindent 4 }}
     {{- end }}
   labels:
     {{- include "common.selectorLabels" $rootCtx | nindent 4 }}
