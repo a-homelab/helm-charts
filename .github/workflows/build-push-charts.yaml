@@ -39,9 +39,11 @@ jobs:
       
       - name: Login to the helm registry
         run: |-
-          echo "${HELM_INTERNAL_REGISTRY_PASSWORD}" | helm registry login ${PUBLIC_REGISTRY} --username "${HELM_INTERNAL_REGISTRY_USERNAME}" --password-stdin
-          echo "${HELM_INTERNAL_REGISTRY_PASSWORD}" | helm registry login ${PRIVATE_REGISTRY} --username "${HELM_INTERNAL_REGISTRY_USERNAME}" --password-stdin
+          echo "${HELM_INTERNAL_REGISTRY_PASSWORD}" | helm registry login "${PUBLIC_REGISTRY}" --username "${HELM_INTERNAL_REGISTRY_USERNAME}" --password-stdin
+          echo "${HELM_INTERNAL_REGISTRY_PASSWORD}" | helm registry login "${PRIVATE_REGISTRY}" --username "${HELM_INTERNAL_REGISTRY_USERNAME}" --password-stdin
         env:
+          PUBLIC_REGISTRY: registry.benfu.me/helm
+          INTERNAL_REGISTRY: registry.benfu.me/helm-internal
           HELM_INTERNAL_REGISTRY_USERNAME: ${{ secrets.HELM_INTERNAL_REGISTRY_USERNAME }}
           HELM_INTERNAL_REGISTRY_PASSWORD: ${{ secrets.HELM_INTERNAL_REGISTRY_PASSWORD }}
 
