@@ -22,6 +22,10 @@ spec:
   {{- if not $deploymentValues.autoscaling.enabled }}
   replicas: {{ $deploymentValues.replicaCount }}
   {{- end }}
+  {{- with $deploymentValues.strategy }}
+  strategy:
+    {{ toYaml . | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "common.selectorLabels" $rootCtx | nindent 6 }}
