@@ -31,12 +31,12 @@ env:
 envFrom:
   {{- toYaml . | nindent 2 }}
 {{- end }}
-{{- with (($containerValues.service).port) }}
 ports:
-  - name: http
-    containerPort: {{ . }}
-    protocol: TCP
-{{- end }}
+  {{- range $portName, $portValues := $containerValues.service.ports }}
+  - name: {{ $portName | quote }}
+    containerPort: {{ $portValues.containerPort | default $portValues.port | int }}
+    protocol: {{ $portValues.protocol | default "TCP" | quote }}
+  {{- end }}
 {{- with $containerValues.livenessProbe }}
 livenessProbe:
   {{- toYaml . | nindent 2 }}

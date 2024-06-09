@@ -21,10 +21,15 @@ metadata:
 spec:
   type: {{ $serviceValues.service.type }}
   ports:
-    - port: {{ $serviceValues.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
+    {{- range $portName, $portValues := $serviceValues.service.ports }}
+    - name: {{ $portName | quote }}
+      port: {{ $portValues.port | int }}
+      targetPort: {{ $portName | quote }}
+      protocol: {{ $portValues.protocol | default "TCP" | quote }}
+      {{- with $portValues.appProtocol }}
+      appProtocol: {{ . | quote }}
+      {{- end }}
+    {{- end }}
   selector:
     {{- include "common.selectorLabels" $rootCtx | nindent 4 }}
     {{- include "common.componentSelectorLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
