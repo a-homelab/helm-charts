@@ -13,7 +13,7 @@ This takes a dict with the following keys:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: name: {{ include "common.configMapName" (dict "rootCtx" $rootCtx "componentName" $componentName "configMapValues" $configMapValues) }}
+  name: {{ include "common.configMapName" (dict "rootCtx" $rootCtx "componentName" $componentName "configMapValues" $configMapValues) }}
   namespace: {{ $rootCtx.Release.Namespace | quote }}
   labels:
     {{- include "common.labels" $rootCtx | nindent 4 }}
