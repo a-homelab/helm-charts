@@ -1,1 +1,1 @@
-{{- include "common.deployment" (dict "rootCtx" $ "configMapValues" $.Values.config) -}}
+{{- include "common.configMap" (dict "rootCtx" $ "configMapValues" $.Values.config) -}}
