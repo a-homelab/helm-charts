@@ -19,7 +19,7 @@ metadata:
     {{- include "common.labels" $rootCtx | nindent 4 }}
     {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
 data:
-  {{- toYaml $configMapValues.data | nindent 2 }}
+  {{- tpl (toYaml $configMapValues.data) $rootCtx | nindent 2 }}
 {{- end -}}
 
 {{/*
