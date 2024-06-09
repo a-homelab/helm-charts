@@ -10,6 +10,9 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+strategy:
+  type: Recreate
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
