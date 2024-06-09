@@ -31,7 +31,7 @@ This takes a dict with the following keys:
 */}}
 {{- define "common.configMap" -}}
 {{- $rootCtx := .rootCtx -}}
-{{- $configMapValues := .configMapValues | default $rootCtx.Values -}}
+{{- $configMapValues := required ".configMapValues path to configMap config is required" .configMapValues -}}
 {{- $configMapOverrides := .configMapOverrides | default "common.defaultEmptyOverrides" -}}
 {{- $componentName := .componentName | default "" -}}
 {{- include "common.util.merge" (dict "rootCtx" $rootCtx "templateValues" $configMapValues "sourceTemplate" "common.configMap.tpl" "overridesTemplate" $configMapOverrides "componentName" $componentName) -}}
