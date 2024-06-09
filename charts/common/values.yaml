@@ -136,14 +136,9 @@ tolerations: []
 
 affinity: {}
 
-# `.Values.`
-secrets: []
-  # - name: my-secret
-  #   storeName: my-store
+configMaps: []
+  # - name: my-config
   #   data:
-  #     - secretKey: secretKey
-  #       remoteRef:
-  #         key: my-secrets-manager/path/to/secret
-  #         property: secretKey
-  #   dataFrom:
-  #     - key: my-secrets-manager/path/to/secret
+  #     someKey: someValue
+
+secrets: []

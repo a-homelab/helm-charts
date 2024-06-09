@@ -102,6 +102,16 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the name of a confiMap for a component
+*/}}
+{{- define "common.configMapName" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $componentName := .componentName -}}
+{{- $configMapValues := .configMapValues -}}
+{{- printf "%s-%s" (include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName)) ($configMapValues.name) }}
+{{- end }}
+
+{{/*
 Empty template for overrides
 */}}
 {{- define "common.defaultEmptyOverrides" -}}

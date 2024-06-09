@@ -1,0 +1,38 @@
+{{/*
+`common.configMap.tpl` defines a configMap definition.
+See: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/config-map-v1/
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .configMapValues: the portion of the Helm values map for the configMap. Defaults to the root values (`.Values`)
+- (optional) .componentName: the component name if this is part of a multi-component app
+*/}}
+{{- define "common.configMap.tpl" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $configMapValues := required ".templateValues path to configMap config is required" .templateValues -}}
+{{- $componentName := .componentName | default "" -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: name: {{ include "common.configMapName" (dict "rootCtx" $rootCtx "componentName" $componentName "configMapValues" $configMapValues) }}
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "common.labels" $rootCtx | nindent 4 }}
+    {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+data:
+  {{- toYaml $configMapValues.data | nindent 2 }}
+{{- end -}}
+
+{{/*
+`common.configMap` merges the configMap definition in `common.configMap.tpl` with overrides defined the helm values.
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .configMapValues: the portion of the Helm values map for the configMap. Defaults to the root values (`.Values`)
+- (optional) .configMapOverrides: the template name of the configMap overrides defined by the application chart
+*/}}
+{{- define "common.configMap" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $configMapValues := .configMapValues | default $rootCtx.Values -}}
+{{- $configMapOverrides := .configMapOverrides | default "common.defaultEmptyOverrides" -}}
+{{- $componentName := .componentName | default "" -}}
+{{- include "common.util.merge" (dict "rootCtx" $rootCtx "templateValues" $configMapValues "sourceTemplate" "common.configMap.tpl" "overridesTemplate" $configMapOverrides "componentName" $componentName) -}}
+{{- end -}}
