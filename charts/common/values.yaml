@@ -43,6 +43,8 @@ securityContext: {}
 
 env: []
 
+envFrom: []
+
 readinessProbe: {}
 
 initContainers: []
