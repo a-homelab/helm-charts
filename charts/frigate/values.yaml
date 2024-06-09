@@ -10,6 +10,8 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+runtimeClassName: ""
+
 strategy:
   type: Recreate
 
@@ -24,7 +26,9 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-podAnnotations: {}
+podAnnotations:
+  checksum/config: '{{ get .Values.config.data "config.yml" | sha256sum }}'
+
 podLabels: {}
 
 podSecurityContext: {}
