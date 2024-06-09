@@ -57,6 +57,9 @@ service:
 
   ports:
     http:
+      port: 8080
+      appProtocol: http
+    http-authless:
       port: 5000
       appProtocol: http
     rtsp:
