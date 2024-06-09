@@ -136,7 +136,7 @@ affinity: {}
 config:
   name: config
   data:
-    config: |-
+    config.yml: |-
       database:
         path: /config/frigate.db
 
