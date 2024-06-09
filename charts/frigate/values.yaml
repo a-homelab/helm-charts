@@ -53,9 +53,17 @@ service:
 
   ports:
     http:
-      port: 8080
-      # containerPort: 8080
-      # appProtocol: http
+      port: 5000
+      appProtocol: http
+    rtsp:
+      port: 8554
+      appProtocol: tcp
+    webrtc-tcp:
+      port: 8555
+      appProtocol: tcp
+    webrtc-udp:
+      port: 8555
+      appProtocol: udp
 
 ingress:
   enabled: false
