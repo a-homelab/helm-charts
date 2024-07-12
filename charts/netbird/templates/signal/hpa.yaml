@@ -1,0 +1,1 @@
+{{- include "common.hpa" (dict "rootCtx" $ "hpaValues" $.Values.signal "componentName" "signal") -}}

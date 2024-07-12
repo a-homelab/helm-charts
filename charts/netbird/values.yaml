@@ -139,8 +139,7 @@ signal:
     # If not set and create is true, a name is generated using the fullname template
     name: ""
 
-  podAnnotations:
-    checksum/config: '{{ get .Values.config.data "turnserver.conf" | sha256sum }}'
+  podAnnotations: {}
 
   podLabels: {}
 
@@ -157,7 +156,9 @@ signal:
 
   command: []
 
-  args: []
+  args:
+    - --log-file
+    - console
 
   env: []
 
@@ -174,7 +175,7 @@ signal:
 
     ports:
       http:
-        port: 8080
+        port: 10000
         # containerPort: 8080
         # appProtocol: http
 
