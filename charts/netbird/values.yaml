@@ -67,8 +67,8 @@ management:
     ports:
       http:
         port: 8080
-        # containerPort: 8080
-        # appProtocol: http
+        containerPort: 8080
+        appProtocol: http2
 
   httpRoute:
     enabled: false
@@ -176,10 +176,10 @@ signal:
     type: ClusterIP
 
     ports:
-      http:
+      grpc:
         port: 8080
-        # containerPort: 8080
-        # appProtocol: http
+        containerPort: 8080
+        appProtocol: grpc
 
   ingress:
     enabled: false
