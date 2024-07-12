@@ -157,6 +157,8 @@ signal:
   command: []
 
   args:
+    - --port
+    - "8080"
     - --log-file
     - console
 
@@ -175,7 +177,7 @@ signal:
 
     ports:
       http:
-        port: 10000
+        port: 8080
         # containerPort: 8080
         # appProtocol: http
 
