@@ -1,0 +1,1 @@
+{{- include "common.service" (dict "rootCtx" $ "serviceValues" $.Values.management "componentName" "management") -}}

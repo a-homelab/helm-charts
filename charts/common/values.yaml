@@ -43,6 +43,10 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+command: []
+
+args: []
+
 env: []
 
 envFrom: []
