@@ -32,7 +32,7 @@ envFrom:
   {{- toYaml . | nindent 2 }}
 {{- end }}
 ports:
-  {{- range $portName, $portValues := $containerValues.service.ports }}
+  {{- range $portName, $portValues := (($containerValues.service).ports) }}
   - name: {{ $portName | quote }}
     containerPort: {{ $portValues.containerPort | default $portValues.port | int }}
     protocol: {{ $portValues.protocol | default "TCP" | quote }}
