@@ -1,13 +1,5 @@
-# yaml-language-server: $schema=./container.schema.json
-
-# Default values for common.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-replicaCount: 1
-
 image:
-  repository: nginx
+  repository: netbirdio/netbird
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -35,10 +27,12 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
+securityContext:
+  capabilities:
+    add:
+      - NET_ADMIN
+      - SYS_RESOURCE
+      - SYS_ADMIN
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
@@ -47,7 +41,13 @@ command: []
 
 args: []
 
-env: []
+env:
+  - name: NB_SETUP_KEY
+    value: "0000000000-0000-0000-0000-0000000000" # replace with your setup key
+  - name: NB_HOSTNAME
+    value: "netbird-k8s-router" # name that will appear in the management UI
+  - name: NB_LOG_LEVEL
+    value: "info"
 
 envFrom: []
 
@@ -59,49 +59,6 @@ initContainers: []
 
 # Daemonset specific
 updateStrategy: {}
-
-service:
-  type: ClusterIP
-
-  ports:
-    http:
-      port: 8080
-      # containerPort: 8080
-      # appProtocol: http
-
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-
-httpRoute:
-  enabled: false
-  serviceHostname: ""
-  gatewayHostname: ""
-  parentRefs: []
-    # - name: ""
-    #   namespace: ""
-    #   sectionName: ""
-
-tlsRoute:
-  enabled: false
-  serviceHostname: ""
-  gatewayHostname: ""
-  parentRefs: []
-    # - name: ""
-    #   namespace: ""
-    #   sectionName: ""
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
