@@ -120,8 +120,8 @@ topologySpreadConstraints: []
   #   whenUnsatisfiable: DoNotSchedule
   #   labelSelector:
   #     matchLabels:
-  #       {{- include "common.selectorLabels" . | nindent 4 }}
-  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" . "componentName" "my-component") | nindent 4 }}
+  #       {{- include "common.selectorLabels" . | nindent 8 }}
+  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" . "componentName" "my-component") | nindent 8 }}
   #   matchLabelKeys:
   #     - pod-template-hash
   #   nodeTaintsPolicy: Honor
