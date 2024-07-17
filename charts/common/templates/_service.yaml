@@ -21,7 +21,9 @@ metadata:
 spec:
   type: {{ $serviceValues.service.type }}
   {{- if eq $serviceValues.service.type "ClusterIP" }}
-  clusterIP: {{ $serviceValues.service.clusterIP }}
+  {{- with $serviceValues.service.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
   {{- end }}
   ports:
     {{- range $portName, $portValues := $serviceValues.service.ports }}
