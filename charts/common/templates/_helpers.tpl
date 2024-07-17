@@ -138,6 +138,7 @@ Template the value if is a string, or use `toYaml`
 {{- else }}
 {{- tpl (toYaml $template) $rootCtx }}
 {{- end }}
+{{- end }}
 
 {{/*
 common.util.merge will merge two YAML templates and output the result.
