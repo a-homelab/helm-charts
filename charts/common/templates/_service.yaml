@@ -20,6 +20,9 @@ metadata:
     {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
 spec:
   type: {{ $serviceValues.service.type }}
+  {{- if eq $serviceValues.service.type "ClusterIP" }}
+  clusterIP: {{ $serviceValues.service.clusterIP }}
+  {{- end }}
   ports:
     {{- range $portName, $portValues := $serviceValues.service.ports }}
     - name: {{ $portName | quote }}

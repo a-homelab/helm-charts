@@ -62,6 +62,7 @@ updateStrategy: {}
 
 service:
   type: ClusterIP
+  clusterIP: ""
 
   ports:
     http:
