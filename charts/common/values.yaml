@@ -146,6 +146,17 @@ tolerations: []
 
 affinity: {}
 
+topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: kubernetes.io/hostname
+  #   whenUnsatisfiable: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       app.kubernetes.io/component: my-app
+  #   matchLabelKeys:
+  #     - pod-template-hash
+  #   nodeTaintsPolicy: Honor
+
 configMaps: []
   # - name: my-config
   #   data:
