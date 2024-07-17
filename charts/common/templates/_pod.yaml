@@ -50,7 +50,7 @@ spec:
   {{- end }}
   {{- with $podValues.topologySpreadConstraints }}
   topologySpreadConstraints:
-    {{- tpl (toYaml .) $rootCtx | nindent 4 }}
+    {{- include "common.tpl" (dict "rootCtx" $rootCtx "template" .) | nindent 4 }}
   {{- end }}
   {{- with $podValues.volumes }}
   volumes:

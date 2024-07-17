@@ -128,6 +128,18 @@ Get externalsecret name for referencing from env vars
 {{- end }}
 
 {{/*
+Template the value if is a string, or use `toYaml`
+*/}}
+{{- define "common.tpl" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $template := .template -}}
+{{- if typeIs "string" $template }}
+{{- tpl $template $rootCtx }}
+{{- else }}
+{{- tpl (toYaml $template) $rootCtx }}
+{{- end }}
+
+{{/*
 common.util.merge will merge two YAML templates and output the result.
 This takes a dict with the following keys:
 - .rootCtx: the root context

@@ -151,8 +151,9 @@ topologySpreadConstraints: []
   #   topologyKey: kubernetes.io/hostname
   #   whenUnsatisfiable: DoNotSchedule
   #   labelSelector:
-  #     matchLabels:
-  #       app.kubernetes.io/component: my-app
+  #     matchLabels: |
+  #       {{- include "common.selectorLabels" $rootCtx | nindent 4 }}
+  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
   #   matchLabelKeys:
   #     - pod-template-hash
   #   nodeTaintsPolicy: Honor
