@@ -120,7 +120,8 @@ topologySpreadConstraints: []
   #   whenUnsatisfiable: DoNotSchedule
   #   labelSelector:
   #     matchLabels:
-  #       app.kubernetes.io/component: my-app
+  #       {{- include "common.selectorLabels" . | nindent 4 }}
+  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" . "componentName" "my-component") | nindent 4 }}
   #   matchLabelKeys:
   #     - pod-template-hash
   #   nodeTaintsPolicy: Honor
