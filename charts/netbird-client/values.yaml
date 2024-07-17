@@ -64,7 +64,6 @@ updateStrategy: {}
 
 service:
   type: ClusterIP
-  clusterIP: ""
 
   ports:
     udp:
