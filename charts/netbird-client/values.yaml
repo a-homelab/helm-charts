@@ -68,6 +68,7 @@ service:
   ports:
     udp:
       port: 1 # port doesn't matter here
+      protocol: UDP
       # containerPort: 8080
       # appProtocol: http
 
