@@ -61,10 +61,18 @@ spec:
     storageClass: {{ .Values.storageClass | quote }}
     size: {{ .Values.storageSize | quote }}
   
-  # affinity:
-  #   enablePodAntiAffinity: true
-  #   topologyKey: kubernetes.io/hostname
-  #   podAntiAffinityType: preferred
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.benfu.me/storage
+                operator: In
+                values:
+                  - "true"
+    # enablePodAntiAffinity: true
+    # topologyKey: kubernetes.io/hostname
+    # podAntiAffinityType: required
   
   topologySpreadConstraints:
     - maxSkew: 1
@@ -73,7 +81,6 @@ spec:
       labelSelector:
         matchLabels:
           {{- include "postgresql.labels" . | nindent 10 }}
-      nodeTaintsPolicy: Honor
   
   resources:
     {{- toYaml .Values.resources | nindent 4 }}
