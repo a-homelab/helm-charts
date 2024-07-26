@@ -30,8 +30,8 @@ serviceAccount:
 podAnnotations: {}
 podLabels: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+podSecurityContext:
+  fsGroup: 1000
 
 securityContext: {}
   # capabilities:
@@ -45,7 +45,13 @@ command: []
 
 args: []
 
-env: []
+env:
+  - name: TZ
+    value: America/Chicago
+  - name: PUID
+    value: "1000"
+  - name: PGID
+    value: "1000"
 
 envFrom: []
 
@@ -135,17 +141,16 @@ pdb:
   # minAvailable: 1
 
 # Additional volumes on the output Deployment definition.
-volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
-#     optional: false
+volumes:
+  - name: config
+    persistentVolumeClaim:
+      claimName: radarr-config
 
 # Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-# - name: foo
-#   mountPath: "/etc/foo"
-#   readOnly: true
+volumeMounts:
+  - name: config
+    mountPath: /config
+    readOnly: true
 
 nodeSelector: {}
 
