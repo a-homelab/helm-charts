@@ -112,6 +112,16 @@ Create the name of a confiMap for a component
 {{- end }}
 
 {{/*
+Create the name of a pvc for a component
+*/}}
+{{- define "common.pvcName" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $componentName := .componentName -}}
+{{- $pvcValues := .pvcValues -}}
+{{- printf "%s-%s" (include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName)) ($pvcValues.name) }}
+{{- end }}
+
+{{/*
 Empty template for overrides
 */}}
 {{- define "common.defaultEmptyOverrides" -}}

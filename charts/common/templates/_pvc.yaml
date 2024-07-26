@@ -1,0 +1,46 @@
+{{/*
+`common.pvc.tpl` defines a pvc definition.
+See: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .pvcValues: the portion of the Helm values map for the pvc. Defaults to the root values (`.Values`)
+- (optional) .componentName: the component name if this is part of a multi-component app
+*/}}
+{{- define "common.pvc.tpl" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $pvcValues := required ".templateValues path to pvc config is required" .templateValues -}}
+{{- $componentName := .componentName | default "" -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "common.pvcName" (dict "rootCtx" $rootCtx "componentName" $componentName "pvcValues" $pvcValues) }}
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "common.labels" $rootCtx | nindent 4 }}
+    {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+spec:
+  storageClassName: {{ $pvcValues.storageClassName | quote }}
+  accessModes:
+    {{- range $pvcValues.accessModes }}
+    - {{ . }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ $pvcValues.storageSize | quote }}
+  {{- tpl (toYaml $pvcValues.data) $rootCtx | nindent 2 }}
+{{- end -}}
+
+{{/*
+`common.pvc` merges the pvc definition in `common.pvc.tpl` with overrides defined the helm values.
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .pvcValues: the portion of the Helm values map for the pvc. Defaults to the root values (`.Values`)
+- (optional) .pvcOverrides: the template name of the pvc overrides defined by the application chart
+*/}}
+{{- define "common.pvc" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $pvcValues := required ".pvcValues path to pvc config is required" .pvcValues -}}
+{{- $pvcOverrides := .pvcOverrides | default "common.defaultEmptyOverrides" -}}
+{{- $componentName := .componentName | default "" -}}
+{{- include "common.util.merge" (dict "rootCtx" $rootCtx "templateValues" $pvcValues "sourceTemplate" "common.pvc.tpl" "overridesTemplate" $pvcOverrides "componentName" $componentName) -}}
+{{- end -}}

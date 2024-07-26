@@ -163,4 +163,11 @@ configMaps: []
   #   data:
   #     someKey: someValue
 
+persistentVolumeClaims: []
+  # - name: my-pvc
+  #   storageClassName: my-storage-class
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   storageSize: 1Gi
+
 secrets: []
