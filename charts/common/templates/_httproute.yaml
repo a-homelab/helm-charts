@@ -12,7 +12,7 @@ This takes a dict with the following keys:
 {{- $componentName := .componentName | default "" -}}
 {{- if $httpRouteValues.httpRoute.enabled -}}
 {{- $serviceHostname := $httpRouteValues.httpRoute.serviceHostname | default (include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName)) -}}
-{{- $gatewayHostname := $httpRouteValues.httpRoute.gatewayHostname | default $rootCtx.Values.global.gateway.hostname -}}
+{{- $gatewayHostname := $httpRouteValues.httpRoute.gatewayHostname -}}
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
 metadata:
@@ -35,7 +35,7 @@ spec:
     - {{ include "common.tpl" (dict "rootCtx" $rootCtx "template" .) | nindent 6 }}
     {{- end }}
 {{- end }}
-{{- end }}
+{{- end -}}
 
 {{/*
 `common.httpRoute` merges the httpRoute definition in `common.httpRoute.tpl` with overrides defined the helm values.
