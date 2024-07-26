@@ -27,6 +27,7 @@ postgresqlConfig: {}
 initdb:
   localeCType: C
   localeCollate: C
+  postInitSQL: []
   postInitTemplateSQL: []
   postInitApplicationSQL: []
 

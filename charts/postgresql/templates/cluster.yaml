@@ -36,6 +36,10 @@ spec:
         name: {{ required ".Values.userCredsSecretName" .Values.userCredsSecretName | quote }}
       localeCType: {{ .Values.initdb.localeCType | quote }}
       localeCollate: {{ .Values.initdb.localeCollate | quote }}
+      {{- with .Values.initdb.postInitSQL }}
+      postInitSQL:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.initdb.postInitTemplateSQL }}
       postInitTemplateSQL:
         {{- toYaml . | nindent 8 }}
