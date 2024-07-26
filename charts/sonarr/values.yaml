@@ -70,7 +70,7 @@ service:
 
   ports:
     http:
-      port: 7878
+      port: 8989
       # containerPort: 8080
       # appProtocol: http
 
