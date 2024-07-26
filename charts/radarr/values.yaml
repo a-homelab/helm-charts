@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=./container.schema.json
-
 # Default values for common.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
@@ -7,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: nginx
+  repository: lscr.io/linuxserver/radarr
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
@@ -163,12 +161,12 @@ configMaps: []
   #   data:
   #     someKey: someValue
 
-persistentVolumeClaims: {}
-  # my-pvc:
-  #   name: my-pvc
-  #   storageClassName: my-storage-class
-  #   accessModes:
-  #     - ReadWriteOnce
-  #   storageSize: 1Gi
+persistentVolumeClaims:
+  config:
+    name: config
+    storageClassName: my-storage-class
+    accessModes:
+      - ReadWriteOnce
+    storageSize: 1Gi
 
 secrets: []
