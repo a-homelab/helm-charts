@@ -94,6 +94,15 @@ httpRoute:
     # - name: ""
     #   namespace: ""
     #   sectionName: ""
+  rules: []
+    # - |
+    #   matches:
+    #     - path:
+    #         type: PathPrefix
+    #         value: /
+    #   backendRefs:
+    #     - name: {{ include "common.fullComponentName" (dict "rootCtx" $ "componentName" "my-component") }}
+    #       port: {{ $.Values.service.ports.http.port }}
 
 tlsRoute:
   enabled: false

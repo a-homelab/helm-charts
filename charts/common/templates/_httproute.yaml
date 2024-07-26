@@ -31,13 +31,9 @@ spec:
   hostnames:
     - "{{ $serviceHostname }}.{{ $gatewayHostname }}"
   rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      backendRefs:
-        - name: {{ include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName) }}
-          port: {{ $httpRouteValues.service.port }}
+    {{- range $httpRouteValues.httpRoute.rules }}
+    - {{ include "common.tpl" (dict "rootCtx" $rootCtx "template" .) | nindent 6 }}
+    {{- end }}
 {{- end }}
 {{- end }}
 
