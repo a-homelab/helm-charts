@@ -150,7 +150,6 @@ volumes:
 volumeMounts:
   - name: config
     mountPath: /config
-    readOnly: true
 
 nodeSelector: {}
 
