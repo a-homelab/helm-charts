@@ -22,7 +22,7 @@ spec:
   storageClassName: {{ $pvcValues.storageClassName | quote }}
   accessModes:
     {{- range $pvcValues.accessModes }}
-    - {{ . | nindent 4 }}
+    - {{ . | nindent 6 }}
     {{- end }}
   resources:
     requests:
