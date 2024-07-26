@@ -21,6 +21,9 @@ metadata:
   labels:
     {{- include "common.labels" $rootCtx | nindent 4 }}
     {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+    {{- with $httpRouteValues.httpRoute.labels }}
+    {{- toYaml . | nindent 4 -}}
+    {{- end }}
   annotations:
     link.argocd.argoproj.io/external-link: "https://{{ $serviceHostname }}.{{ $gatewayHostname }}"
 spec:

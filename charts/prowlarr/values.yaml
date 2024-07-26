@@ -92,6 +92,7 @@ ingress:
 
 httpRoute:
   enabled: false
+  labels: {}
   serviceHostname: ""
   gatewayHostname: ""
   parentRefs: []
