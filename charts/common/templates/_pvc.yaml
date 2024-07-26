@@ -22,12 +22,11 @@ spec:
   storageClassName: {{ $pvcValues.storageClassName | quote }}
   accessModes:
     {{- range $pvcValues.accessModes }}
-    - {{ . }}
+    - {{ . | nindent 4 }}
     {{- end }}
   resources:
     requests:
       storage: {{ $pvcValues.storageSize | quote }}
-  {{- tpl (toYaml $pvcValues.data) $rootCtx | nindent 2 }}
 {{- end -}}
 
 {{/*
