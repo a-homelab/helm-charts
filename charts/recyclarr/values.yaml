@@ -9,6 +9,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 runtimeClassName: ""
+restartPolicy: Never
 
 serviceAccount:
   # Specifies whether a service account should be created
