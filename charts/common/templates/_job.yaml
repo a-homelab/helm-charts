@@ -44,10 +44,6 @@ spec:
   {{- with $jobValues.suspend }}
   suspend: {{ . }}
   {{- end }}
-  selector:
-    matchLabels:
-      {{- include "common.selectorLabels" $rootCtx | nindent 6 }}
-      {{- include "common.componentSelectorLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 6 }}
 {{- end }}
 
 {{/*
