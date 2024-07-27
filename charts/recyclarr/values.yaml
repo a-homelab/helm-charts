@@ -71,8 +71,8 @@ updateStrategy: {}
 # Cronjob
 schedule: "0 * * * *"
 timeZone: ""
-concurrencyPolicy: ""
-startingDeadlineSeconds: null
+concurrencyPolicy: Forbid
+startingDeadlineSeconds: 300
 successfulJobsHistoryLimit: null
 failedJobsHistoryLimit: null
 
