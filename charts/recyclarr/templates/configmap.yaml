@@ -1,0 +1,1 @@
+{{- include "common.configMap" (dict "rootCtx" $ "configMapValues" $.Values.configMaps.config) -}}

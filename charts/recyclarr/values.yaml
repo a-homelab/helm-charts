@@ -1,0 +1,162 @@
+image:
+  repository: ghcr.io/recyclarr/recyclarr
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+runtimeClassName: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  # capabilities:
+  #   drop:
+  #   - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+command:
+  - recyclarr
+
+args:
+  # - create
+  - sync
+  - --preview
+  - --debug
+
+env:
+  - name: TZ
+    value: America/Chicago
+  - name: RECYCLARR_CREATE_CONFIG
+    value: "false"
+
+envFrom: []
+
+livenessProbe: {}
+readinessProbe: {}
+startupProbe: {}
+
+initContainers: []
+
+# Create a standalone resource. Applies to the following templates:
+#   - pod
+#   - job
+createStandaloneResource: false
+
+# Daemonset
+updateStrategy: {}
+
+# Cronjob
+schedule: "0 * * * *"
+timeZone: ""
+concurrencyPolicy: ""
+startingDeadlineSeconds: null
+successfulJobsHistoryLimit: null
+failedJobsHistoryLimit: null
+
+# Applies to both cronjob and job
+suspend: false
+
+# Job
+parallelism: null
+completions: null
+completionMode: ""
+backoffLimit: null
+activeDeadlineSeconds: null
+ttlSecondsAfterFinished: null
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# Additional volumes on the output Deployment definition.
+volumes:
+  - name: config
+    configMap:
+      name: '{{ include "common.configMapName" (dict "rootCtx" $ "configMapValues" $.Values.configMaps.config) }}'
+      defaultMode: 0400
+  - name: data
+    persistentVolumeClaim:
+      claimName: recyclarr-data
+  - name: tmpfs
+    emptyDir:
+      medium: Memory
+      sizeLimit: 1Gi
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+  - name: config
+    mountPath: /config/recyclarr.yml
+    subPath: recyclarr.yml
+    readOnly: true
+  - name: data
+    mountPath: /config
+  - name: tmpfs
+    mountPath: /tmp
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: kubernetes.io/hostname
+  #   whenUnsatisfiable: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       {{- include "common.selectorLabels" . | nindent 8 }}
+  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" . "componentName" "my-component") | nindent 8 }}
+  #   matchLabelKeys:
+  #     - pod-template-hash
+  #   nodeTaintsPolicy: Honor
+
+configMaps:
+  config:
+    name: config
+    data:
+      recyclarr.yml: |
+        service_type:
+          instance_name:
+            base_url: http://localhost:1234
+            api_key: f7e74ba6c80046e39e076a27af5a8444
+
+persistentVolumeClaims:
+  data:
+    name: recyclarr-data
+    storageClassName: my-storage-class
+    accessModes:
+      - ReadWriteOnce
+    storageSize: 1Gi
+
+secrets: []
