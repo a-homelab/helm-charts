@@ -26,6 +26,9 @@ spec:
   {{- with $podValues.runtimeClassName }}
   runtimeClassName: {{ . | quote }}
   {{- end }}
+  {{- with $podValues.restartPolicy }}
+  restartPolicy: {{ . | quote }}
+  {{- end }}
   enableServiceLinks: false
   serviceAccountName: {{ include "common.serviceAccountName" (dict "rootCtx" $rootCtx "serviceAccountValues" $podValues "componentName" $componentName) }}
   securityContext:
