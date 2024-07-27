@@ -57,9 +57,34 @@ startupProbe: {}
 
 initContainers: []
 
-# Daemonset specific
+# Create a standalone resource. Applies to the following templates:
+#   - pod
+#   - job
+createStandaloneResource: false
+
+# Daemonset
 updateStrategy: {}
 
+# Cronjob
+schedule: ""
+timeZone: ""
+concurrencyPolicy: ""
+startingDeadlineSeconds: null
+successfulJobsHistoryLimit: null
+failedJobsHistoryLimit: null
+
+# Applies to both cronjob and job
+suspend: false
+
+# Job
+parallelism: null
+completions: null
+completionMode: ""
+backoffLimit: null
+activeDeadlineSeconds: null
+ttlSecondsAfterFinished: null
+
+# Service values
 service:
   type: ClusterIP
   clusterIP: ""

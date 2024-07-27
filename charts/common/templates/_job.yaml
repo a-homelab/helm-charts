@@ -1,0 +1,66 @@
+{{/*
+`common.job.tpl` defines a job definition.
+See: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/job-v1/
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .jobValues: the portion of the Helm values map for the job. Defaults to the root values (`.Values`)
+- (optional) .componentName: the component name if this is part of a multi-component app
+*/}}
+{{- define "common.job.tpl" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $jobValues := .templateValues | default $rootCtx.Values -}}
+{{- $componentName := .componentName | default "" -}}
+{{- if $jobValues.createStandaloneResource }}
+apiVersion: batch/v1
+kind: Job
+{{- end }}
+metadata:
+  name: {{ include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName) }}
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "common.labels" $rootCtx | nindent 4 }}
+    {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+spec:
+  template:
+    {{- include "common.pod.tpl" (dict "rootCtx" $rootCtx "templateValues" $jobValues "componentName" $componentName) | nindent 4 }}
+  {{- with $jobValues.parallelism }}
+  parallelism: {{ . | int }}
+  {{- end }}
+  {{- with $jobValues.completions }}
+  completions: {{ . | int }}
+  {{- end }}
+  {{- with $jobValues.completionMode }}
+  completionMode: {{ . | quote }}
+  {{- end }}
+  {{- with $jobValues.backoffLimit }}
+  backoffLimit: {{ . | int }}
+  {{- end }}
+  {{- with $jobValues.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . | int }}
+  {{- end }}
+  {{- with $jobValues.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . | int }}
+  {{- end }}
+  {{- with $jobValues.suspend }}
+  suspend: {{ . }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" $rootCtx | nindent 6 }}
+      {{- include "common.componentSelectorLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 6 }}
+{{- end }}
+
+{{/*
+`common.job` merges the job definition in `common.job.tpl` with overrides defined the helm values.
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .jobValues: the portion of the Helm values map for the job. Defaults to the root values (`.Values`)
+- (optional) .jobOverrides: the template name of the job overrides defined by the application chart
+*/}}
+{{- define "common.job" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $jobValues := .jobValues | default $rootCtx.Values -}}
+{{- $jobOverrides := .jobOverrides | default "common.defaultEmptyOverrides" -}}
+{{- $componentName := .componentName | default "" -}}
+{{- include "common.util.merge" (dict "rootCtx" $rootCtx "templateValues" $jobValues "sourceTemplate" "common.job.tpl" "overridesTemplate" $jobOverrides "componentName" $componentName) -}}
+{{- end -}}

@@ -1,0 +1,58 @@
+{{/*
+`common.cronJob.tpl` defines a cronJob definition.
+See: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/cron-job-v1/
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .cronJobValues: the portion of the Helm values map for the cronJob. Defaults to the root values (`.Values`)
+- (optional) .componentName: the component name if this is part of a multi-component app
+*/}}
+{{- define "common.cronJob.tpl" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $cronJobValues := .templateValues | default $rootCtx.Values -}}
+{{- $componentName := .componentName | default "" -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName) }}
+  namespace: {{ $rootCtx.Release.Namespace | quote }}
+  labels:
+    {{- include "common.labels" $rootCtx | nindent 4 }}
+    {{- include "common.componentLabels" (dict "rootCtx" $rootCtx "componentName" $componentName) | nindent 4 }}
+spec:
+  jobTemplate:
+    {{- include "common.job.tpl" (dict "rootCtx" $rootCtx "templateValues" $cronJobValues "componentName" $componentName) | nindent 4 }}
+  schedule: {{ $cronJobValues.schedule | quote }}
+  {{- with $cronJobValues.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  {{- with $cronJobValues.concurrencyPolicy }}
+  concurrencyPolicy: {{ . | quote }}
+  {{- end }}
+  {{- with $cronJobValues.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ . | int }}
+  {{- end }}
+  {{- with $cronJobValues.suspend }}
+  suspend: {{ . }}
+  {{- end }}
+  {{- with $cronJobValues.successfulJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ . | int }}
+  {{- end }}
+  {{- with $cronJobValues.failedJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ . | int }}
+  {{- end }}
+{{- end }}
+
+{{/*
+`common.cronJob` merges the cronJob definition in `common.cronJob.tpl` with overrides defined the helm values.
+This takes a dict with the following keys:
+- .rootCtx: the root context
+- (optional) .cronJobValues: the portion of the Helm values map for the cronJob. Defaults to the root values (`.Values`)
+- (optional) .cronJobOverrides: the template name of the cronJob overrides defined by the application chart
+*/}}
+{{- define "common.cronJob" -}}
+{{- $rootCtx := .rootCtx -}}
+{{- $cronJobValues := .cronJobValues | default $rootCtx.Values -}}
+{{- $cronJobOverrides := .cronJobOverrides | default "common.defaultEmptyOverrides" -}}
+{{- $componentName := .componentName | default "" -}}
+{{- include "common.util.merge" (dict "rootCtx" $rootCtx "templateValues" $cronJobValues "sourceTemplate" "common.cronJob.tpl" "overridesTemplate" $cronJobOverrides "componentName" $componentName) -}}
+{{- end -}}
