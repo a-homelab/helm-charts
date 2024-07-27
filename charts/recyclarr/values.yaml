@@ -154,7 +154,7 @@ configMaps:
 
 persistentVolumeClaims:
   data:
-    name: recyclarr-data
+    name: data
     storageClassName: my-storage-class
     accessModes:
       - ReadWriteOnce
