@@ -57,7 +57,7 @@ service:
 
   ports:
     http:
-      port: 8080
+      port: 8971
       appProtocol: http
     http-authless:
       port: 5000
