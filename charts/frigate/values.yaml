@@ -58,7 +58,16 @@ readinessProbe:
   periodSeconds: 10
   timeoutSeconds: 10
 
-startupProbe: {}
+startupProbe:
+  httpGet:
+    path: /api/version
+    port: http
+    scheme: HTTP
+  # 10 min for generating tensorrt models
+  failureThreshold: 60
+  successThreshold: 1
+  periodSeconds: 10
+  timeoutSeconds: 1
 
 initContainers: []
 
