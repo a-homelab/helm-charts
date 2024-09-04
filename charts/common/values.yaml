@@ -63,6 +63,9 @@ initContainers: []
 #   - job
 createStandaloneResource: false
 
+# Deployment
+strategy: {}
+
 # Daemonset
 updateStrategy: {}
 

@@ -61,6 +61,10 @@ startupProbe: {}
 
 initContainers: []
 
+# Deployment
+strategy:
+  type: Recreate
+
 # Daemonset specific
 updateStrategy: {}
 
