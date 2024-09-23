@@ -131,8 +131,7 @@ gateway:
   image:
     repository: codecov/self-hosted-gateway
     pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: ""
+    tag: "24.9.3"
 
   imagePullSecrets: []
   nameOverride: ""
@@ -246,8 +245,7 @@ frontend:
   image:
     repository: codecov/self-hosted-frontend
     pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: ""
+    tag: "24.9.3"
 
   imagePullSecrets: []
   nameOverride: ""
@@ -336,8 +334,7 @@ api:
   image:
     repository: codecov/self-hosted-api
     pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: ""
+    tag: "24.9.1"
 
   imagePullSecrets: []
   nameOverride: ""
@@ -426,8 +423,7 @@ worker:
   image:
     repository: codecov/self-hosted-worker
     pullPolicy: IfNotPresent
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: ""
+    tag: "24.9.3"
 
   imagePullSecrets: []
   nameOverride: ""
