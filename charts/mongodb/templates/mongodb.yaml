@@ -49,17 +49,17 @@ spec:
   
   statefulSet:
     spec:
-      selector:
-        matchLabels:
-          {{- include "mongodb.selectorLabels" . | nindent 10 }}
+      # selector:
+      #   matchLabels:
+      #     {{- include "mongodb.selectorLabels" . | nindent 10 }}
       template:
         metadata:
           {{- with .Values.podAnnotations }}
           annotations:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          labels:
-            {{- include "mongodb.selectorLabels" . | nindent 12 }}
+          # labels:
+          #   {{- include "mongodb.selectorLabels" . | nindent 12 }}
         spec:
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets:
