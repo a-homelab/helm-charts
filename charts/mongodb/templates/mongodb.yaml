@@ -61,8 +61,6 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           serviceAccountName: {{ include "mongodb.fullname" . }}
-          securityContext:
-            {{- toYaml .Values.podSecurityContext | nindent 12 }}
           containers:
             - name: mongod
               resources:
