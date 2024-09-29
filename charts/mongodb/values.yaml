@@ -1,5 +1,6 @@
 members: 3
 version: 7.0.2
+featureCompatibilityVersion: ""
 
 # admin username
 adminUserName: null

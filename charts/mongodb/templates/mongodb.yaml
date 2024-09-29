@@ -9,6 +9,9 @@ spec:
   members: {{ .Values.members }}
   type: ReplicaSet
   version: {{ .Values.version }}
+  {{- with .Values.featureCompatibilityVersion }}
+  featureCompatibilityVersion: {{ . | quote }}
+  {{- end }}
 
   agent:
     logFile: /dev/stdout
