@@ -62,6 +62,8 @@ spec:
               value: {{ .Values.mongodb.port | quote }}
             - name: MONGO_DBNAME
               value: {{ .Values.mongodb.dbName | quote }}
+            - name: MONGO_AUTHSOURCE
+              value: {{ .Values.mongodb.authSource | quote }}
             {{- with .Values.memoryLimit }}
             - name: MEM_LIMIT
               value: {{ . | quote }}

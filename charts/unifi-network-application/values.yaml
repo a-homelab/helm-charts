@@ -6,6 +6,7 @@ mongodb:
   host: unifi-db
   port: 27017
   dbName: unifi
+  authSource: admin
   # Existing k8s secret must have following keys: `username`, `password`
   existingSecretName: null
 
