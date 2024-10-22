@@ -22,7 +22,7 @@ spec:
 {{- $componentCtx := index . 2 -}}
 env:
   - name: RUN_ENV
-    value: enterprise
+    value: ENTERPRISE
   {{- include "codecov.common.env" . | nindent 2 }}
   {{- with $componentCtx.extraEnv }}
   {{- toYaml . | nindent 2 }}
