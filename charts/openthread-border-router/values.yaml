@@ -69,7 +69,7 @@ args: []
 
 env: |
   - name: OT_RCP_DEVICE
-    value: "spinel+hdlc+uart:///dev/ttyACM0?uart-baudrate=1000000&uart-flow-control"
+    value: "spinel+hdlc+uart:///dev/ttyACM0?uart-baudrate=460800&uart-flow-control"
   - name: OT_INFRA_IF
     value: {{ .Values.infraNetworkInterface | quote }}
   - name: OT_THREAD_IF
