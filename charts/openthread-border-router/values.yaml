@@ -54,6 +54,7 @@ securityContext:
   capabilities:
     add:
       - NET_ADMIN
+      - SYS_RAWIO
   # Required to get device passthrough working
   # privileged: true
   # readOnlyRootFilesystem: true
