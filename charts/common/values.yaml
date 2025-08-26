@@ -19,6 +19,7 @@ fullnameOverride: ""
 runtimeClassName: ""
 restartPolicy: ""
 hostNetwork: false
+dnsPolicy: ""
 
 serviceAccount:
   # Specifies whether a service account should be created

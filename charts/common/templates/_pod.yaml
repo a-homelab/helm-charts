@@ -32,6 +32,9 @@ spec:
   {{- with $podValues.hostNetwork }}
   hostNetwork: {{ . }}
   {{- end }}
+  {{- with $podValues.dnsPolicy }}
+  dnsPolicy: {{ . | quote }}
+  {{- end }}
   enableServiceLinks: false
   serviceAccountName: {{ include "common.serviceAccountName" (dict "rootCtx" $rootCtx "serviceAccountValues" $podValues "componentName" $componentName) }}
   securityContext:
