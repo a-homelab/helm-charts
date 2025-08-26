@@ -58,7 +58,7 @@ securityContext:
       - SYS_ADMIN
       - SYS_RESOURCE
   # Required to get device passthrough working
-  # privileged: true
+  privileged: true
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
