@@ -1,0 +1,157 @@
+# Default values for common.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/home-assistant-libs/python-matter-server
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+runtimeClassName: ""
+
+# Host network, multus, or a multicast CNI is needed to bridge with outside network
+hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+  # capabilities:
+  #   add:
+  #     - NET_ADMIN
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+command: []
+
+args: []
+
+env: |
+  - name: OT_RCP_DEVICE
+    value: "spinel+hdlc+uart:///dev/ttyACM0?uart-baudrate=460800&uart-flow-control"
+  - name: OT_INFRA_IF
+    value: {{ .Values.infraNetworkInterface | quote }}
+  - name: OT_THREAD_IF
+    value: {{ .Values.threadNetworkInterface | quote }}
+  - name: OT_REST_LISTEN_ADDR
+    value: "0.0.0.0"
+  - name: OT_REST_LISTEN_PORT
+    value: {{ .Values.service.ports.http.port | quote }}
+  - name: OT_LOG_LEVEL
+    value: {{ .Values.logLevel | quote }}
+
+envFrom: []
+
+livenessProbe: {}
+readinessProbe: {}
+startupProbe: {}
+
+initContainers: []
+
+# Deployment
+strategy:
+  type: Recreate
+
+# Daemonset specific
+updateStrategy: {}
+
+service:
+  type: ClusterIP
+  ports:
+    http:
+      port: 8081
+
+httpRoute:
+  enabled: false
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+pdb:
+  enabled: false
+  # minAvailable: 1
+
+# Additional volumes on the output Deployment definition.
+volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: >-
+        {{ include "common.pvcName" (dict "rootCtx" $ "pvcValues" $.Values.persistentVolumeClaims.data) }}
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+  - name: data
+    mountPath: /data
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: kubernetes.io/hostname
+  #   whenUnsatisfiable: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       {{- include "common.selectorLabels" . | nindent 8 }}
+  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" . "componentName" "my-component") | nindent 8 }}
+  #   matchLabelKeys:
+  #     - pod-template-hash
+  #   nodeTaintsPolicy: Honor
+
+configMaps: []
+  # - name: my-config
+  #   data:
+  #     someKey: someValue
+
+persistentVolumeClaims:
+  data:
+    name: data
+    storageClassName: my-storage-class
+    accessModes:
+      - ReadWriteOnce
+    storageSize: 1Gi
+
+secrets: []
