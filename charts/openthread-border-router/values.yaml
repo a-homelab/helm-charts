@@ -1,0 +1,177 @@
+# Default values for common.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Thread RCP device
+rcpDeviceHostPath: ""
+
+# Network interface used for the adjacent network.
+# See: https://openthread.io/guides/border-router/build-docker#create-an-otbr-configuration-file
+infraNetworkInterface: ""
+
+# Network interface used for the thread network.
+# See: https://openthread.io/guides/border-router/build-docker#create-an-otbr-configuration-file
+threadNetworkInterface: wpan0
+
+# Log level used by OpenThread
+# See: https://openthread.io/guides/border-router/build-docker#create-an-otbr-configuration-file
+logLevel: 7
+
+replicaCount: 1
+
+image:
+  repository: openthread/border-router
+  pullPolicy: Always
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: latest
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+runtimeClassName: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext:
+  capabilities:
+    add:
+      - NET_ADMIN
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+command: []
+
+args: []
+
+env:
+  - name: OT_RCP_DEVICE
+    value: "spinel+hdlc+uart:///dev/ttyACM0?uart-baudrate=1000000&uart-flow-control"
+  - name: OT_INFRA_IF
+    value: "{{ .Values.infraNetworkInterface | quote }}"
+  - name: OT_THREAD_IF
+    value: "{{ .Values.threadNetworkInterface | quote }}"
+  - name: OT_REST_LISTEN_ADDR
+    value: "0.0.0.0"
+  - name: OT_REST_LISTEN_PORT
+    value: "{{ .Values.service.ports.http.port | quote }}"
+  - name: OT_LOG_LEVEL
+    value: "{{ .Values.logLevel | quote }}"
+
+envFrom: []
+
+livenessProbe: {}
+readinessProbe: {}
+startupProbe: {}
+
+initContainers: []
+
+# Deployment
+strategy:
+  type: Recreate
+
+# Daemonset specific
+updateStrategy: {}
+
+service:
+  type: ClusterIP
+  ports:
+    http:
+      port: 8081
+
+httpRoute:
+  enabled: false
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+pdb:
+  enabled: false
+  # minAvailable: 1
+
+# Additional volumes on the output Deployment definition.
+volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: >-
+        {{ include "common.pvcName" (dict "rootCtx" $ "pvcValues" $.Values.persistentVolumeClaims.data) }}
+  - name: rcp
+    hostPath:
+      path: >-
+        {{ .Values.rcpDeviceHostPath | quote }}
+  - name: tunnel
+    hostPath:
+      path: /dev/net/tun
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+  - name: data
+    mountPath: /data
+  - name: rcp
+    mountPath: /dev/ttyACM0
+  - name: tunnel
+    mountPath: /dev/net/tun
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+topologySpreadConstraints: []
+  # - maxSkew: 1
+  #   topologyKey: kubernetes.io/hostname
+  #   whenUnsatisfiable: DoNotSchedule
+  #   labelSelector:
+  #     matchLabels:
+  #       {{- include "common.selectorLabels" . | nindent 8 }}
+  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" . "componentName" "my-component") | nindent 8 }}
+  #   matchLabelKeys:
+  #     - pod-template-hash
+  #   nodeTaintsPolicy: Honor
+
+configMaps: []
+  # - name: my-config
+  #   data:
+  #     someKey: someValue
+
+persistentVolumeClaims:
+  data:
+    name: data
+    storageClassName: my-storage-class
+    accessModes:
+      - ReadWriteOnce
+    storageSize: 1Gi
+
+secrets: []
