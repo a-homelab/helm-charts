@@ -25,7 +25,7 @@ args:
 {{- end }}
 env:
   {{- with $containerValues.env }}
-  {{- tpl (toYaml .) $rootCtx | nindent 2 }}
+  {{- include "common.tpl" (dict "rootCtx" $rootCtx "template" .) | nindent 2 }}
   {{- end }}
 {{- with $containerValues.envFrom }}
 envFrom:
