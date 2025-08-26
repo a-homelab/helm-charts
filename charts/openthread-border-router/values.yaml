@@ -55,7 +55,7 @@ securityContext:
     add:
       - NET_ADMIN
   # Required to get device passthrough working
-  privileged: true
+  # privileged: true
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
@@ -133,8 +133,7 @@ volumes:
         {{ include "common.pvcName" (dict "rootCtx" $ "pvcValues" $.Values.persistentVolumeClaims.data) }}
   - name: rcp
     hostPath:
-      path: >-
-        {{ .Values.rcpDeviceHostPath | quote }}
+      path: "{{ .Values.rcpDeviceHostPath }}"
       type: CharDevice
   - name: tunnel
     hostPath:
