@@ -33,6 +33,7 @@ runtimeClassName: ""
 
 # Host network, multus, or a multicast CNI is needed to bridge with outside network
 hostNetwork: true
+dnsPolicy: ClusterFirstWithHostNet
 
 serviceAccount:
   # Specifies whether a service account should be created
