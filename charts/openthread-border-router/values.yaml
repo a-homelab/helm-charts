@@ -133,9 +133,12 @@ volumes:
     hostPath:
       path: >-
         {{ .Values.rcpDeviceHostPath | quote }}
+      type: CharDevice
   - name: tunnel
     hostPath:
       path: /dev/net/tun
+      type: CharDevice
+
 
 # Additional volumeMounts on the output Deployment definition.
 volumeMounts:
