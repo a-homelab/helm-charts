@@ -29,6 +29,9 @@ spec:
   {{- with $podValues.restartPolicy }}
   restartPolicy: {{ . | quote }}
   {{- end }}
+  {{- with $podValues.hostNetwork }}
+  hostNetwork: {{ . }}
+  {{- end }}
   enableServiceLinks: false
   serviceAccountName: {{ include "common.serviceAccountName" (dict "rootCtx" $rootCtx "serviceAccountValues" $podValues "componentName" $componentName) }}
   securityContext:
