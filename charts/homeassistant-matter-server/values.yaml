@@ -51,6 +51,10 @@ securityContext: {}
 command: []
 
 args:
+  - --storage-path
+  - /data
+  - --paa-root-cert-dir
+  - /data/credentials
   - --primary-interface
   - "{{ .Values.primaryInterface }}"
 
