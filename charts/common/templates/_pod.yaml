@@ -35,6 +35,10 @@ spec:
   {{- with $podValues.dnsPolicy }}
   dnsPolicy: {{ . | quote }}
   {{- end }}
+  {{- with $podValues.dnsConfig }}
+  dnsConfig:
+    {{ toYaml . | nindent 4 }}
+  {{- end }}
   enableServiceLinks: false
   serviceAccountName: {{ include "common.serviceAccountName" (dict "rootCtx" $rootCtx "serviceAccountValues" $podValues "componentName" $componentName) }}
   securityContext:
