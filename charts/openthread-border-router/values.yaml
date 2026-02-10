@@ -76,6 +76,10 @@ env: |
     value: "0.0.0.0"
   - name: OT_REST_LISTEN_PORT
     value: {{ .Values.service.ports.http.port | quote }}
+  - name: OT_WEB_LISTEN_ADDR
+    value: "0.0.0.0"
+  - name: OT_WEB_LISTEN_PORT
+    value: {{ .Values.service.ports.http-web.port | quote }}
   - name: OT_LOG_LEVEL
     value: {{ .Values.logLevel | quote }}
 
@@ -99,6 +103,8 @@ service:
   ports:
     http:
       port: 8081
+    http-web:
+      port: 8080
 
 httpRoute:
   enabled: false
