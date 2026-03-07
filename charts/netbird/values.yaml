@@ -282,11 +282,7 @@ relay:
 
   command: []
 
-  args:
-    - --port
-    - "8080"
-    - --log-file
-    - console
+  args: []
 
   env:
     - name: NB_LOG_LEVEL
