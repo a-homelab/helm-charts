@@ -385,7 +385,8 @@ dashboard:
     repository: netbirdio/dashboard
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: "v2.4.1"
+    # https://github.com/netbirdio/dashboard/releases
+    tag: "v2.33.0"
 
   imagePullSecrets: []
   nameOverride: ""
