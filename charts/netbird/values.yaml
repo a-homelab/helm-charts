@@ -44,10 +44,13 @@ management:
 
   args:
     - --port
-    - "8080"
+    - "33073"
     - --log-file
     - console
+    - --log-level
+    - info
     - --disable-anonymous-metrics=true
+    - --single-account-mode-domain=netbird.selfhosted
     - --dns-domain
     - netbird.selfhosted
 
@@ -66,8 +69,8 @@ management:
 
     ports:
       http:
-        port: 8080
-        containerPort: 8080
+        port: 33073
+        containerPort: 33073
         appProtocol: http2
 
   httpRoute:
@@ -156,11 +159,7 @@ signal:
 
   command: []
 
-  args:
-    - --port
-    - "8080"
-    - --log-file
-    - console
+  args: []
 
   env: []
 
@@ -314,7 +313,7 @@ relay:
       http:
         port: 33080
         containerPort: 33080
-        appProtocol: http
+        appProtocol: http2
 
   ingress:
     enabled: false
