@@ -176,8 +176,8 @@ signal:
 
     ports:
       grpc:
-        port: 8080
-        containerPort: 8080
+        port: 10000
+        containerPort: 10000
         appProtocol: grpc
 
   ingress:
