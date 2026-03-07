@@ -287,7 +287,7 @@ relay:
     - name: NB_LOG_LEVEL
       value: info
     - name: NB_LISTEN_ADDRESS
-      value: "33080"
+      value: ":33080"
     - name: NB_EXPOSED_ADDRESS
       value: rel://$NETBIRD_RELAY_DOMAIN:$NETBIRD_RELAY_PORT
     # Generate with:
