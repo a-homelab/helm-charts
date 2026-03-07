@@ -50,7 +50,7 @@ management:
     - --log-level
     - info
     - --disable-anonymous-metrics=true
-    - --single-account-mode-domain=netbird.selfhosted
+    - --single-account-mode-domain=$NETBIRD_MGMT_SINGLE_ACCOUNT_MODE_DOMAIN
     - --dns-domain
     - netbird.selfhosted
 
