@@ -1,1 +1,1 @@
-{{- include "common.service" (dict "rootCtx" $ "serviceValues" $.Values.signal "componentName" "signal") -}}
+{{- include "common.service" (dict "rootCtx" $ "serviceValues" $.Values.dashboard "componentName" "dashboard") -}}
