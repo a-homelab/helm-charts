@@ -13,7 +13,7 @@ This takes a dict with the following keys:
 name: {{ $containerValues.containerName | default (include "common.fullComponentName" (dict "rootCtx" $rootCtx "componentName" $componentName)) }}
 securityContext:
   {{- toYaml $containerValues.securityContext | nindent 2 }}
-image: "{{ $containerValues.image.repository }}:{{ $containerValues.image.tag | default $rootCtx.Chart.AppVersion }}"
+image: "{{ $containerValues.image.repository }}:{{ tpl $containerValues.image.tag $rootCtx | default $rootCtx.Chart.AppVersion }}"
 imagePullPolicy: {{ $containerValues.image.pullPolicy }}
 {{- with $containerValues.command }}
 command:
