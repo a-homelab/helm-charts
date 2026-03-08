@@ -275,7 +275,7 @@ relay:
   podLabels: {}
 
   podSecurityContext:
-    fsGroup: 1000
+    fsGroup: 65532
 
   securityContext:
     # capabilities:
@@ -283,7 +283,7 @@ relay:
     #   - ALL
     # readOnlyRootFilesystem: true
     runAsNonRoot: true
-    runAsUser: 1000
+    runAsUser: 65532
 
   command: []
 
