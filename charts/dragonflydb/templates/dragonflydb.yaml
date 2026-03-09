@@ -15,14 +15,42 @@ spec:
   image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
   serviceAccountName: {{ include "dragonflydb.serviceAccountName" . }}
 
+  {{- if and .Values.snapshot.enabled (eq .Values.snapshot.type "s3") }}
+  args:
+    - --s3_endpoint={{ .Values.snapshot.s3.endpoint }}
+    - --s3_use_https={{ not .Values.snapshot.s3.insecure | toString }}
+    {{- with .Values.args }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- else }}
   {{- with .Values.args }}
   args:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- end }}
 
+  {{- if and .Values.snapshot.enabled (eq .Values.snapshot.type "s3") }}
+  env:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: "{{ include "dragonflydb.fullname" . }}-snapshots"
+          key: AWS_ACCESS_KEY_ID
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: "{{ include "dragonflydb.fullname" . }}-snapshots"
+          key: AWS_SECRET_ACCESS_KEY
+    - name: AWS_REGION
+      value: us-east-1
+    {{- with .Values.args }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- else }}
   {{- with .Values.env }}
   env:
     {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- end }}
 
   {{- if .Values.tls.enabled }}
@@ -56,9 +84,19 @@ spec:
     {{- end }}
   {{- end }}
 
-  {{- with .Values.snapshot }}
+  {{- if .Values.snapshot.enabled }}
   snapshot:
-    {{- toYaml . | nindent 4 }}
+    cron: {{ .Values.snapshot.cron | quote }}
+
+    {{- if eq .Values.snapshot.type "s3" }}
+    dir: "s3://{{ include "dragonflydb.fullname" . }}-snapshots"
+    {{- else if eq .Values.snapshot.type "pvc" }}
+    {{- with .Values.snapshot.pvc }}
+    persistentVolumeClaimSpec:
+      {{- toYaml . | nindent 6 }}
+    {{- else }}
+    {{- fail ".Values.snapshot.type must be one of: `s3`, `pvc`" }}
+    {{- end }}
   {{- end }}
 
   {{- with .Values.podAnnotations }}

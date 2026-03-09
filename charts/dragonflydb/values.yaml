@@ -21,7 +21,7 @@ tls:
 
 auth:
   enabled: false
-  
+
   # Valid values are `password`, `tls`
   # https://www.dragonflydb.io/docs/managing-dragonfly/operator/authentication
   mode: password
@@ -41,15 +41,31 @@ auth:
   # clientCaCertSecret:
   #   name: my-tls-secret
 
-snapshot: {}
-  # cron: "*/5 * * * *"
-  # persistentVolumeClaimSpec:
-  #   accessModes:
-  #     - ReadWriteOnce
-  #   resources:
-  #     requests:
-  #       storage: 10Gi
-  #   storageClassName: rook-ceph-block-ssd
+snapshot:
+  enabled: false
+
+  # Valid values are `pvc` or `s3`
+  type: pvc
+
+  cron: "*/5 * * * *"
+
+  s3:
+    storageClassName: rook-ceph-bucket
+    maxSize: 5G
+    existingSecret: {}
+      # name: my-existing-secret
+      # key: my-secret-key
+    
+    endpoint: rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc
+    insecure: false
+
+  pvc:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 10Gi
+    storageClassName: rook-ceph-block-ssd
 
 serviceAccount:
   # Specifies whether a service account should be created
