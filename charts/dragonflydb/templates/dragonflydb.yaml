@@ -94,6 +94,7 @@ spec:
     {{- with .Values.snapshot.pvc }}
     persistentVolumeClaimSpec:
       {{- toYaml . | nindent 6 }}
+    {{- end }}
     {{- else }}
     {{- fail ".Values.snapshot.type must be one of: `s3`, `pvc`" }}
     {{- end }}
