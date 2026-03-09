@@ -319,7 +319,7 @@ relay:
       http:
         port: 33080
         containerPort: 33080
-        appProtocol: http2
+        # appProtocol: http2
 
   ingress:
     enabled: false
