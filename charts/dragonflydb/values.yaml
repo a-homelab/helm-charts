@@ -1,13 +1,9 @@
-# Default values for dragonflydb.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
 replicaCount: 1
 
 image:
   repository: docker.dragonflydb.io/dragonflydb/dragonfly
   pullPolicy: IfNotPresent
-  tag: "v1.15.1"
+  tag: "v1.37.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -23,11 +19,22 @@ env: []
 tls:
   enabled: false
 
-authentication:
-  # Name of existing secret reference
-  # passwordFromSecret:
-    # name: my-existing-secret
-    # key: my-secret-key
+auth:
+  enabled: false
+  
+  # Valid values are `password`, `tls`
+  # https://www.dragonflydb.io/docs/managing-dragonfly/operator/authentication
+  mode: password
+
+  # The chart will auto-generate a password using external-secrets.
+  password:
+    # Key to use inside the k8s secret
+    secretKey: password
+
+    # Use this option to use an existing k8s secret instead of the auto-generated one.
+    existingSecret: {}
+      # name: my-existing-secret
+      # key: my-secret-key
 
   # Name of existing secret containing CA certificate files that will
   # be checked during client authentication
@@ -52,6 +59,12 @@ serviceAccount:
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
+
+# Common labels for all resources
+labels: {}
+
+# Common annotations for all resources
+annotations: {}
 
 podAnnotations: {}
 
@@ -80,9 +93,26 @@ resources: {}
 
 nodeSelector: {}
 
+affinity: {}
+
 tolerations: []
 
-affinity: {}
+topologySpreadConstraints:
+  # If `labelSelector` is empty or not provided, the chart will default to the selector labels
+  - topologyKey: kubernetes.io/hostname
+    maxSkew: 1
+    minDomains: 2
+    whenUnsatisfiable: DoNotSchedule
+    nodeTaintsPolicy: Honor
+  - topologyKey: topology.kubernetes.io/zone
+    maxSkew: 2
+    whenUnsatisfiable: ScheduleAnyway
+    nodeTaintsPolicy: Honor
+
+externalSecrets:
+  # Whether to push secrets to external secrets manager or not
+  push:
+    enabled: true
 
 certificateIssuerRef:
   name: apps-ca-issuer

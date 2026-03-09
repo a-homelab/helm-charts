@@ -5,7 +5,12 @@ metadata:
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "dragonflydb.labels" . | nindent 4 }}
+  annotations:
+    {{- include "dragonflydb.annotations" . | nindent 4 }}
 spec:
+  labels:
+    {{- include "dragonflydb.selectorLabels" . | nindent 4 }}
+
   replicas: {{ .Values.replicaCount }}
   image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
   serviceAccountName: {{ include "dragonflydb.serviceAccountName" . }}
@@ -24,17 +29,30 @@ spec:
   tlsSecretRef:
     name: "{{ include "dragonflydb.fullname" . }}-server-tls"
   {{- end }}
-
-  {{- if .Values.authentication }}
+  
+  {{- if .Values.auth.enabled }}
   authentication:
-    {{- with .Values.authentication.passwordFromSecret }}
+    {{- if eq .Values.auth.mode "password" }}
     passwordFromSecret:
-      {{- toYaml . | nindent 6 }}
+      {{- with .Values.auth.password.existingSecret }}
+      name: {{ .name | quote }}
+      key: {{ .key | quote }}
+      {{- else }}
+      name: "{{ include "dragonflydb.fullname" . }}-password"
+      key: {{ .Values.auth.password.secretKey | quote }}
+      {{- end }}
+
+    {{- else if eq .Values.auth.mode "tls" }}
+    {{- if and .Values.tls.enabled .Values.auth.clientCaCertSecret }}
+    clientCaCertSecret:
+      name: {{ .Values.auth.clientCaCertSecret.name }}
+    {{- else }}
+    {{- fail ".Values.tls.enabled and .Values.auth.clientCaCertSecret must both be set when .Values.auth.mode is 'password'" }}
     {{- end }}
 
-    {{- if and .Values.tls.enabled .Values.authentication.clientCaCertSecret }}
-    clientCaCertSecret:
-      name: {{ .Values.authentication.clientCaCertSecret.name }}
+    {{- else }}
+    {{- fail printf "Invalid value for .Values.auth.mode: '%s'. Must be one of 'password', 'tls'" .Values.auth.mode }}
+
     {{- end }}
   {{- end }}
 
@@ -59,4 +77,18 @@ spec:
   {{- with .Values.tolerations }}
   tolerations:
     {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- if gt (.Values.replicaCount | int) 1 }}
+  {{- with .Values.topologySpreadConstraints }}
+  topologySpreadConstraints:
+    {{- range . }}
+    - {{- toYaml . | nindent 6 }}
+      {{- if not .labelSelector }}
+      labelSelector:
+        matchLabels:
+          {{ include "dragonflydb.selectorLabels" $ | nindent 10 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
   {{- end }}

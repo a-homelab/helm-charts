@@ -4,6 +4,10 @@ kind: Certificate
 metadata:
   name: "{{ include "dragonflydb.fullname" . }}-server-tls"
   namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "dragonflydb.labels" . | nindent 4 }}
+  annotations:
+    {{- include "dragonflydb.annotations" . | nindent 4 }}
 spec:
   secretName: "{{ include "dragonflydb.fullname" . }}-server-tls"
   duration: 2160h0m0s # 90d
