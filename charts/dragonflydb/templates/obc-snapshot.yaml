@@ -9,4 +9,17 @@ spec:
   storageClassName: {{ .Values.snapshot.s3.storageClassName | quote }}
   additionalConfig:
     maxSize: {{ .Values.snapshot.s3.maxSize | quote }}
+    bucketLifecycle: |
+      {
+        "Rules": [
+          {
+            "ID": "ExpireAfter30Days",
+            "Status": "Enabled",
+            "Prefix": "",
+            "Expiration": {
+              "Days": {{ .Values.snapshot.s3.retentionDays | int }}
+            }
+          }
+        ]
+      }
 {{- end }}

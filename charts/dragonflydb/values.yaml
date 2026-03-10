@@ -52,6 +52,7 @@ snapshot:
   s3:
     storageClassName: rook-ceph-bucket
     maxSize: 5G
+    retentionDays: 30
     existingSecret: {}
       # name: my-existing-secret
       # key: my-secret-key
