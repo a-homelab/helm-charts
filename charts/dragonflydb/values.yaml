@@ -56,7 +56,7 @@ snapshot:
       # name: my-existing-secret
       # key: my-secret-key
     
-    endpoint: rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc
+    endpoint: rook-ceph-rgw-k8s-store.rook-ceph.svc
     insecure: false
 
   pvc:
