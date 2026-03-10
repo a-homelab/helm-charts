@@ -57,7 +57,7 @@ snapshot:
       # key: my-secret-key
     
     endpoint: rook-ceph-rgw-k8s-store.rook-ceph.svc
-    insecure: false
+    insecure: true
 
   pvc:
     accessModes:
