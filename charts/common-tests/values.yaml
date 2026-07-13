@@ -1,0 +1,35 @@
+# Default harness values: minimal single-app chart (sonarr-like).
+# The implicit "main" component renders Deployment, Service, ServiceAccount,
+# HTTPRoute and a PVC from ~25 lines of values.
+global:
+  domain: example.com
+  gateway:
+    name: internal
+    namespace: gateways
+
+components:
+  main:
+    container:
+      image:
+        repository: lscr.io/linuxserver/sonarr
+      env:
+        TZ: America/Chicago
+        PUID: "1000"
+        PGID: "1000"
+      ports:
+        http:
+          port: 8989
+    pod:
+      securityContext:
+        fsGroup: 1000
+      volumes:
+        config:
+          type: pvc
+          size: 1Gi
+          mounts:
+            /config: {}
+    deployment:
+      strategy:
+        type: Recreate
+    httpRoute:
+      enabled: true

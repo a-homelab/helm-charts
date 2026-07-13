@@ -1,0 +1,13 @@
+apiVersion: v2
+name: common-tests
+description: |
+  Test harness for the common library chart. Depends on common via a
+  file:// path so tests always exercise the in-repo code. Render the ci/
+  values files with `helm template` to verify output.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: common
+    version: 1.0.0-alpha.1
+    repository: file://../common

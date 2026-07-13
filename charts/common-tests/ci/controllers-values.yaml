@@ -1,0 +1,59 @@
+# Exercises the remaining controller kinds: StatefulSet (with
+# volumeClaimTemplates + mounts), DaemonSet (hostNetwork), Job, and
+# pod/controller-level overrides.
+components:
+  main: ~
+  db:
+    kind: StatefulSet
+    container:
+      image:
+        repository: ghcr.io/example/db
+      ports:
+        db:
+          port: 5432
+    statefulset:
+      replicas: 3
+      podManagementPolicy: Parallel
+      volumeClaimTemplates:
+        data:
+          size: 10Gi
+          storageClass: fast
+          mounts:
+            /var/lib/db: {}
+    pod:
+      overrides:
+        hostUsers: false            # unmodeled pod field via pod overrides
+    overrides:
+      spec:
+        persistentVolumeClaimRetentionPolicy:   # unmodeled controller field
+          whenDeleted: Retain
+
+  node-agent:
+    kind: DaemonSet
+    container:
+      image:
+        repository: ghcr.io/example/agent
+    service: ~
+    serviceAccount:
+      enabled: false
+    pod:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      tolerations:
+        control-plane:
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+
+  migrate:
+    kind: Job
+    container:
+      image:
+        repository: ghcr.io/example/app
+      command: [./migrate]
+    job:
+      restartPolicy: Never
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 300
+    service: ~
+    serviceAccount:
+      enabled: false
