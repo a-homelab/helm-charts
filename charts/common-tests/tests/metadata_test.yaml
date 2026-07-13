@@ -1,0 +1,102 @@
+suite: label and annotation propagation rules
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+tests:
+  - it: generates the standard label set on controllers
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/name: common-tests
+            app.kubernetes.io/instance: t
+            app.kubernetes.io/component: main
+            app.kubernetes.io/part-of: common-tests
+            app.kubernetes.io/managed-by: Helm
+            helm.sh/chart: common-tests-0.1.0
+        documentIndex: 0
+
+  - it: locks selector labels to name+instance+component, ignoring user labels
+    set:
+      labels:
+        team: media
+      components.main.labels:
+        tier: frontend
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: common-tests
+            app.kubernetes.io/instance: t
+            app.kubernetes.io/component: main
+        documentIndex: 0
+
+  - it: keeps volatile generated labels off the pod template
+    asserts:
+      - notExists:
+          path: spec.template.metadata.labels["helm.sh/chart"]
+        documentIndex: 0
+      - notExists:
+          path: spec.template.metadata.labels["app.kubernetes.io/version"]
+        documentIndex: 0
+
+  - it: spreads top-level labels everywhere including pods, but annotations never reach pods
+    set:
+      labels:
+        team: media
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: media
+        documentIndex: 0
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "1"
+        documentIndex: 0
+      - equal:
+          path: metadata.labels.team
+          value: media
+        documentIndex: 2
+      - equal:
+          path: spec.template.metadata.labels.team
+          value: media
+        documentIndex: 0
+      - notExists:
+          path: spec.template.metadata.annotations
+        documentIndex: 0
+
+  - it: sends pod.annotations to the pod template only, tpl-rendered
+    set:
+      components.main.pod.annotations:
+        checksum/config: "{{ .Release.Name }}-sum"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/config"]
+          value: t-sum
+        documentIndex: 0
+      - notExists:
+          path: metadata.annotations["checksum/config"]
+        documentIndex: 0
+
+  - it: lets resource-level labels win over the cascade and tpl-renders annotation values
+    set:
+      labels:
+        team: media
+      components.main.service:
+        labels:
+          team: overridden
+        annotations:
+          external-dns.alpha.kubernetes.io/hostname: "{{ .Release.Name }}.example.com"
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: overridden
+        documentIndex: 2
+      - equal:
+          path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          value: t.example.com
+        documentIndex: 2

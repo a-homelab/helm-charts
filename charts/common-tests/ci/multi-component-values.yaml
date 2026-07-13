@@ -1,0 +1,135 @@
+# yaml-language-server: $schema=../../common/schema/values.schema.json
+# Multi-component exercise: shared defaults, api with sidecar + init +
+# configMap volume + route, worker without service, nightly cronjob.
+# Also exercises: delete-by-null (service: ~, env FOO: ~), tolerations map,
+# overrides at container/pod/resource altitude, extras, hpa, pdb.
+global:
+  domain: example.com
+  gateway:
+    name: internal
+    namespace: gateways
+  externalSecrets:
+    storeName: default-store
+
+labels:
+  team: platform
+annotations:
+  example.com/owner: ben
+
+defaults:
+  container:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    env:
+      LOG_LEVEL: info
+      DEPRECATED: to-be-deleted
+  pod:
+    securityContext:
+      runAsNonRoot: true
+
+components:
+  main: ~                                  # delete the component declared by the harness values.yaml
+  api:
+    container:
+      image:
+        repository: ghcr.io/example/app
+      env:
+        DEPRECATED: ~                      # delete inherited default
+        DB_HOST: "{{ .Release.Name }}-pg-rw"
+      ports:
+        http:
+          port: 8080
+      probes:
+        readiness:
+          httpGet:
+            path: /healthz
+            port: http
+      overrides:
+        terminationMessagePolicy: FallbackToLogsOnError   # unmodeled field via container overrides
+    sidecars:
+      oauth-proxy:
+        image:
+          repository: quay.io/oauth2-proxy/oauth2-proxy
+          tag: v7.6.0
+        ports:
+          proxy:
+            port: 4180
+            expose: 80
+    initContainers:
+      10-migrate:                          # inherits main image
+        command: [./migrate]
+    pod:
+      tolerations:
+        arch:
+          key: kubernetes.io/arch
+          operator: Equal
+          value: arm64
+          effect: NoSchedule
+      volumes:
+        config:
+          type: configMap
+          ref: app-config
+          mounts:
+            /etc/app: {}
+            /etc/proxy:
+              containers: [oauth-proxy]
+              readOnly: true
+      annotations:
+        checksum/config: '{{ .Values.extras.configMap | toYaml | sha256sum }}'
+    service:
+      ports:
+        http: ~                            # prune app port; only expose proxy
+    httpRoute:
+      enabled: true
+      hostnames:
+        - "app.{{ .Values.global.domain }}"
+    hpa:
+      enabled: true
+      min: 2
+      max: 5
+      targetCPU: 80
+    pdb:
+      enabled: true
+      minAvailable: 1
+
+  worker:
+    container:
+      image:
+        repository: ghcr.io/example/app
+      command: [./worker]
+    service: ~                             # delete the whole inherited Service block
+    deployment:
+      replicas: 2
+
+  nightly-report:
+    kind: CronJob
+    cronjob:
+      schedule: "0 3 * * *"
+      timeZone: America/Chicago
+    container:
+      image:
+        repository: ghcr.io/example/app
+      command: [./report]
+    serviceAccount:
+      enabled: false
+
+extras:
+  configMap:
+    app-config:
+      data:
+        config.yml: |
+          log_level: info
+  externalSecret:
+    api-key:
+      data:
+        api-key:
+          remoteRef:
+            key: example-api-key
+  rawResource:
+    widget:
+      apiVersion: example.io/v1
+      kind: Widget
+      spec:
+        size: 3

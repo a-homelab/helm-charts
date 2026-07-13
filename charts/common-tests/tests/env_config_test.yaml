@@ -1,0 +1,135 @@
+suite: env map conversion and configMap extras
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+tests:
+  - it: renders env entries sorted by name with string values
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - name: PGID
+              value: "1000"
+            - name: PUID
+              value: "1000"
+            - name: TZ
+              value: America/Chicago
+        documentIndex: 0
+
+  - it: converts number and bool shorthands to quoted strings
+    set:
+      components.main.container.env.PORT: 8080
+      components.main.container.env.DEBUG: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PORT
+            value: "8080"
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DEBUG
+            value: "true"
+        documentIndex: 0
+
+  - it: passes valueFrom entries through with the name injected
+    set:
+      components.main.container.env.API_KEY:
+        valueFrom:
+          secretKeyRef:
+            name: my-secret
+            key: api-key
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: my-secret
+                key: api-key
+        documentIndex: 0
+
+  - it: tpl-renders string env values against the release context
+    set:
+      components.main.container.env.DB_HOST: "{{ .Release.Name }}-postgresql-rw"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: t-postgresql-rw
+        documentIndex: 0
+
+  - it: deletes env entries set to null in an overlay
+    values:
+      - values/env-delete.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TZ
+            value: America/Chicago
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PUID
+            value: "1000"
+        documentIndex: 0
+
+  - it: converts the envFrom map to a list
+    set:
+      components.main.container.envFrom.settings:
+        configMapRef:
+          name: app-settings
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: app-settings
+        documentIndex: 0
+
+  - it: renders extras configMaps named <fullname>-<key>
+    set:
+      extras.configMap.config:
+        data:
+          config.yml: "log: info"
+    asserts:
+      - hasDocuments:
+          count: 6
+      - isKind:
+          of: ConfigMap
+        documentIndex: 5
+      - equal:
+          path: metadata.name
+          value: t-common-tests-config
+        documentIndex: 5
+      - equal:
+          path: data["config.yml"]
+          value: "log: info"
+        documentIndex: 5
+
+  - it: tpl-renders configMap data only when opted in
+    set:
+      extras.configMap.config:
+        tpl: true
+        data:
+          release: "{{ .Release.Name }}"
+      extras.configMap.raw:
+        data:
+          release: "{{ .Release.Name }}"
+    asserts:
+      - equal:
+          path: data.release
+          value: t
+        documentIndex: 5
+      - equal:
+          path: data.release
+          value: "{{ .Release.Name }}"
+        documentIndex: 6

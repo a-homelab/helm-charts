@@ -1,0 +1,140 @@
+suite: service port derivation and httpRoute wiring
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+tests:
+  - it: derives service ports from container ports
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - name: http
+              port: 8989
+              protocol: TCP
+              targetPort: http
+        documentIndex: 2
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/name: common-tests
+            app.kubernetes.io/instance: t
+            app.kubernetes.io/component: main
+        documentIndex: 2
+
+  - it: uses expose for the service-side port
+    set:
+      components.main.container.ports.http.expose: 80
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: http
+            port: 80
+            protocol: TCP
+            targetPort: http
+        documentIndex: 2
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8989
+        documentIndex: 0
+
+  - it: includes sidecar ports in the service
+    set:
+      components.main.sidecars.metrics:
+        image:
+          repository: prom/exporter
+        ports:
+          metrics:
+            port: 9090
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 9090
+            protocol: TCP
+            targetPort: metrics
+        documentIndex: 2
+
+  - it: prunes derived ports via null
+    values:
+      - values/port-prune.yaml
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - name: metrics
+              port: 9090
+              protocol: TCP
+              targetPort: metrics
+        documentIndex: 2
+
+  - it: omits the service when disabled or when no ports exist
+    set:
+      components.main.service.enabled: false
+      components.main.httpRoute.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 3
+
+  - it: builds httpRoute defaults from global context and the service
+    asserts:
+      - equal:
+          path: spec.hostnames
+          value: [t-common-tests.example.com]
+        documentIndex: 3
+      - equal:
+          path: spec.parentRefs
+          value:
+            - name: internal
+              namespace: gateways
+        documentIndex: 3
+      - equal:
+          path: spec.rules
+          value:
+            - backendRefs:
+                - name: t-common-tests
+                  port: 8989
+        documentIndex: 3
+
+  - it: tpl-renders explicit hostnames and fills backendRef defaults in rules
+    set:
+      components.main.httpRoute.hostnames:
+        - "app.{{ .Values.global.domain }}"
+      components.main.httpRoute.rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /api
+    asserts:
+      - equal:
+          path: spec.hostnames
+          value: [app.example.com]
+        documentIndex: 3
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - name: t-common-tests
+              port: 8989
+        documentIndex: 3
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /api
+        documentIndex: 3
+
+  - it: attaches to explicit parentRefs keyed by gateway name
+    set:
+      components.main.httpRoute.parentRefs:
+        public:
+          namespace: gateways
+          sectionName: https
+    asserts:
+      - equal:
+          path: spec.parentRefs
+          value:
+            - name: public
+              namespace: gateways
+              sectionName: https
+        documentIndex: 3

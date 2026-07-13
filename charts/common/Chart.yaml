@@ -1,19 +1,16 @@
 apiVersion: v2
 name: common
-description: Common library chart
-
-# A chart can be either an 'application' or a 'library' chart.
-#
-# Application charts are a collection of templates that can be packaged into versioned archives
-# to be deployed.
-#
-# Library charts provide useful utilities or functions for the chart developer. They're included as
-# a dependency of application charts to inject those utilities and functions into the rendering
-# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+description: |
+  Component-oriented Helm library chart. Consumer charts declare named
+  components (workloads) plus chart-scoped extras entirely through values;
+  a single `{{ include "common.all" . }}` renders every resource. Values
+  resolve through a layered deep-merge (library defaults -> defaults ->
+  component) with delete-by-null, map-shaped collections everywhere, and
+  per-resource `overrides` escape hatches at container, pod, and resource
+  altitude.
 type: library
-
-# This is the chart version. This version number should be incremented each time you make changes
-# to the chart and its templates, including the app version.
-# Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.0
-
+version: 1.0.0-alpha.1
+kubeVersion: ">=1.26.0-0"
+keywords:
+  - common
+  - library
