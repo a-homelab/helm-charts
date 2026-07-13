@@ -9,3 +9,6 @@ dist/
 **/charts/*.tgz
 
 # End of https://www.gitignore.io/api/helm
+
+# Claude Code worktrees and session files
+.claude/
