@@ -9,3 +9,4 @@ dist/
 **/charts/*.tgz
 
 # End of https://www.gitignore.io/api/helm
+charts/common-tests/charts/

@@ -1,215 +1,224 @@
-# yaml-language-server: $schema=./container.schema.json
+# common — component-oriented library chart.
+#
+# This file documents the full values shape the library accepts. As a
+# library chart it is never installed directly and these values are not
+# applied at render time; consumer charts declare only their deltas.
+#
+# Structure — six top-level keys plus the familiar Helm naming overrides:
+#   global:      injected platform context (never set by the app chart)
+#   defaults:    component-shaped defaults merged under every component
+#   components:  named workloads (empty -> one implicit component "main")
+#   extras:      chart-scoped resources: extras.<type>.<name>
+#   labels:      stamped on every rendered resource (pods included)
+#   annotations: stamped on every rendered resource (pods excluded)
+#
+# Resolution per component: libraryDefaults <- defaults <- components.<name>
+# (deep merge; explicit null DELETES the key at any depth).
+#
+# Collections are maps, not arrays: env, ports, volumes, mounts, sidecars,
+# tolerations, parentRefs, ... Map keys give entries identity so overlays
+# can add/override/delete (~) individual entries; rendering converts maps
+# to deterministically ordered lists. Arrays remain only where order is
+# semantic (command, args, httpRoute.rules) or for raw k8s passthrough
+# (affinity, hpa.behavior).
 
-# Default values for common.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
-
-replicaCount: 1
-
-image:
-  repository: nginx
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
-
-imagePullSecrets: []
+# -----------------------------------------------------------------------------
+# Chart identity & metadata
+# -----------------------------------------------------------------------------
 nameOverride: ""
 fullnameOverride: ""
+namespaceOverride: ""
+labels: {}
+annotations: {}
 
-runtimeClassName: ""
-restartPolicy: ""
-hostNetwork: false
-dnsPolicy: ""
+# -----------------------------------------------------------------------------
+# Platform-injected context
+# -----------------------------------------------------------------------------
+global:
+  domain: ""              # default hostname base for httpRoutes: <name>.<domain>
+  gateway:
+    name: ""              # default HTTPRoute parentRef
+    namespace: ""
+  externalSecrets:
+    storeName: ""         # default secretStoreRef name
+    kind: ClusterSecretStore
 
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name: ""
+# -----------------------------------------------------------------------------
+# Defaults — component-shaped, merged under every component. Only put
+# things here that make sense for ALL components (see components.main
+# below for the full component shape).
+# -----------------------------------------------------------------------------
+defaults: {}
+  # pod:
+  #   securityContext:
+  #     runAsNonRoot: true
+  # container:
+  #   resources:
+  #     requests: { cpu: 50m, memory: 128Mi }
 
-podAnnotations: {}
-podLabels: {}
+# -----------------------------------------------------------------------------
+# Components. Empty -> one implicit component named "main". Declaring any
+# component replaces the implicit main. The component named "main" renders
+# resources as <fullname>; others as <fullname>-<name>.
+# -----------------------------------------------------------------------------
+components: {}
+  # main:
+  #   enabled: true
+  #   kind: Deployment            # Deployment | StatefulSet | DaemonSet | CronJob | Job
+  #   labels: {}                  # every resource of this component
+  #   annotations: {}             # every resource except the pod template
+  #
+  #   container:                  # the primary container
+  #     image:
+  #       repository: ""          # REQUIRED (no default by design)
+  #       tag: ""                 # default .Chart.AppVersion; "sha256:..." renders as digest
+  #       pullPolicy: IfNotPresent
+  #     command: []
+  #     args: []
+  #     workingDir: ""
+  #     env: {}                   # map: string|number|bool -> value (tpl-rendered),
+  #                               #      map -> {value|valueFrom}, ~ -> delete
+  #     envFrom: {}               # map<id, {secretRef|configMapRef, prefix}>
+  #     ports: {}                 # map<name, {port, protocol, expose, appProtocol}>
+  #     probes: { liveness: {}, readiness: {}, startup: {} }   # raw k8s probes
+  #     resources: {}
+  #     securityContext: {}
+  #     lifecycle: {}
+  #     overrides: {}             # merged onto this container pre-assembly
+  #
+  #   sidecars: {}                # map<name, container shape>; image inherits main's
+  #   initContainers: {}          # map<name, container shape>; sorted key order = run order
+  #                               # (use numeric prefixes: 10-wait-db, 20-migrate);
+  #                               # restartPolicy: Always = native sidecar
+  #
+  #   pod:
+  #     labels: {}
+  #     annotations: {}           # the ONLY way annotations reach pods
+  #     securityContext: {}
+  #     nodeSelector: {}
+  #     tolerations: {}           # map w/ synthetic keys: gpu: {key: ..., operator: Exists}
+  #     topologySpreadConstraints: {}   # map w/ synthetic keys
+  #     affinity: {}              # raw k8s passthrough
+  #     hostAliases: {}           # map<ip, {hostnames: [...]}>
+  #     imagePullSecrets: {}      # map<secretName, {}>
+  #     priorityClassName: ""
+  #     runtimeClassName: ""
+  #     schedulerName: ""
+  #     hostNetwork: false
+  #     enableServiceLinks: false
+  #     dnsPolicy: ""
+  #     dnsConfig: {}
+  #     terminationGracePeriodSeconds: ~
+  #     automountServiceAccountToken: ~
+  #     volumes:                  # definition + mounts in one place
+  #       {}
+  #       # config:
+  #       #   type: pvc           # pvc | existingClaim | configMap | secret |
+  #       #                       # emptyDir | hostPath | nfs | custom
+  #       #   size: 1Gi           # pvc: size (required), storageClass, accessModes
+  #       #   mounts:             # map keyed by mount path
+  #       #     /config: {}       # default target: the main container
+  #       #     /shared: { containers: [sidecar], readOnly: true, subPath: x }
+  #     overrides: {}             # merged onto the rendered PodTemplateSpec
+  #
+  #   deployment:                 # read only when kind: Deployment
+  #     replicas: 1               # omitted when hpa.enabled
+  #     strategy: {}
+  #     revisionHistoryLimit: 10
+  #   statefulset:
+  #     replicas: 1
+  #     serviceName: ""           # default: the component's Service
+  #     podManagementPolicy: ""
+  #     updateStrategy: {}
+  #     volumeClaimTemplates: {}  # map<name, pvc shape incl. mounts>
+  #   daemonset:
+  #     updateStrategy: {}
+  #   cronjob:
+  #     schedule: ""              # REQUIRED when kind: CronJob
+  #     timeZone: ""
+  #     concurrencyPolicy: Forbid
+  #     suspend: false
+  #     successfulJobsHistoryLimit: 3
+  #     failedJobsHistoryLimit: 1
+  #   job:                        # kind: Job, and the jobTemplate of kind: CronJob
+  #     restartPolicy: OnFailure
+  #     backoffLimit: 6
+  #     completions: ~
+  #     parallelism: ~
+  #     ttlSecondsAfterFinished: ~
+  #
+  #   overrides: {}               # merged onto the final controller manifest
+  #
+  #   service:
+  #     enabled: true             # renders only if any container exposes ports
+  #     type: ClusterIP
+  #     ports: {}                 # override/prune (~) the ports derived from containers;
+  #                               # service-side port = expose | port
+  #     labels: {}
+  #     annotations: {}
+  #     overrides: {}
+  #
+  #   httpRoute:
+  #     enabled: false
+  #     hostnames: []             # tpl-rendered; default <name>.<global.domain>
+  #     parentRefs: {}            # map<gatewayName, {namespace, sectionName}>;
+  #                               # default: global.gateway
+  #     rules: []                 # ordered array; default: one rule -> first service port;
+  #                               # backendRefs default name/port
+  #     labels: {}
+  #     annotations: {}
+  #     overrides: {}
+  #
+  #   hpa:
+  #     enabled: false            # when enabled the controller omits replicas
+  #     min: 1
+  #     max: 3
+  #     targetCPU: ~              # utilization % shortcut
+  #     targetMemory: ~
+  #     metrics: {}               # map<name, raw autoscaling/v2 metric spec>
+  #     behavior: {}
+  #     overrides: {}
+  #
+  #   pdb:
+  #     enabled: false
+  #     minAvailable: ~           # exactly one of minAvailable/maxUnavailable
+  #     maxUnavailable: ~
+  #     unhealthyPodEvictionPolicy: ""
+  #     overrides: {}
+  #
+  #   serviceAccount:
+  #     enabled: true             # false + name -> reference an existing SA
+  #     name: ""
+  #     automount: ~
+  #     labels: {}
+  #     annotations: {}
+  #     overrides: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
-
-command: []
-
-args: []
-
-env: []
-
-envFrom: []
-
-livenessProbe: {}
-readinessProbe: {}
-startupProbe: {}
-
-initContainers: []
-
-# Create a standalone resource. Applies to the following templates:
-#   - pod
-#   - job
-createStandaloneResource: false
-
-# Deployment
-strategy: {}
-
-# Daemonset
-updateStrategy: {}
-
-# Cronjob
-schedule: ""
-timeZone: ""
-concurrencyPolicy: ""
-startingDeadlineSeconds: null
-successfulJobsHistoryLimit: null
-failedJobsHistoryLimit: null
-
-# Applies to both cronjob and job
-suspend: false
-
-# Job
-parallelism: null
-completions: null
-completionMode: ""
-backoffLimit: null
-activeDeadlineSeconds: null
-ttlSecondsAfterFinished: null
-
-# Service values
-service:
-  type: ClusterIP
-  clusterIP: ""
-
-  ports:
-    http:
-      port: 8080
-      # containerPort: 8080
-      # appProtocol: http
-
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: ImplementationSpecific
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-
-httpRoute:
-  enabled: false
-  labels: {}
-  serviceHostname: ""
-  gatewayHostname: ""
-  parentRefs: []
-    # - name: ""
-    #   namespace: ""
-    #   sectionName: ""
-  rules: []
-    # - |
-    #   matches:
-    #     - path:
-    #         type: PathPrefix
-    #         value: /
-    #   backendRefs:
-    #     - name: {{ include "common.fullComponentName" (dict "rootCtx" $ "componentName" "my-component") }}
-    #       port: {{ $.Values.service.ports.http.port }}
-
-tlsRoute:
-  enabled: false
-  serviceHostname: ""
-  gatewayHostname: ""
-  parentRefs: []
-    # - name: ""
-    #   namespace: ""
-    #   sectionName: ""
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
-  # targetMemoryUtilizationPercentage: 80
-
-pdb:
-  enabled: false
-  # minAvailable: 1
-
-# Additional volumes on the output Deployment definition.
-volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
-#     optional: false
-
-# Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-# - name: foo
-#   mountPath: "/etc/foo"
-#   readOnly: true
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
-
-topologySpreadConstraints: []
-  # - maxSkew: 1
-  #   topologyKey: kubernetes.io/hostname
-  #   whenUnsatisfiable: DoNotSchedule
-  #   labelSelector:
-  #     matchLabels:
-  #       {{- include "common.selectorLabels" . | nindent 8 }}
-  #       {{- include "common.componentSelectorLabels" (dict "rootCtx" . "componentName" "my-component") | nindent 8 }}
-  #   matchLabelKeys:
-  #     - pod-template-hash
-  #   nodeTaintsPolicy: Honor
-
-configMaps: []
-  # - name: my-config
-  #   data:
-  #     someKey: someValue
-
-persistentVolumeClaims: {}
-  # my-pvc:
-  #   name: my-pvc
-  #   storageClassName: my-storage-class
-  #   accessModes:
-  #     - ReadWriteOnce
-  #   storageSize: 1Gi
-
-secrets: []
+# -----------------------------------------------------------------------------
+# Extras — chart-scoped resources, named <fullname>-<key>. Components
+# reference them via volume `ref:` or env valueFrom.
+# -----------------------------------------------------------------------------
+extras: {}
+  # configMap:
+  #   config:
+  #     tpl: false                # opt-in tpl rendering of data values
+  #     data:
+  #       config.yml: |
+  #         ...
+  # secret:
+  #   creds:
+  #     stringData: { user: admin }
+  # externalSecret:
+  #   api-key:
+  #     storeRef: {}              # default: global.externalSecrets
+  #     refreshInterval: 1h
+  #     data:                     # map keyed by secretKey
+  #       api-key:
+  #         remoteRef: { key: my-remote-key }
+  # pvc:
+  #   media: { size: 100Gi, storageClass: nfs }
+  # rawResource:
+  #   my-crd:
+  #     apiVersion: example.io/v1
+  #     kind: Widget
+  #     spec: { }                 # tpl-rendered; gets standard labels
