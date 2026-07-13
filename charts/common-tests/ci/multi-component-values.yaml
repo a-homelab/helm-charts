@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../../common/schema/values.schema.json
 # Multi-component exercise: shared defaults, api with sidecar + init +
 # configMap volume + route, worker without service, nightly cronjob.
 # Also exercises: delete-by-null (service: ~, env FOO: ~), tolerations map,

@@ -1,0 +1,629 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/a-homelab/helm-charts/main/charts/common/schema/values.schema.json",
+  "title": "common library chart values",
+  "description": "Values shape for the common library chart. Kubernetes-typed fields reference the upstream kubernetes-json-schema definitions (pinned k8s version) instead of duplicating them; this schema only describes the library's own structure. NOTE: deliberately NOT shipped as the chart's top-level values.schema.json — Helm's validator eagerly fetches remote $refs, which would make every render network-dependent. Use via editor modeline (yaml-language-server) and CI validation.",
+  "type": "object",
+  "properties": {
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "namespaceOverride": { "type": "string" },
+    "labels": { "$ref": "#/definitions/stringMap" },
+    "annotations": { "$ref": "#/definitions/stringMap" },
+    "global": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "domain": { "type": "string" },
+        "gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "namespace": { "type": "string" }
+          }
+        },
+        "externalSecrets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "storeName": { "type": "string" },
+            "kind": { "type": "string" }
+          }
+        }
+      }
+    },
+    "defaults": { "$ref": "#/definitions/component" },
+    "components": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          { "type": "null" },
+          { "$ref": "#/definitions/component" }
+        ]
+      }
+    },
+    "extras": { "$ref": "#/definitions/extras" }
+  },
+  "definitions": {
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [{ "type": "null" }, { "type": "string" }]
+      }
+    },
+    "overrides": {
+      "description": "Free-form escape hatch, tpl-rendered and deep-merged onto the rendered output. Unvalidated by design.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "kind": { "enum": ["Deployment", "StatefulSet", "DaemonSet", "CronJob", "Job"] },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "container": { "$ref": "#/definitions/container" },
+        "sidecars": { "$ref": "#/definitions/containerMap" },
+        "initContainers": { "$ref": "#/definitions/containerMap" },
+        "pod": { "$ref": "#/definitions/pod" },
+        "deployment": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/deployment" }] },
+        "statefulset": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/statefulset" }] },
+        "daemonset": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/daemonset" }] },
+        "cronjob": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/cronjob" }] },
+        "job": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/job" }] },
+        "overrides": { "$ref": "#/definitions/overrides" },
+        "service": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/service" }] },
+        "httpRoute": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/httpRoute" }] },
+        "hpa": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/hpa" }] },
+        "pdb": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/pdb" }] },
+        "serviceAccount": { "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/serviceAccount" }] }
+      }
+    },
+    "containerMap": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/container" }]
+      }
+    },
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": ["string", "number"] },
+            "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never", ""] }
+          }
+        },
+        "command": { "type": "array", "items": { "type": "string" } },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "workingDir": { "type": "string" },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "value": { "type": ["string", "number", "boolean"] },
+                  "valueFrom": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.EnvVarSource" },
+                  "weight": { "type": "number" }
+                }
+              }
+            ]
+          }
+        },
+        "envFrom": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.EnvFromSource" }
+            ]
+          }
+        },
+        "ports": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/port" }]
+          }
+        },
+        "probes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "liveness": { "$ref": "#/definitions/probe" },
+            "readiness": { "$ref": "#/definitions/probe" },
+            "startup": { "$ref": "#/definitions/probe" }
+          }
+        },
+        "resources": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.ResourceRequirements" },
+        "securityContext": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.SecurityContext" },
+        "lifecycle": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.Lifecycle" },
+        "restartPolicy": { "type": "string" },
+        "weight": { "type": "number" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "probe": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.Probe" }
+      ]
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port"],
+      "properties": {
+        "port": { "type": "integer" },
+        "protocol": { "enum": ["TCP", "UDP", "SCTP"] },
+        "expose": { "type": "integer", "description": "Service-side port; defaults to `port`" },
+        "appProtocol": { "type": "string" },
+        "nodePort": { "type": "integer" },
+        "weight": { "type": "number" }
+      }
+    },
+    "pod": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "securityContext": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.PodSecurityContext" },
+        "nodeSelector": { "$ref": "#/definitions/stringMap" },
+        "tolerations": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.Toleration" }
+            ]
+          }
+        },
+        "topologySpreadConstraints": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.TopologySpreadConstraint" }
+            ]
+          }
+        },
+        "affinity": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.Affinity" },
+        "hostAliases": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "hostnames": { "type": "array", "items": { "type": "string" } },
+                  "weight": { "type": "number" }
+                }
+              }
+            ]
+          }
+        },
+        "imagePullSecrets": {
+          "type": "object",
+          "additionalProperties": { "anyOf": [{ "type": "null" }, { "type": "object" }] }
+        },
+        "priorityClassName": { "type": "string" },
+        "runtimeClassName": { "type": "string" },
+        "schedulerName": { "type": "string" },
+        "hostNetwork": { "type": "boolean" },
+        "enableServiceLinks": { "type": "boolean" },
+        "dnsPolicy": { "type": "string" },
+        "dnsConfig": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.core.v1.PodDNSConfig" },
+        "terminationGracePeriodSeconds": { "type": ["integer", "null"] },
+        "automountServiceAccountToken": { "type": ["boolean", "null"] },
+        "restartPolicy": { "type": "string" },
+        "volumes": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [{ "type": "null" }, { "$ref": "#/definitions/volume" }]
+          }
+        },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "volume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["pvc", "existingClaim", "configMap", "secret", "emptyDir", "hostPath", "nfs", "custom"] },
+        "size": { "type": "string" },
+        "storageClass": { "type": ["string", "null"] },
+        "accessModes": { "type": "array", "items": { "type": "string" } },
+        "volumeMode": { "type": "string" },
+        "claimName": { "type": "string" },
+        "ref": { "type": "string", "description": "Key of an extras.configMap/extras.secret entry; resolves to <fullname>-<ref>" },
+        "name": { "type": "string", "description": "Verbatim external ConfigMap/Secret name (tpl-rendered)" },
+        "items": { "type": "array" },
+        "defaultMode": { "type": "integer" },
+        "medium": { "type": "string" },
+        "sizeLimit": { "type": "string" },
+        "path": { "type": "string" },
+        "hostPathType": { "type": "string" },
+        "server": { "type": "string" },
+        "spec": { "type": "object", "description": "Raw volume source for type: custom" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "mounts": { "$ref": "#/definitions/mounts" }
+      }
+    },
+    "mounts": {
+      "type": "object",
+      "description": "Map keyed by mount path",
+      "additionalProperties": {
+        "anyOf": [
+          { "type": "null" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "containers": { "type": "array", "items": { "type": "string" } },
+              "readOnly": { "type": "boolean" },
+              "subPath": { "type": "string" },
+              "subPathExpr": { "type": "string" },
+              "mountPropagation": { "type": "string" }
+            }
+          }
+        ]
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": { "type": "integer" },
+        "strategy": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.apps.v1.DeploymentStrategy" },
+        "revisionHistoryLimit": { "type": "integer" },
+        "minReadySeconds": { "type": "integer" },
+        "progressDeadlineSeconds": { "type": "integer" }
+      }
+    },
+    "statefulset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": { "type": "integer" },
+        "serviceName": { "type": "string" },
+        "podManagementPolicy": { "type": "string" },
+        "updateStrategy": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.apps.v1.StatefulSetUpdateStrategy" },
+        "volumeClaimTemplates": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["size"],
+                "properties": {
+                  "size": { "type": "string" },
+                  "storageClass": { "type": ["string", "null"] },
+                  "accessModes": { "type": "array", "items": { "type": "string" } },
+                  "volumeMode": { "type": "string" },
+                  "mounts": { "$ref": "#/definitions/mounts" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "daemonset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "updateStrategy": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.apps.v1.DaemonSetUpdateStrategy" }
+      }
+    },
+    "cronjob": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schedule": { "type": "string" },
+        "timeZone": { "type": "string" },
+        "concurrencyPolicy": { "enum": ["Allow", "Forbid", "Replace"] },
+        "suspend": { "type": ["boolean", "null"] },
+        "successfulJobsHistoryLimit": { "type": ["integer", "null"] },
+        "failedJobsHistoryLimit": { "type": ["integer", "null"] },
+        "startingDeadlineSeconds": { "type": ["integer", "null"] }
+      }
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "restartPolicy": { "enum": ["OnFailure", "Never"] },
+        "backoffLimit": { "type": ["integer", "null"] },
+        "completions": { "type": ["integer", "null"] },
+        "parallelism": { "type": ["integer", "null"] },
+        "completionMode": { "type": "string" },
+        "activeDeadlineSeconds": { "type": ["integer", "null"] },
+        "ttlSecondsAfterFinished": { "type": ["integer", "null"] },
+        "suspend": { "type": ["boolean", "null"] }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"] },
+        "clusterIP": { "type": "string" },
+        "externalTrafficPolicy": { "type": "string" },
+        "internalTrafficPolicy": { "type": "string" },
+        "loadBalancerIP": { "type": "string" },
+        "loadBalancerClass": { "type": "string" },
+        "ports": {
+          "type": "object",
+          "description": "Overrides/prunes (~) the ports derived from containers",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "port": { "type": "integer" },
+                  "expose": { "type": "integer" },
+                  "protocol": { "enum": ["TCP", "UDP", "SCTP"] },
+                  "appProtocol": { "type": "string" },
+                  "nodePort": { "type": "integer" },
+                  "weight": { "type": "number" }
+                }
+              }
+            ]
+          }
+        },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "hostnames": { "type": "array", "items": { "type": "string" } },
+        "parentRefs": {
+          "type": "object",
+          "description": "Map keyed by gateway name; default: global.gateway",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "group": { "type": "string" },
+                  "kind": { "type": "string" },
+                  "namespace": { "type": "string" },
+                  "sectionName": { "type": "string" },
+                  "port": { "type": "integer" },
+                  "weight": { "type": "number" }
+                }
+              }
+            ]
+          }
+        },
+        "rules": {
+          "type": "array",
+          "description": "Raw HTTPRouteRule entries (ordered; match precedence). backendRefs default to the component Service and first port.",
+          "items": { "type": "object" }
+        },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "hpa": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" },
+        "targetCPU": { "type": ["integer", "null"] },
+        "targetMemory": { "type": ["integer", "null"] },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.autoscaling.v2.MetricSpec" }
+            ]
+          }
+        },
+        "behavior": { "$ref": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/v1.31.0/_definitions.json#/definitions/io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerBehavior" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "pdb": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "minAvailable": { "type": ["integer", "string", "null"] },
+        "maxUnavailable": { "type": ["integer", "string", "null"] },
+        "unhealthyPodEvictionPolicy": { "type": "string" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "name": { "type": "string" },
+        "automount": { "type": ["boolean", "null"] },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "extras": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "configMap": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "tpl": { "type": "boolean" },
+                  "data": { "$ref": "#/definitions/stringMap" },
+                  "binaryData": { "$ref": "#/definitions/stringMap" },
+                  "labels": { "$ref": "#/definitions/stringMap" },
+                  "annotations": { "$ref": "#/definitions/stringMap" },
+                  "overrides": { "$ref": "#/definitions/overrides" }
+                }
+              }
+            ]
+          }
+        },
+        "secret": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "type": "string" },
+                  "tpl": { "type": "boolean" },
+                  "stringData": { "$ref": "#/definitions/stringMap" },
+                  "data": { "$ref": "#/definitions/stringMap" },
+                  "labels": { "$ref": "#/definitions/stringMap" },
+                  "annotations": { "$ref": "#/definitions/stringMap" },
+                  "overrides": { "$ref": "#/definitions/overrides" }
+                }
+              }
+            ]
+          }
+        },
+        "externalSecret": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "storeRef": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": { "type": "string" },
+                      "kind": { "type": "string" }
+                    }
+                  },
+                  "refreshInterval": { "type": "string" },
+                  "target": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": { "type": "string" },
+                      "creationPolicy": { "type": "string" },
+                      "template": { "type": "object" }
+                    }
+                  },
+                  "data": {
+                    "type": "object",
+                    "description": "Map keyed by secretKey",
+                    "additionalProperties": {
+                      "anyOf": [
+                        { "type": "null" },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "remoteRef": { "type": "object" },
+                            "weight": { "type": "number" }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "dataFrom": { "type": "array" },
+                  "labels": { "$ref": "#/definitions/stringMap" },
+                  "annotations": { "$ref": "#/definitions/stringMap" },
+                  "overrides": { "$ref": "#/definitions/overrides" }
+                }
+              }
+            ]
+          }
+        },
+        "pvc": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["size"],
+                "properties": {
+                  "size": { "type": "string" },
+                  "storageClass": { "type": ["string", "null"] },
+                  "accessModes": { "type": "array", "items": { "type": "string" } },
+                  "volumeMode": { "type": "string" },
+                  "labels": { "$ref": "#/definitions/stringMap" },
+                  "annotations": { "$ref": "#/definitions/stringMap" },
+                  "overrides": { "$ref": "#/definitions/overrides" }
+                }
+              }
+            ]
+          }
+        },
+        "rawResource": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": true,
+                "required": ["apiVersion", "kind"],
+                "properties": {
+                  "apiVersion": { "type": "string" },
+                  "kind": { "type": "string" },
+                  "metadata": { "type": "object" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

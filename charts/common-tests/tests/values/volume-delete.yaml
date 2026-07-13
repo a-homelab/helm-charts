@@ -1,0 +1,5 @@
+components:
+  main:
+    pod:
+      volumes:
+        config: ~

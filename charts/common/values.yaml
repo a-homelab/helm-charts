@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=schema/values.schema.json
 # common — component-oriented library chart.
 #
 # This file documents the full values shape the library accepts. As a

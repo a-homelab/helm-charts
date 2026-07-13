@@ -147,25 +147,60 @@ components:
     service: ~           # delete the inherited Service
 ```
 
+## Values schema
+
+[`schema/values.schema.json`](schema/values.schema.json) validates the
+library's structural keys and delegates every Kubernetes-typed field
+(probes, securityContext, affinity, resources, strategies, HPA metrics, ...)
+to the upstream [kubernetes-json-schema](https://github.com/yannh/kubernetes-json-schema)
+definitions via remote `$ref` (pinned k8s version) — no upstream logic is
+duplicated here.
+
+It deliberately does **not** live at the chart's magic `values.schema.json`
+path: Helm's validator eagerly fetches remote `$ref`s at render time, which
+would make every `helm template` (and every ArgoCD render) network-dependent.
+Instead:
+
+- **Editor**: consumer values files opt in with a modeline —
+  `# yaml-language-server: $schema=charts/common/schema/values.schema.json`
+  (or the raw GitHub URL once published).
+- **CI**: fixtures are validated with `check-jsonschema` (resolves remote
+  refs) in the test workflow.
+
 ## Testing
 
 The sibling [`common-tests`](../common-tests/) harness chart depends on this
-chart via `file://../common`:
+chart via `file://../common`. Unit tests use
+[helm-unittest](https://github.com/helm-unittest/helm-unittest) and cover
+deployment basics, metadata propagation rules, env/config conversion,
+persistence (PVCs, existingClaim, configMap refs, emptyDir, custom volumes,
+statefulset volumeClaimTemplates), service/route derivation, overrides at
+all three altitudes, multi-component resolution, and all controller kinds.
 
 ```sh
+helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.5.2
 helm dependency update charts/common-tests
+helm unittest charts/common-tests
+
+# render fixtures directly
 helm template t charts/common-tests                                        # single-app
 helm template t charts/common-tests -f charts/common-tests/ci/multi-component-values.yaml
 helm template t charts/common-tests -f charts/common-tests/ci/controllers-values.yaml
+
+# validate values against the schema
+uvx check-jsonschema --schemafile charts/common/schema/values.schema.json <values.yaml>
 ```
+
+CI runs lint + unit tests + fixture rendering + schema validation on every
+PR touching `charts/**` (`.github/workflows/test-charts.yaml`).
 
 ## Status / roadmap
 
 v1.0.0-alpha: Deployment, StatefulSet (incl. volumeClaimTemplates),
 DaemonSet, CronJob, Job; Service, HTTPRoute, HPA, PDB, ServiceAccount;
-extras: configMap, secret, externalSecret, pvc, rawResource.
+extras: configMap, secret, externalSecret, pvc, rawResource; values schema
+(upstream k8s refs); helm-unittest suite in CI.
 
-Planned: values.schema.json (generated), NetworkPolicy, ServiceMonitor,
-GRPCRoute/TCPRoute/TLSRoute, `extras` component back-references
-(`component: api` to borrow selectors), helm-unittest suite in CI,
+Planned: NetworkPolicy, ServiceMonitor, GRPCRoute/TCPRoute/TLSRoute,
+`extras` component back-references (`component: api` to borrow selectors),
 migration of existing app charts.
