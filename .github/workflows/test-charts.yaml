@@ -1,0 +1,48 @@
+name: Test Charts
+
+on:
+  pull_request:
+    paths:
+      - "charts/**"
+      - ".github/workflows/test-charts.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "charts/**"
+
+jobs:
+  test:
+    name: Lint, unit tests, schema validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Lint
+        run: |-
+          helm lint charts/common --strict
+          helm lint charts/common-tests --strict
+
+      - name: Resolve test harness dependency
+        run: helm dependency update charts/common-tests
+
+      - name: Install helm-unittest
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.5.2
+
+      - name: Run unit tests
+        run: helm unittest charts/common-tests
+
+      - name: Render fixtures
+        run: |-
+          helm template t charts/common-tests > /dev/null
+          helm template t charts/common-tests -f charts/common-tests/ci/multi-component-values.yaml > /dev/null
+          helm template t charts/common-tests -f charts/common-tests/ci/controllers-values.yaml > /dev/null
+
+      - name: Validate fixtures against values schema
+        run: |-
+          pipx run check-jsonschema \
+            --schemafile charts/common/schema/values.schema.json \
+            charts/common-tests/values.yaml \
+            charts/common-tests/ci/multi-component-values.yaml \
+            charts/common-tests/ci/controllers-values.yaml

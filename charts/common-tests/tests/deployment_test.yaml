@@ -1,0 +1,103 @@
+suite: deployment basics (implicit main component)
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+tests:
+  - it: renders the expected resource set from minimal values
+    asserts:
+      - hasDocuments:
+          count: 5
+      - isKind:
+          of: Deployment
+        documentIndex: 0
+      - isKind:
+          of: PersistentVolumeClaim
+        documentIndex: 1
+      - isKind:
+          of: Service
+        documentIndex: 2
+      - isKind:
+          of: HTTPRoute
+        documentIndex: 3
+      - isKind:
+          of: ServiceAccount
+        documentIndex: 4
+
+  - it: names main-component resources with the bare fullname
+    asserts:
+      - equal:
+          path: metadata.name
+          value: t-common-tests
+        documentIndex: 0
+      - equal:
+          path: metadata.namespace
+          value: test
+        documentIndex: 0
+
+  - it: image tag defaults to the chart appVersion
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: lscr.io/linuxserver/sonarr:1.0.0
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: IfNotPresent
+        documentIndex: 0
+
+  - it: renders a digest tag with the @ separator
+    set:
+      components.main.container.image.tag: "sha256:abc123"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: lscr.io/linuxserver/sonarr@sha256:abc123
+        documentIndex: 0
+
+  - it: applies deployment-kind settings and library defaults
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentIndex: 0
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+        documentIndex: 0
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 10
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.enableServiceLinks
+          value: false
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: t-common-tests
+        documentIndex: 0
+
+  - it: propagates pod securityContext from values
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
+        documentIndex: 0
+
+  - it: fails fast when an enabled component has no image repository
+    set:
+      components.broken:
+        container:
+          command: [sleep]
+    asserts:
+      - failedTemplate:
+          errorMessage: "common: components.broken is enabled but container.image.repository is not set"
+
+  - it: skips disabled components entirely
+    set:
+      components.main.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

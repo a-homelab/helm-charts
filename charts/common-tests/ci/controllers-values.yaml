@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../../common/schema/values.schema.json
 # Exercises the remaining controller kinds: StatefulSet (with
 # volumeClaimTemplates + mounts), DaemonSet (hostNetwork), Job, and
 # pod/controller-level overrides.

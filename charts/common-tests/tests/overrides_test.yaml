@@ -1,0 +1,83 @@
+suite: overrides escape hatches at all three altitudes
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+tests:
+  - it: merges container overrides pre-assembly (unmodeled container fields)
+    set:
+      components.main.container.overrides:
+        terminationMessagePolicy: FallbackToLogsOnError
+        stdin: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].terminationMessagePolicy
+          value: FallbackToLogsOnError
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].stdin
+          value: true
+        documentIndex: 0
+
+  - it: merges pod overrides onto the pod spec (unmodeled pod fields)
+    set:
+      components.main.pod.overrides:
+        hostUsers: false
+        setHostnameAsFQDN: true
+    asserts:
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: false
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.setHostnameAsFQDN
+          value: true
+        documentIndex: 0
+
+  - it: merges controller overrides onto the manifest with tpl rendering
+    set:
+      components.main.overrides:
+        metadata:
+          annotations:
+            rendered: "{{ .Release.Name }}-{{ .Release.Namespace }}"
+        spec:
+          paused: true
+    asserts:
+      - equal:
+          path: metadata.annotations.rendered
+          value: t-test
+        documentIndex: 0
+      - equal:
+          path: spec.paused
+          value: true
+        documentIndex: 0
+
+  - it: deletes rendered fields via null in overrides
+    values:
+      - values/override-delete.yaml
+    asserts:
+      - notExists:
+          path: spec.revisionHistoryLimit
+        documentIndex: 0
+
+  - it: merges resource overrides on services
+    set:
+      components.main.service.overrides:
+        spec:
+          sessionAffinity: ClientIP
+    asserts:
+      - equal:
+          path: spec.sessionAffinity
+          value: ClientIP
+        documentIndex: 2
+
+  - it: keeps overrides layered — container override beats first-class values
+    set:
+      components.main.container.overrides:
+        imagePullPolicy: Always
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+        documentIndex: 0

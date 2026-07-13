@@ -1,0 +1,198 @@
+suite: persistence (volumes, PVCs, mounts)
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+tests:
+  - it: emits a PVC per pvc-type volume and wires the claim into the pod
+    asserts:
+      - isKind:
+          of: PersistentVolumeClaim
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: t-common-tests-config
+        documentIndex: 1
+      - equal:
+          path: spec.resources.requests.storage
+          value: 1Gi
+        documentIndex: 1
+      - equal:
+          path: spec.accessModes
+          value: [ReadWriteOnce]
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: config
+            persistentVolumeClaim:
+              claimName: t-common-tests-config
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /config
+        documentIndex: 0
+
+  - it: honors storageClass and accessModes on pvc volumes
+    set:
+      components.main.pod.volumes.config.storageClass: fast
+      components.main.pod.volumes.config.accessModes: [ReadWriteMany]
+    asserts:
+      - equal:
+          path: spec.storageClassName
+          value: fast
+        documentIndex: 1
+      - equal:
+          path: spec.accessModes
+          value: [ReadWriteMany]
+        documentIndex: 1
+
+  - it: mounts existing claims without emitting a PVC
+    set:
+      components.main.pod.volumes.media:
+        type: existingClaim
+        claimName: nas-media
+        mounts:
+          /media:
+            readOnly: true
+    asserts:
+      - hasDocuments:
+          count: 5
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: media
+            persistentVolumeClaim:
+              claimName: nas-media
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: media
+            mountPath: /media
+            readOnly: true
+        documentIndex: 0
+
+  - it: resolves configMap volume ref to the extras resource name
+    set:
+      extras.configMap.settings:
+        data:
+          a: b
+      components.main.pod.volumes.settings:
+        type: configMap
+        ref: settings
+        mounts:
+          /etc/app: {}
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: settings
+            configMap:
+              name: t-common-tests-settings
+        documentIndex: 0
+
+  - it: supports emptyDir with sizeLimit and subPath mounts
+    set:
+      components.main.pod.volumes.scratch:
+        type: emptyDir
+        sizeLimit: 2Gi
+        mounts:
+          /tmp/work:
+            subPath: work
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: scratch
+            emptyDir:
+              sizeLimit: 2Gi
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: scratch
+            mountPath: /tmp/work
+            subPath: work
+        documentIndex: 0
+
+  - it: passes custom volume sources through verbatim
+    set:
+      components.main.pod.volumes.tuntap:
+        type: custom
+        spec:
+          hostPath:
+            path: /dev/net/tun
+        mounts:
+          /dev/net/tun: {}
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tuntap
+            hostPath:
+              path: /dev/net/tun
+        documentIndex: 0
+
+  - it: deletes an inherited volume (and its PVC and mounts) via null
+    values:
+      - values/volume-delete.yaml
+    asserts:
+      - hasDocuments:
+          count: 4
+      - notExists:
+          path: spec.template.spec.volumes
+        documentIndex: 0
+      - notExists:
+          path: spec.template.spec.containers[0].volumeMounts
+        documentIndex: 0
+
+  - it: renders statefulset volumeClaimTemplates with mounts and no standalone PVC
+    values:
+      - ../ci/controllers-values.yaml
+    asserts:
+      - isKind:
+          of: StatefulSet
+        documentIndex: 0
+      - equal:
+          path: spec.volumeClaimTemplates[0].metadata.name
+          value: data
+        documentIndex: 0
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: fast
+        documentIndex: 0
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 10Gi
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /var/lib/db
+        documentIndex: 0
+
+  - it: renders standalone PVCs from extras
+    set:
+      extras.pvc.shared:
+        size: 100Gi
+        storageClass: nfs
+        accessModes: [ReadWriteMany]
+    asserts:
+      - hasDocuments:
+          count: 6
+      - isKind:
+          of: PersistentVolumeClaim
+        documentIndex: 5
+      - equal:
+          path: metadata.name
+          value: t-common-tests-shared
+        documentIndex: 5
+      - equal:
+          path: spec.storageClassName
+          value: nfs
+        documentIndex: 5
