@@ -92,6 +92,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "name": { "type": "string", "description": "Container name override (tpl-rendered); defaults to the component name" },
         "image": {
           "type": "object",
           "additionalProperties": false,

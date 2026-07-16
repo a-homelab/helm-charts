@@ -33,7 +33,9 @@ Input dict: { ctx, name (component name), component (resolved), box }
     {{- if not (dig "hpa" "enabled" false $comp) -}}
       {{- $_ := set $spec "replicas" (int ($d.replicas | default 1)) -}}
     {{- end -}}
-    {{- $_ := set $spec "revisionHistoryLimit" (int ($d.revisionHistoryLimit | default 10)) -}}
+    {{- if ne (kindOf $d.revisionHistoryLimit) "invalid" -}}
+      {{- $_ := set $spec "revisionHistoryLimit" (int $d.revisionHistoryLimit) -}}
+    {{- end -}}
     {{- include "common.lib.setIf" (dict "target" $spec "key" "strategy" "value" $d.strategy) -}}
     {{- include "common.lib.setIf" (dict "target" $spec "key" "minReadySeconds" "value" $d.minReadySeconds) -}}
     {{- include "common.lib.setIf" (dict "target" $spec "key" "progressDeadlineSeconds" "value" $d.progressDeadlineSeconds) -}}
@@ -83,12 +85,16 @@ Input dict: { ctx, name (component name), component (resolved), box }
     {{- $_ := set $spec "schedule" $cj.schedule -}}
     {{- include "common.lib.setIf" (dict "target" $spec "key" "timeZone" "value" $cj.timeZone) -}}
     {{- include "common.lib.setIf" (dict "target" $spec "key" "concurrencyPolicy" "value" $cj.concurrencyPolicy) -}}
+    {{- /* suspend/history limits render only when explicitly set (k8s has defaults) */ -}}
     {{- include "common.lib.setIf" (dict "target" $spec "key" "startingDeadlineSeconds" "value" $cj.startingDeadlineSeconds) -}}
     {{- if ne (kindOf $cj.suspend) "invalid" -}}{{- $_ := set $spec "suspend" $cj.suspend -}}{{- end -}}
     {{- if ne (kindOf $cj.successfulJobsHistoryLimit) "invalid" -}}{{- $_ := set $spec "successfulJobsHistoryLimit" (int $cj.successfulJobsHistoryLimit) -}}{{- end -}}
     {{- if ne (kindOf $cj.failedJobsHistoryLimit) "invalid" -}}{{- $_ := set $spec "failedJobsHistoryLimit" (int $cj.failedJobsHistoryLimit) -}}{{- end -}}
     {{- include "common.build.jobSpec" (dict "comp" $comp "podTemplate" $podTemplate "box" $b) -}}
-    {{- $_ := set $spec "jobTemplate" (dict "spec" $b.result) -}}
+    {{- $jobSpec := $b.result -}}
+    {{/* jobTemplate metadata labels propagate to the Jobs the controller spawns */}}
+    {{- include "common.metadata.build" (dict "ctx" $ctx "name" $resourceName "componentName" $name "component" $comp "labels" dict "annotations" dict "box" $b) -}}
+    {{- $_ := set $spec "jobTemplate" (dict "metadata" (omit $b.result "annotations") "spec" $jobSpec) -}}
 
   {{- else -}}
     {{- fail (printf "common: components.%s has unknown kind %q" $name $kind) -}}

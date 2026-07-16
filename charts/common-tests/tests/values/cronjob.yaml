@@ -6,6 +6,8 @@ components:
     cronjob:
       schedule: "0 3 * * *"
       timeZone: America/Chicago
+      concurrencyPolicy: Forbid
+      suspend: false
     job:
       backoffLimit: 1
     service: ~

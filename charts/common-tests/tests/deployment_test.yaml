@@ -66,9 +66,8 @@ tests:
           path: spec.strategy.type
           value: Recreate
         documentIndex: 0
-      - equal:
+      - notExists:
           path: spec.revisionHistoryLimit
-          value: 10
         documentIndex: 0
       - equal:
           path: spec.template.spec.enableServiceLinks
@@ -88,12 +87,29 @@ tests:
 
   - it: fails fast when an enabled component has no image repository
     set:
-      components.broken:
-        container:
-          command: [sleep]
+      components.main.container.image.repository: ""
     asserts:
       - failedTemplate:
-          errorMessage: "common: components.broken is enabled but container.image.repository is not set"
+          errorMessage: "common: components.main is enabled but container.image.repository is not set"
+
+  - it: rejects mixing the reserved main component with named components
+    set:
+      components.api:
+        container:
+          image:
+            repository: ghcr.io/example/app
+    asserts:
+      - failedTemplate:
+          errorMessage: 'common: the component name "main" is reserved for single-component charts (it renders without a component selector label). Name every component explicitly in multi-component charts.'
+
+  - it: renders a custom tpl-rendered container name
+    set:
+      components.main.container.name: "{{ include \"common.fullname\" . }}"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: t-common-tests
+        documentIndex: 0
 
   - it: skips disabled components entirely
     set:

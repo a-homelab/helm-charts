@@ -34,6 +34,9 @@ Input dict: { ctx: <root context>, box: <dict> }
       {{- $nonNull = dict "main" dict -}}
     {{- end -}}
   {{- end -}}
+  {{- if and (hasKey $nonNull "main") (gt (len $nonNull) 1) -}}
+    {{- fail "common: the component name \"main\" is reserved for single-component charts (it renders without a component selector label). Name every component explicitly in multi-component charts." -}}
+  {{- end -}}
   {{- $out := dict -}}
   {{- range $name, $compValues := $nonNull -}}
     {{- $eff := include "common.defaults.component" $ctx | fromYaml -}}

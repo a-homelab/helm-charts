@@ -77,13 +77,25 @@ Input dict:
       {{- fail (printf "common: container %q has no image.repository and nothing to inherit" .containerName) -}}
     {{- end -}}
   {{- end -}}
+  {{- $name := .containerName -}}
+  {{- with $v.name -}}
+    {{- $name = tpl . $ctx -}}
+  {{- end -}}
   {{- $c := dict
-    "name" .containerName
+    "name" $name
     "image" (include "common.resolve.image" (dict "ctx" $ctx "image" $image))
     "imagePullPolicy" ($image.pullPolicy | default "IfNotPresent")
   -}}
-  {{- include "common.lib.setIf" (dict "target" $c "key" "command" "value" $v.command) -}}
-  {{- include "common.lib.setIf" (dict "target" $c "key" "args" "value" $v.args) -}}
+  {{- with $v.command -}}
+    {{- $cmd := list -}}
+    {{- range . }}{{- $cmd = append $cmd (tpl . $ctx) -}}{{ end -}}
+    {{- $_ := set $c "command" $cmd -}}
+  {{- end -}}
+  {{- with $v.args -}}
+    {{- $a := list -}}
+    {{- range . }}{{- $a = append $a (tpl . $ctx) -}}{{ end -}}
+    {{- $_ := set $c "args" $a -}}
+  {{- end -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "workingDir" "value" $v.workingDir) -}}
   {{- include "common.build.env" (dict "ctx" $ctx "env" $v.env "box" $b) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "env" "value" $b.result) -}}

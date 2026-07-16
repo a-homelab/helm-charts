@@ -14,22 +14,29 @@ The four propagation rules:
 
 {{/*
 common.metadata.selectorLabels -> box.result (dict)
-Always includes app.kubernetes.io/component (also for "main") so sibling
-components can never match each other's selectors.
+The component named "main" is reserved for single-component charts and
+gets NO component selector label (matching classic single-app charts, so
+migrations don't touch the immutable Deployment selector). Every other
+component gets app.kubernetes.io/component so siblings can never match
+each other's selectors — and mixing "main" with named components is
+rejected at resolve time for exactly that reason.
 Input dict: { ctx: <root>, componentName: <string> }
 */}}
 {{- define "common.metadata.selectorLabels" -}}
   {{- $out := dict
     "app.kubernetes.io/name" (include "common.name" .ctx)
     "app.kubernetes.io/instance" .ctx.Release.Name
-    "app.kubernetes.io/component" .componentName
   -}}
+  {{- if and .componentName (ne .componentName "main") -}}
+    {{- $_ := set $out "app.kubernetes.io/component" .componentName -}}
+  {{- end -}}
   {{- $_ := set .box "result" $out -}}
 {{- end -}}
 
 {{/*
 common.metadata.standardLabels -> box.result (dict)
-Full generated label set for non-pod resources.
+Full generated label set for non-pod resources. part-of and component are
+added only for named (non-"main") components, mirroring selector behavior.
 Input dict: { ctx: <root>, componentName: <string, may be ""> }
 */}}
 {{- define "common.metadata.standardLabels" -}}
@@ -37,14 +44,12 @@ Input dict: { ctx: <root>, componentName: <string, may be ""> }
   {{- $out := dict
     "helm.sh/chart" (include "common.chartLabel" .ctx)
     "app.kubernetes.io/managed-by" .ctx.Release.Service
-    "app.kubernetes.io/part-of" (include "common.name" .ctx)
+    "app.kubernetes.io/name" (include "common.name" .ctx)
+    "app.kubernetes.io/instance" .ctx.Release.Name
   -}}
-  {{- if .componentName -}}
-    {{- include "common.metadata.selectorLabels" (dict "ctx" .ctx "componentName" .componentName "box" $box) -}}
-    {{- include "common.lib.merge" (dict "base" $out "overlay" $box.result) -}}
-  {{- else -}}
-    {{- $_ := set $out "app.kubernetes.io/name" (include "common.name" .ctx) -}}
-    {{- $_ := set $out "app.kubernetes.io/instance" .ctx.Release.Name -}}
+  {{- if and .componentName (ne .componentName "main") -}}
+    {{- $_ := set $out "app.kubernetes.io/component" .componentName -}}
+    {{- $_ := set $out "app.kubernetes.io/part-of" (include "common.name" .ctx) -}}
   {{- end -}}
   {{- with .ctx.Chart.AppVersion -}}
     {{- $_ := set $out "app.kubernetes.io/version" (. | toString) -}}

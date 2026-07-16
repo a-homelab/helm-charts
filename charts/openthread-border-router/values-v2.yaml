@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=../common/schema/values.schema.json
+# Migration values for the new common library; verified manifest-equivalent
+# by scripts/verify-common-migration.py.
+rcpDeviceHostPath: ""
+infraNetworkInterface: ""
+threadNetworkInterface: wpan0
+logLevel: 7
+
+components:
+  main:
+    container:
+      name: '{{ include "common.fullname" . }}'
+      image:
+        repository: openthread/border-router
+        tag: latest
+        pullPolicy: Always
+      securityContext:
+        capabilities:
+          add:
+            - NET_ADMIN
+        privileged: true
+      env:
+        OT_RCP_DEVICE: "spinel+hdlc+uart:///dev/ttyACM0?uart-baudrate=460800&uart-flow-control"
+        OT_INFRA_IF: "{{ .Values.infraNetworkInterface }}"
+        OT_THREAD_IF: "{{ .Values.threadNetworkInterface }}"
+        OT_REST_LISTEN_ADDR: "0.0.0.0"
+        OT_REST_LISTEN_PORT: "8081"
+        OT_WEB_LISTEN_ADDR: "0.0.0.0"
+        OT_WEB_LISTEN_PORT: "8080"
+        OT_LOG_LEVEL: "{{ .Values.logLevel }}"
+      ports:
+        http:
+          port: 8081
+        http-web:
+          port: 8080
+    pod:
+      volumes:
+        data:
+          type: pvc
+          size: 1Gi
+          storageClass: my-storage-class
+          mounts:
+            /data: {}
+        rcp:
+          type: hostPath
+          path: "{{ .Values.rcpDeviceHostPath }}"
+          hostPathType: CharDevice
+          mounts:
+            /dev/ttyACM0: {}
+        tunnel:
+          type: hostPath
+          path: /dev/net/tun
+          hostPathType: CharDevice
+          mounts:
+            /dev/net/tun: {}
+    deployment:
+      strategy:
+        type: Recreate

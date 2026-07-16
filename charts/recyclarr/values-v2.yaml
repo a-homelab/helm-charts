@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=../common/schema/values.schema.json
+# Migration values for the new common library; verified manifest-equivalent
+# by scripts/verify-common-migration.py.
+components:
+  main:
+    kind: CronJob
+    container:
+      name: '{{ include "common.fullname" . }}'
+      image:
+        repository: ghcr.io/recyclarr/recyclarr
+      command:
+        - recyclarr
+      args:
+        - sync
+        - --preview
+        - --debug
+      env:
+        TZ: America/Chicago
+        RECYCLARR_CREATE_CONFIG: "false"
+      securityContext:
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+    pod:
+      securityContext:
+        fsGroup: 1000
+      volumes:
+        config:
+          type: configMap
+          ref: config
+          defaultMode: 0400
+          mounts:
+            /config/recyclarr.yml:
+              subPath: recyclarr.yml
+              readOnly: true
+        data:
+          type: pvc
+          size: 1Gi
+          storageClass: my-storage-class
+          mounts:
+            /config: {}
+        tmpfs:
+          type: emptyDir
+          medium: Memory
+          sizeLimit: 1Gi
+          mounts:
+            /tmp: {}
+    cronjob:
+      schedule: "0 * * * *"
+      concurrencyPolicy: Forbid
+      startingDeadlineSeconds: 300
+    job:
+      restartPolicy: Never
+
+extras:
+  configMap:
+    config:
+      tpl: true
+      data:
+        recyclarr.yml: |-
+          service_type:
+            instance_name:
+              base_url: http://localhost:1234
+              api_key: f7e74ba6c80046e39e076a27af5a8444

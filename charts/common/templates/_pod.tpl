@@ -75,8 +75,8 @@ Input dict:
         {{- include "common.lib.setIf" (dict "target" $src "key" "sizeLimit" "value" $v.sizeLimit) -}}
         {{- $_ := set $vol "emptyDir" $src -}}
       {{- else if eq $type "hostPath" -}}
-        {{- if not $v.path -}}{{- fail (printf "common: volume %q (hostPath) must set path" $name) -}}{{- end -}}
-        {{- $src := dict "path" $v.path -}}
+        {{- if not (hasKey $v "path") -}}{{- fail (printf "common: volume %q (hostPath) must set path" $name) -}}{{- end -}}
+        {{- $src := dict "path" (tpl $v.path $ctx) -}}
         {{- include "common.lib.setIf" (dict "target" $src "key" "type" "value" $v.hostPathType) -}}
         {{- $_ := set $vol "hostPath" $src -}}
       {{- else if eq $type "nfs" -}}

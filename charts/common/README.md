@@ -74,8 +74,12 @@ Cross-resource plumbing is computed at render time, never stored in values:
 
 ### Metadata rules
 
-1. Selector labels are locked: exactly `name` + `instance` + `component`
-   (always, also for `main`), never merged with user labels.
+1. Selector labels are locked and never merged with user labels: `name` +
+   `instance`, plus `component` for named components. The component named
+   `main` gets no component/part-of labels (classic single-app layout, and
+   migrations from plain charts never touch the immutable Deployment
+   selector) — which is why mixing `main` with named components is
+   rejected: sibling selectors could otherwise match main's pods.
 2. Volatile generated labels (`helm.sh/chart`, `version`) stay off pod
    templates, so a chart version bump alone never rolls pods.
 3. Top-level `annotations` never touch pod templates; pod annotations come

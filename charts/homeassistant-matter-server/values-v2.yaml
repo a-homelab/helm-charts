@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=../common/schema/values.schema.json
+# Migration values for the new common library; verified manifest-equivalent
+# by scripts/verify-common-migration.py.
+primaryInterface: ""
+
+components:
+  main:
+    container:
+      name: '{{ include "common.fullname" . }}'
+      image:
+        repository: ghcr.io/home-assistant-libs/python-matter-server
+      args:
+        - --storage-path
+        - /data
+        - --paa-root-cert-dir
+        - /data/credentials
+        - --primary-interface
+        - "{{ .Values.primaryInterface }}"
+      ports:
+        http:
+          port: 5580
+    pod:
+      volumes:
+        data:
+          type: pvc
+          size: 1Gi
+          storageClass: my-storage-class
+          mounts:
+            /data: {}
+    deployment:
+      strategy:
+        type: Recreate

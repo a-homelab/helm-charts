@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=../common/schema/values.schema.json
+# Migration values for the new common library (see charts/common/README.md).
+# Verified manifest-equivalent to values.yaml + old library by
+# scripts/verify-common-migration.py.
+components:
+  main:
+    container:
+      name: '{{ include "common.fullname" . }}'
+      image:
+        repository: lscr.io/linuxserver/lidarr
+      env:
+        TZ: America/Chicago
+        PUID: "1000"
+        PGID: "1000"
+      ports:
+        http:
+          port: 8686
+    pod:
+      securityContext:
+        fsGroup: 1000
+      volumes:
+        config:
+          type: pvc
+          size: 1Gi
+          storageClass: my-storage-class
+          mounts:
+            /config: {}
+    deployment:
+      strategy:
+        type: Recreate

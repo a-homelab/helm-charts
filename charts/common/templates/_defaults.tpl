@@ -60,10 +60,13 @@ pod:
   volumes: {}
   overrides: {}
 
+# Fields whose values would merely restate the Kubernetes defaults
+# (revisionHistoryLimit, concurrencyPolicy, job history limits, ...) are
+# deliberately absent: the library renders them only when explicitly set,
+# so manifests stay minimal and migrations from plain charts stay diff-free.
 deployment:
   replicas: 1
   strategy: {}
-  revisionHistoryLimit: 10
 
 statefulset:
   replicas: 1
@@ -78,15 +81,10 @@ daemonset:
 # The job block applies to kind: Job AND to the jobTemplate of kind: CronJob.
 job:
   restartPolicy: OnFailure
-  backoffLimit: 6
 
 cronjob:
   schedule: ""
   timeZone: ""
-  concurrencyPolicy: Forbid
-  suspend: false
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 1
 
 overrides: {}
 

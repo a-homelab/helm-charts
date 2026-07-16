@@ -20,7 +20,6 @@ tests:
           value:
             app.kubernetes.io/name: common-tests
             app.kubernetes.io/instance: t
-            app.kubernetes.io/component: main
         documentIndex: 2
 
   - it: uses expose for the service-side port

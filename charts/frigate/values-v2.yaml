@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=../common/schema/values.schema.json
+# Migration values for the new common library; verified manifest-equivalent
+# by scripts/verify-common-migration.py.
+components:
+  main:
+    container:
+      name: '{{ include "common.fullname" . }}'
+      image:
+        repository: ghcr.io/blakeblackshear/frigate
+      probes:
+        readiness:
+          httpGet:
+            path: /api/version
+            port: http
+            scheme: HTTP
+          failureThreshold: 5
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 10
+        startup:
+          httpGet:
+            path: /api/version
+            port: http
+            scheme: HTTP
+          # 10 min for generating tensorrt models
+          failureThreshold: 60
+          successThreshold: 1
+          periodSeconds: 10
+          timeoutSeconds: 1
+      ports:
+        http:
+          port: 8971
+          appProtocol: http
+        http-authless:
+          port: 5000
+          appProtocol: http
+        rtsp:
+          port: 8554
+          appProtocol: tcp
+        webrtc-tcp:
+          port: 8555
+          appProtocol: tcp
+        webrtc-udp:
+          port: 8555
+          appProtocol: udp
+    pod:
+      annotations:
+        checksum/config: '{{ get (index .Values.extras.configMap "config").data "config.yml" | sha256sum }}'
+    deployment:
+      strategy:
+        type: Recreate
+
+extras:
+  configMap:
+    config:
+      tpl: true
+      data:
+        config.yml: |-
+          database:
+            path: /config/frigate.db
