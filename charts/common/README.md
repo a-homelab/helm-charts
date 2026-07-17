@@ -1,7 +1,7 @@
 # common
 
 Component-oriented Helm library chart. A consumer chart declares **components**
-(workloads) and **extras** (chart-scoped resources) entirely through values;
+(workloads), **appResources** (typed application-scoped resources) and **rawResources** (verbatim manifests) entirely through values;
 its whole `templates/` directory is one line:
 
 ```yaml
@@ -16,7 +16,8 @@ its whole `templates/` directory is one line:
 global:      # injected platform context (gateway, domain, secret store)
 defaults:    # component-shaped defaults merged under every component
 components:  # named workloads; empty -> one implicit component "main"
-extras:      # chart-scoped resources: extras.<type>.<name>
+appResources: # typed application-scoped resources: appResources.<type>.<name>
+rawResources: # raw manifests rendered verbatim (map of key -> manifest|string)
 labels:      # stamped on every rendered resource (pods included)
 annotations: # stamped on every rendered resource (pods excluded)
 # plus the familiar Helm keys: nameOverride, fullnameOverride, namespaceOverride
@@ -53,7 +54,7 @@ libraryDefaults  <-  .Values.defaults  <-  .Values.components.<name>
 
 Every collection whose entries have identity is a map: `env`, `ports`,
 `volumes`, `mounts`, `sidecars`, `initContainers`, `tolerations`,
-`parentRefs`, `extras.*`, ... Map keys give entries identity across layers
+`parentRefs`, `appResources.*`, `rawResources`, ... Map keys give entries identity across layers
 and values files (add/override/delete individual entries from an overlay);
 rendering converts maps to deterministically ordered lists (sorted by
 optional `weight`, then key), so manifests are byte-stable and GitOps diffs
@@ -91,34 +92,52 @@ Cascade (later wins): generated -> top-level -> component -> resource.
 ### Shared resources: two scopes, and sharing = hoist + reference
 
 Every resource has one owner. Component scope (inside `components.<name>`,
-named `<componentResourceName>-<key>`) or chart scope (`extras.<type>.<key>`,
+named `<componentResourceName>-<key>`) or app scope (`appResources.<type>.<key>`,
 named `<fullname>-<key>`). Sharing is never one component reaching into
-another — anything shared is hoisted to `extras` and consumed **by key**;
+another — anything shared is hoisted to `appResources` and consumed **by key**;
 the library resolves keys to rendered names and fails on dangling
 references at render time:
 
 | You write | Resolves to | Emits |
 |---|---|---|
 | volume `type: pvc` (inline) | claim `<component>-<key>` | component-scoped PVC |
-| volume `type: pvc, ref: k` | claim of `extras.pvc.k` | nothing |
-| volume `type: configMap/secret, ref: k` | that extras resource | nothing |
-| volume `type: secret, certRef: k` | `extras.certificate.k`'s secretName | nothing |
-| env `valueFrom` / `envFrom` `ref: k` | that extras resource | nothing |
+| volume `type: pvc, ref: k` | claim of `appResources.pvc.k` | nothing |
+| volume `type: configMap/secret, ref: k` | that appResources resource | nothing |
+| volume `type: secret, certRef: k` | `appResources.certificate.k`'s secretName | nothing |
+| env `valueFrom` / `envFrom` `ref: k` | that appResources resource | nothing |
 | route backendRef `component: c` | `c`'s Service + resolved port (name or first) | nothing |
-| extras entry `component: c` | named/labeled under `c` | component-scoped resource |
+| appResources entry `component: c` | named/labeled under `c` | component-scoped resource |
 
-`extras.httpRoute.<key>` fans one hostname across components (rules
-required, backendRefs by `component:`); `extras.certificate.<key>` renders
+`appResources.httpRoute.<key>` fans one hostname across components (rules
+required, backendRefs by `component:`); `appResources.certificate.<key>` renders
 a cert-manager Certificate (issuer from `global.certIssuer`, secret
 `<name>-tls`, dnsNames from `global.domain`).
 
-Inside any tpl-rendered string (env values, annotations, overrides), the
-same resolution is available as named templates:
+### Template API (stable, for tpl-rendered values)
+
+Inside any tpl-rendered string (env values, annotations, hostnames,
+overrides, rawResources), these named templates are the supported way to
+reference other parts of the chart — all validated, so dangling
+references fail at render time:
+
+| Template | Returns |
+|---|---|
+| `common.fullname` (ctx) | release-scoped app name |
+| `common.name` (ctx) | chart/app name |
+| `common.namespace` (ctx) | target namespace |
+| `common.ref` (list ctx type key) | rendered name of an `appResources` entry |
+| `common.ref.component` (list ctx name) | a component's resource/Service name |
+| `common.ref.serviceHost` (list ctx name) | `<service>.<namespace>.svc` |
+| `common.ref.tlsSecret` (list ctx key) | Secret name a certificate writes |
 
 ```yaml
 env:
   CONFIG_NAME: '{{ include "common.ref" (list . "configMap" "config") }}'
+  WORKER_URL: 'http://{{ include "common.ref.serviceHost" (list . "worker") }}:9090'
   TLS_SECRET: '{{ include "common.ref.tlsSecret" (list . "web") }}'
+pod:
+  annotations:
+    checksum/config: '{{ .Values.appResources.configMap.config.data | toYaml | sha256sum }}'
 ```
 
 Deliberate non-feature: shared volumes do not auto-mount into components.
@@ -133,7 +152,7 @@ onto the rendered manifest. Crucially, `container.overrides` and
 any container/pod field the library doesn't model is still reachable
 (deep-merge cannot patch list elements, so patching happens pre-assembly).
 For entire resource types the library doesn't model, use
-`extras.rawResource.<name>` — full manifests that still get standard
+`rawResources.<name>` — full manifests (as maps or literal YAML strings) that still get standard
 labels and tpl rendering.
 
 ## Minimal consumer
@@ -239,9 +258,10 @@ PR touching `charts/**` (`.github/workflows/test-charts.yaml`).
 
 v1.0.0-alpha: Deployment, StatefulSet (incl. volumeClaimTemplates),
 DaemonSet, CronJob, Job; Service, HTTPRoute, HPA, PDB, ServiceAccount;
-extras: configMap, secret, externalSecret, pvc, rawResource; values schema
+appResources: configMap, secret, externalSecret, pvc, certificate, httpRoute;
+rawResources (map- and string-form); values schema
 (upstream k8s refs); helm-unittest suite in CI.
 
 Planned: NetworkPolicy, ServiceMonitor, GRPCRoute/TCPRoute/TLSRoute,
-`extras` component back-references (`component: api` to borrow selectors),
+
 migration of existing app charts.

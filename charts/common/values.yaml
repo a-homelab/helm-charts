@@ -5,13 +5,23 @@
 # library chart it is never installed directly and these values are not
 # applied at render time; consumer charts declare only their deltas.
 #
-# Structure — six top-level keys plus the familiar Helm naming overrides:
-#   global:      injected platform context (never set by the app chart)
-#   defaults:    component-shaped defaults merged under every component
-#   components:  named workloads (empty -> one implicit component "main")
-#   extras:      chart-scoped resources: extras.<type>.<name>
-#   labels:      stamped on every rendered resource (pods included)
-#   annotations: stamped on every rendered resource (pods excluded)
+# Structure — seven top-level keys plus the familiar Helm naming overrides:
+#   global:       injected platform context (never set by the app chart)
+#   defaults:     component-shaped defaults merged under every component
+#   components:   named workloads (empty -> one implicit component "main")
+#   appResources: typed application-scoped resources: appResources.<type>.<name>
+#   rawResources: raw manifests rendered verbatim (map of key -> manifest|string)
+#   labels:       stamped on every rendered resource (pods included)
+#   annotations:  stamped on every rendered resource (pods excluded)
+#
+# Template API for tpl-rendered strings (env values, annotations, overrides):
+#   {{ include "common.fullname" . }}                              release-scoped app name
+#   {{ include "common.name" . }} / {{ include "common.namespace" . }}
+#   {{ include "common.ref" (list . "configMap" "config") }}       appResources entry name
+#   {{ include "common.ref.component" (list . "worker") }}         component resource/Service name
+#   {{ include "common.ref.serviceHost" (list . "api") }}          <service>.<namespace>.svc
+#   {{ include "common.ref.tlsSecret" (list . "web") }}            certificate's Secret name
+# All are validated: dangling references fail at render time.
 #
 # Resolution per component: libraryDefaults <- defaults <- components.<name>
 # (deep merge; explicit null DELETES the key at any depth).
@@ -44,7 +54,7 @@ global:
     storeName: ""         # default secretStoreRef name
     kind: ClusterSecretStore
   certIssuer:
-    name: ""              # default issuerRef for extras.certificate entries
+    name: ""              # default issuerRef for appResources.certificate entries
     kind: ClusterIssuer
 
 # -----------------------------------------------------------------------------
@@ -199,14 +209,16 @@ components: {}
   #     overrides: {}
 
 # -----------------------------------------------------------------------------
-# Extras — chart-scoped resources, named <fullname>-<key>. This is the
-# SHARED scope: components consume entries by key (volume ref:/certRef:,
-# env/envFrom ref:, backendRef component:, or the common.ref template) and
-# dangling references fail at render time. Any entry may instead declare
+# appResources — TYPED resources scoped to the application as a whole,
+# named <fullname>-<key>. This is where anything not specific to a single
+# component lives ("where do I put a global configmap?" -> here).
+# Components consume entries by key (volume ref:/certRef:, env/envFrom
+# ref:, backendRef component:, or the common.ref template); dangling
+# references fail at render time. Any entry may instead declare
 # `component: <name>` to become component-scoped (named
 # <componentResourceName>-<key>, stamped with component labels).
 # -----------------------------------------------------------------------------
-extras: {}
+appResources: {}
   # configMap:
   #   config:
   #     tpl: false                # opt-in tpl rendering of data values
@@ -243,8 +255,25 @@ extras: {}
   #       - matches: [{ path: { type: PathPrefix, value: /api } }]
   #         backendRefs: [{ component: api }]          # -> Service name + first port
   #       - backendRefs: [{ component: worker, port: metrics }]   # port by NAME
-  # rawResource:
-  #   my-crd:
-  #     apiVersion: example.io/v1
-  #     kind: Widget
-  #     spec: { }                 # tpl-rendered; gets standard labels
+
+# -----------------------------------------------------------------------------
+# rawResources — raw manifests rendered VERBATIM, for anything the typed
+# appResources model doesn't cover ("where do I paste this manifest from a
+# README?" -> here). Map-keyed (unlike the extraObjects array convention)
+# so overlays can override/delete (~) individual entries and ArgoCD diffs
+# stay stable. Entries are a full manifest as a MAP, or a literal YAML
+# STRING for copy-paste + tpl. Managed touches only: standard labels
+# merged under the manifest's own, namespace defaulted, metadata.name
+# defaulted to <fullname>-<key>. No refs — promote to appResources if
+# something needs referencing.
+# -----------------------------------------------------------------------------
+rawResources: {}
+  # my-crd:
+  #   apiVersion: example.io/v1
+  #   kind: Widget
+  #   spec: { }
+  # pasted: |
+  #   apiVersion: example.io/v1
+  #   kind: Widget
+  #   spec:
+  #     release: {{ .Release.Name }}

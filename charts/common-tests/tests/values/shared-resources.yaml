@@ -1,6 +1,6 @@
 # Shared-resources exercise: chart-scoped PVC/configMap/secret/certificate
 # consumed from two components via refs, a chart-scoped HTTPRoute fanning
-# one hostname across components, and a component-scoped extras entry.
+# one hostname across components, and a component-scoped appResources entry.
 global:
   domain: example.com
   gateway:
@@ -60,7 +60,7 @@ components:
             /library:
               readOnly: true
 
-extras:
+appResources:
   pvc:
     media:
       size: 100Gi

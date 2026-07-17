@@ -77,7 +77,7 @@ components:
               containers: [oauth-proxy]
               readOnly: true
       annotations:
-        checksum/config: '{{ .Values.extras.configMap | toYaml | sha256sum }}'
+        checksum/config: '{{ .Values.appResources.configMap | toYaml | sha256sum }}'
     service:
       ports:
         http: ~                            # prune app port; only expose proxy
@@ -115,7 +115,7 @@ components:
     serviceAccount:
       enabled: false
 
-extras:
+appResources:
   configMap:
     app-config:
       data:
@@ -127,9 +127,9 @@ extras:
         api-key:
           remoteRef:
             key: example-api-key
-  rawResource:
-    widget:
-      apiVersion: example.io/v1
-      kind: Widget
-      spec:
-        size: 3
+rawResources:
+  widget:
+    apiVersion: example.io/v1
+    kind: Widget
+    spec:
+      size: 3

@@ -18,7 +18,12 @@ one file per component (nicer ArgoCD diffs):
   {{- range $name, $comp := $components }}
     {{- include "common.render.component" (dict "ctx" $ "name" $name "component" $comp "components" $components) }}
   {{- end }}
-  {{- include "common.build.extras" (dict "ctx" . "components" $components "box" $box) -}}
+  {{- include "common.build.appResources" (dict "ctx" . "components" $components "box" $box) -}}
+  {{- range $manifest := $box.result }}
+---
+{{ toYaml $manifest }}
+  {{- end }}
+  {{- include "common.build.rawResources" (dict "ctx" . "box" $box) -}}
   {{- range $manifest := $box.result }}
 ---
 {{ toYaml $manifest }}

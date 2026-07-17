@@ -78,7 +78,7 @@ tests:
 
   - it: resolves configMap volume ref to the extras resource name
     set:
-      extras.configMap.settings:
+      appResources.configMap.settings:
         data:
           a: b
       components.main.pod.volumes.settings:
@@ -178,7 +178,7 @@ tests:
 
   - it: renders standalone PVCs from extras
     set:
-      extras.pvc.shared:
+      appResources.pvc.shared:
         size: 100Gi
         storageClass: nfs
         accessModes: [ReadWriteMany]

@@ -40,9 +40,9 @@ Input dict:
       {{- $where := printf "volume %q" $name -}}
       {{- if eq $type "pvc" -}}
         {{- if $v.ref -}}
-          {{/* shared: mount the chart-scoped extras.pvc.<ref>; emit nothing */}}
-          {{- include "common.extras.lookup" (dict "ctx" $ctx "type" "pvc" "key" $v.ref "where" $where "box" $b) -}}
-          {{- $claimName := include "common.extras.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
+          {{/* shared: mount the chart-scoped appResources.pvc.<ref>; emit nothing */}}
+          {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "pvc" "key" $v.ref "where" $where "box" $b) -}}
+          {{- $claimName := include "common.appResources.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
           {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
         {{- else -}}
           {{/* exclusive: component-scoped PVC, emitted with the component */}}
@@ -56,12 +56,12 @@ Input dict:
       {{- else if eq $type "configMap" -}}
         {{- $cmName := "" -}}
         {{- if $v.ref -}}
-          {{- include "common.extras.lookup" (dict "ctx" $ctx "type" "configMap" "key" $v.ref "where" $where "box" $b) -}}
-          {{- $cmName = include "common.extras.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
+          {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "configMap" "key" $v.ref "where" $where "box" $b) -}}
+          {{- $cmName = include "common.appResources.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
         {{- else if $v.name -}}
           {{- $cmName = tpl $v.name $ctx -}}
         {{- else -}}
-          {{- fail (printf "common: volume %q (configMap) must set `ref` (extras key) or `name`" $name) -}}
+          {{- fail (printf "common: volume %q (configMap) must set `ref` (appResources key) or `name`" $name) -}}
         {{- end -}}
         {{- $src := dict "name" $cmName -}}
         {{- include "common.lib.setIf" (dict "target" $src "key" "items" "value" $v.items) -}}
@@ -70,15 +70,15 @@ Input dict:
       {{- else if eq $type "secret" -}}
         {{- $secName := "" -}}
         {{- if $v.ref -}}
-          {{- include "common.extras.lookup" (dict "ctx" $ctx "type" "secret" "key" $v.ref "where" $where "box" $b) -}}
-          {{- $secName = include "common.extras.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
+          {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "secret" "key" $v.ref "where" $where "box" $b) -}}
+          {{- $secName = include "common.appResources.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
         {{- else if $v.certRef -}}
-          {{/* mount the Secret an extras.certificate entry writes */}}
+          {{/* mount the Secret an appResources.certificate entry writes */}}
           {{- $secName = include "common.ref.tlsSecret" (list $ctx $v.certRef) -}}
         {{- else if $v.name -}}
           {{- $secName = tpl $v.name $ctx -}}
         {{- else -}}
-          {{- fail (printf "common: volume %q (secret) must set `ref` (extras key), `certRef` (certificate key) or `name`" $name) -}}
+          {{- fail (printf "common: volume %q (secret) must set `ref` (appResources key), `certRef` (certificate key) or `name`" $name) -}}
         {{- end -}}
         {{- $src := dict "secretName" $secName -}}
         {{- include "common.lib.setIf" (dict "target" $src "key" "items" "value" $v.items) -}}

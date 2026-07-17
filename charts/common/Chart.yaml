@@ -2,7 +2,7 @@ apiVersion: v2
 name: common
 description: |
   Component-oriented Helm library chart. Consumer charts declare named
-  components (workloads) plus chart-scoped extras entirely through values;
+  components (workloads), typed appResources and raw manifests entirely through values;
   a single `{{ include "common.all" . }}` renders every resource. Values
   resolve through a layered deep-merge (library defaults -> defaults ->
   component) with delete-by-null, map-shaped collections everywhere, and

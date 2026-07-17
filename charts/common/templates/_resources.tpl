@@ -80,7 +80,7 @@ No derived ports -> no Service (worker pattern).
 
 {{/*
 common.resolve.backendRef -> box.result (resolved Gateway API backendRef)
-Shared by component-scoped and chart-scoped (extras) httpRoutes.
+Shared by component-scoped and chart-scoped (appResources) httpRoutes.
 An entry may name a component instead of a Service:
   { component: <name>, port: <port NAME or number>, ...passthrough }
 Resolution: name -> the component's Service name; port name -> the

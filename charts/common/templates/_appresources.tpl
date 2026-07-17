@@ -1,37 +1,39 @@
 {{/*
 =============================================================================
-Chart-scoped extras: extras.<type>.<name>.
-Types: configMap, secret, externalSecret, pvc, certificate, httpRoute,
-rawResource.
+Application-scoped typed resources: appResources.<type>.<name>.
+Types: configMap, secret, externalSecret, pvc, certificate, httpRoute.
 
-Scoping: entries are chart-scoped by default (named <fullname>-<key>, no
+Scoping: entries are app-scoped by default (named <fullname>-<key>, no
 component label). An entry may declare `component: <name>` to become
 component-scoped: named <componentResourceName>-<key> and stamped with
-that component's labels. Components consume extras by KEY (volume ref:,
-certRef:, env/envFrom ref:, backendRef component:, or the common.ref
-template) — never by rendered name.
+that component's labels. Components consume appResources by KEY (volume
+ref:, certRef:, env/envFrom ref:, backendRef component:, or the
+common.ref template) — never by rendered name.
+
+Raw, untyped manifests live in the separate top-level `rawResources` map
+(see common.build.rawResources at the bottom of this file).
 
 Each builder -> box.result (list of manifest dicts).
 =============================================================================
 */}}
 
 {{/*
-common.extras.meta (internal) -> box.name, box.meta
+common.appResources.meta (internal) -> box.name, box.meta
 Resolves an entry's scope (chart vs component back-reference), validates
 the referenced component exists, and assembles resource metadata.
 Input dict: { ctx, components (resolved map), key, entry, box }
 */}}
-{{- define "common.extras.meta" -}}
+{{- define "common.appResources.meta" -}}
   {{- $entry := .entry -}}
   {{- $compName := $entry.component | default "" -}}
   {{- $comp := dict -}}
   {{- if $compName -}}
     {{- $comp = get (.components | default dict) $compName -}}
     {{- if not $comp -}}
-      {{- fail (printf "common: extras entry %q references unknown or disabled component %q" .key $compName) -}}
+      {{- fail (printf "common: appResources entry %q references unknown or disabled component %q" .key $compName) -}}
     {{- end -}}
   {{- end -}}
-  {{- $name := include "common.extras.name" (dict "ctx" .ctx "key" .key "entry" $entry) -}}
+  {{- $name := include "common.appResources.name" (dict "ctx" .ctx "key" .key "entry" $entry) -}}
   {{- $b := dict -}}
   {{- include "common.metadata.build" (dict "ctx" .ctx "name" $name "componentName" $compName "component" $comp "labels" ($entry.labels | default dict) "annotations" ($entry.annotations | default dict) "box" $b) -}}
   {{- $_ := set .box "name" $name -}}
@@ -39,20 +41,20 @@ Input dict: { ctx, components (resolved map), key, entry, box }
 {{- end -}}
 
 {{/*
-common.build.extras -> box.result (list of manifests)
+common.build.appResources -> box.result (list of manifests)
 Input dict: { ctx, components (resolved map), box }
 */}}
-{{- define "common.build.extras" -}}
+{{- define "common.build.appResources" -}}
   {{- $ctx := .ctx -}}
   {{- $components := .components | default dict -}}
-  {{- $extras := $ctx.Values.extras | default dict -}}
+  {{- $appResources := $ctx.Values.appResources | default dict -}}
   {{- $out := list -}}
   {{- $m := dict -}}
   {{- $b := dict -}}
 
-  {{- range $name, $v := ($extras.configMap | default dict) -}}
+  {{- range $name, $v := ($appResources.configMap | default dict) -}}
     {{- if ne (kindOf $v) "invalid" -}}
-      {{- include "common.extras.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
+      {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $manifest := dict "apiVersion" "v1" "kind" "ConfigMap" "metadata" $m.meta -}}
       {{- $data := $v.data | default dict -}}
       {{- if $v.tpl -}}
@@ -66,9 +68,9 @@ Input dict: { ctx, components (resolved map), box }
     {{- end -}}
   {{- end -}}
 
-  {{- range $name, $v := ($extras.secret | default dict) -}}
+  {{- range $name, $v := ($appResources.secret | default dict) -}}
     {{- if ne (kindOf $v) "invalid" -}}
-      {{- include "common.extras.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
+      {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $manifest := dict "apiVersion" "v1" "kind" "Secret" "metadata" $m.meta "type" ($v.type | default "Opaque") -}}
       {{- $stringData := $v.stringData | default dict -}}
       {{- if $v.tpl -}}
@@ -82,14 +84,14 @@ Input dict: { ctx, components (resolved map), box }
     {{- end -}}
   {{- end -}}
 
-  {{- range $name, $v := ($extras.externalSecret | default dict) -}}
+  {{- range $name, $v := ($appResources.externalSecret | default dict) -}}
     {{- if ne (kindOf $v) "invalid" -}}
       {{- $globalES := dig "externalSecrets" dict ($ctx.Values.global | default dict) -}}
       {{- $storeName := dig "storeRef" "name" "" $v | default ($globalES.storeName | default "") -}}
       {{- if not $storeName -}}
-        {{- fail (printf "common: extras.externalSecret.%s needs storeRef.name or global.externalSecrets.storeName" $name) -}}
+        {{- fail (printf "common: appResources.externalSecret.%s needs storeRef.name or global.externalSecrets.storeName" $name) -}}
       {{- end -}}
-      {{- include "common.extras.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
+      {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $spec := dict
         "refreshInterval" ($v.refreshInterval | default "1h")
         "secretStoreRef" (dict "name" $storeName "kind" (dig "storeRef" "kind" "" $v | default ($globalES.kind | default "ClusterSecretStore")))
@@ -115,11 +117,11 @@ Input dict: { ctx, components (resolved map), box }
     {{- end -}}
   {{- end -}}
 
-  {{- range $name, $v := ($extras.pvc | default dict) -}}
+  {{- range $name, $v := ($appResources.pvc | default dict) -}}
     {{- if ne (kindOf $v) "invalid" -}}
       {{- include "common.build.pvcSpec" (dict "values" $v "box" $b) -}}
       {{- $spec := $b.result -}}
-      {{- include "common.extras.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
+      {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $manifest := dict "apiVersion" "v1" "kind" "PersistentVolumeClaim" "metadata" $m.meta "spec" $spec -}}
       {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" $v.overrides) -}}
       {{- $out = append $out $manifest -}}
@@ -128,13 +130,13 @@ Input dict: { ctx, components (resolved map), box }
 
   {{/* cert-manager.io/v1 Certificate. Defaults: secretName <name>-tls,
        issuerRef from global.certIssuer, dnsNames <name>.<global.domain>. */}}
-  {{- range $name, $v := ($extras.certificate | default dict) -}}
+  {{- range $name, $v := ($appResources.certificate | default dict) -}}
     {{- if ne (kindOf $v) "invalid" -}}
-      {{- include "common.extras.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
+      {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $global := $ctx.Values.global | default dict -}}
       {{- $issuerName := dig "issuerRef" "name" "" $v | default (dig "certIssuer" "name" "" $global) -}}
       {{- if not $issuerName -}}
-        {{- fail (printf "common: extras.certificate.%s needs issuerRef.name or global.certIssuer.name" $name) -}}
+        {{- fail (printf "common: appResources.certificate.%s needs issuerRef.name or global.certIssuer.name" $name) -}}
       {{- end -}}
       {{- $dnsNames := list -}}
       {{- range $d := ($v.dnsNames | default list) -}}
@@ -142,7 +144,7 @@ Input dict: { ctx, components (resolved map), box }
       {{- end -}}
       {{- if not $dnsNames -}}
         {{- if not $global.domain -}}
-          {{- fail (printf "common: extras.certificate.%s needs dnsNames or global.domain" $name) -}}
+          {{- fail (printf "common: appResources.certificate.%s needs dnsNames or global.domain" $name) -}}
         {{- end -}}
         {{- $dnsNames = list (printf "%s.%s" $m.name $global.domain) -}}
       {{- end -}}
@@ -168,9 +170,9 @@ Input dict: { ctx, components (resolved map), box }
        Rules are required (no default backend) and backendRefs use
        `component:` references. With a `component:` back-ref the route is
        component-scoped and that component becomes the default backend. */}}
-  {{- range $name, $v := ($extras.httpRoute | default dict) -}}
+  {{- range $name, $v := ($appResources.httpRoute | default dict) -}}
     {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
-      {{- include "common.extras.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
+      {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $compName := $v.component | default "" -}}
       {{- $defaultHost := include "common.fullname" $ctx -}}
       {{- if $compName -}}
@@ -188,24 +190,46 @@ Input dict: { ctx, components (resolved map), box }
     {{- end -}}
   {{- end -}}
 
-  {{- range $name, $v := ($extras.rawResource | default dict) -}}
+  {{- $_ := set .box "result" $out -}}
+{{- end -}}
+
+{{/*
+common.build.rawResources -> box.result (list of manifests)
+Top-level `rawResources` map: key -> full manifest, verbatim. Entries are
+either a MAP (structured manifest) or a STRING (literal YAML, so
+manifests can be pasted from any project's docs) — both are tpl-rendered.
+The only managed touches: standard labels are merged under the manifest's
+own labels (ArgoCD tracking), namespace is defaulted, and metadata.name
+defaults to <fullname>-<key> when the manifest omits it. Spec content is
+never modified; refs/back-refs are deliberately not supported here — if
+something needs referencing, it deserves a typed appResources home.
+Input dict: { ctx, box }
+*/}}
+{{- define "common.build.rawResources" -}}
+  {{- $ctx := .ctx -}}
+  {{- $out := list -}}
+  {{- $m := dict -}}
+  {{- range $name, $v := ($ctx.Values.rawResources | default dict) -}}
     {{- if ne (kindOf $v) "invalid" -}}
-      {{- if or (not $v.apiVersion) (not $v.kind) -}}
-        {{- fail (printf "common: extras.rawResource.%s must set apiVersion and kind" $name) -}}
+      {{- $manifest := dict -}}
+      {{- if eq (kindOf $v) "string" -}}
+        {{- $manifest = tpl $v $ctx | fromYaml -}}
+        {{- if $manifest.Error -}}
+          {{- fail (printf "common: rawResources.%s is not valid YAML: %s" $name $manifest.Error) -}}
+        {{- end -}}
+      {{- else -}}
+        {{- $manifest = tpl (toYaml $v) $ctx | fromYaml -}}
       {{- end -}}
-      {{- include "common.extras.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
-      {{- $userMeta := $v.metadata | default dict -}}
-      {{- $meta := $m.meta -}}
-      {{- if $userMeta.name -}}
-        {{- $_ := set $meta "name" $userMeta.name -}}
+      {{- if or (not $manifest.apiVersion) (not $manifest.kind) -}}
+        {{- fail (printf "common: rawResources.%s must set apiVersion and kind" $name) -}}
       {{- end -}}
-      {{- include "common.lib.merge" (dict "base" $meta "overlay" (omit $userMeta "name")) -}}
-      {{- $manifest := tpl (toYaml (omit $v "metadata" "component" "labels" "annotations" "overrides")) $ctx | fromYaml -}}
+      {{- include "common.metadata.build" (dict "ctx" $ctx "name" (printf "%s-%s" (include "common.fullname" $ctx) $name) "componentName" "" "labels" dict "annotations" dict "box" $m) -}}
+      {{- $meta := $m.result -}}
+      {{/* the manifest's own metadata wins over the managed defaults */}}
+      {{- include "common.lib.merge" (dict "base" $meta "overlay" ($manifest.metadata | default dict)) -}}
       {{- $_ := set $manifest "metadata" $meta -}}
-      {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" $v.overrides) -}}
       {{- $out = append $out $manifest -}}
     {{- end -}}
   {{- end -}}
-
   {{- $_ := set .box "result" $out -}}
 {{- end -}}

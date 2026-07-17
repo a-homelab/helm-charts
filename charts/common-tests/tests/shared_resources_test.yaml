@@ -159,16 +159,86 @@ tests:
               port: 8080
         documentIndex: 11
 
+  - it: renders string rawResources entries with tpl, name defaulting and managed labels
+    set:
+      rawResources:
+        policy: |
+          apiVersion: example.io/v1
+          kind: Policy
+          spec:
+            release: "{{ .Release.Name }}"
+        named: |
+          apiVersion: example.io/v1
+          kind: Policy
+          metadata:
+            name: my-explicit-name
+            labels:
+              custom: label
+          spec: {}
+    asserts:
+      - hasDocuments:
+          count: 14
+      - isKind:
+          of: Policy
+        documentIndex: 12
+      - equal:
+          path: metadata.name
+          value: my-explicit-name
+        documentIndex: 12
+      - equal:
+          path: metadata.labels.custom
+          value: label
+        documentIndex: 12
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+        documentIndex: 12
+      - equal:
+          path: metadata.name
+          value: t-common-tests-policy
+        documentIndex: 13
+      - equal:
+          path: spec.release
+          value: t
+        documentIndex: 13
+
+  - it: resolves component names and service hosts in tpl strings
+    set:
+      components.api.container.env:
+        WORKER_NAME: '{{ include "common.ref.component" (list . "worker") }}'
+        WORKER_URL: 'http://{{ include "common.ref.serviceHost" (list . "worker") }}:9090'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WORKER_NAME
+            value: t-common-tests-worker
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WORKER_URL
+            value: http://t-common-tests-worker.test.svc:9090
+        documentIndex: 0
+
+  - it: fails on a component reference to an undeclared component
+    set:
+      components.api.container.env:
+        GHOST: '{{ include "common.ref.component" (list . "ghost") }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: 'common.ref.component: component "ghost" is not declared'
+
   - it: fails on a dangling volume ref
     set:
       components.api.pod.volumes.media.ref: nonexistent
     asserts:
       - failedTemplate:
-          errorMessage: 'common: volume "media" references extras.pvc.nonexistent, which is not defined'
+          errorMessage: 'common: volume "media" references appResources.pvc.nonexistent, which is not defined'
 
   - it: fails on a backendRef to an unknown component
     set:
-      extras.httpRoute.web.rules:
+      appResources.httpRoute.web.rules:
         - backendRefs:
             - component: ghost
     asserts:
@@ -177,7 +247,7 @@ tests:
 
   - it: fails on a chart-scoped route without rules
     set:
-      extras.httpRoute.bare:
+      appResources.httpRoute.bare:
         hostnames: [bare.example.com]
     asserts:
       - failedTemplate:

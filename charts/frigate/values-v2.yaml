@@ -45,12 +45,12 @@ components:
           appProtocol: udp
     pod:
       annotations:
-        checksum/config: '{{ get (index .Values.extras.configMap "config").data "config.yml" | sha256sum }}'
+        checksum/config: '{{ get (index .Values.appResources.configMap "config").data "config.yml" | sha256sum }}'
     deployment:
       strategy:
         type: Recreate
 
-extras:
+appResources:
   configMap:
     config:
       tpl: true

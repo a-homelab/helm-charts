@@ -53,7 +53,7 @@ components:
     job:
       restartPolicy: Never
 
-extras:
+appResources:
   configMap:
     config:
       tpl: true
