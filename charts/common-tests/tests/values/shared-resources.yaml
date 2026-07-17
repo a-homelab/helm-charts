@@ -1,0 +1,96 @@
+# Shared-resources exercise: chart-scoped PVC/configMap/secret/certificate
+# consumed from two components via refs, a chart-scoped HTTPRoute fanning
+# one hostname across components, and a component-scoped extras entry.
+global:
+  domain: example.com
+  gateway:
+    name: internal
+    namespace: gateways
+  certIssuer:
+    name: letsencrypt-prod
+
+components:
+  main: ~
+  api:
+    container:
+      image:
+        repository: ghcr.io/example/app
+      ports:
+        http:
+          port: 8080
+      env:
+        CONFIG_NAME: '{{ include "common.ref" (list . "configMap" "shared-config") }}'
+        API_KEY:
+          valueFrom:
+            secretKeyRef:
+              ref: creds
+              key: api-key
+      envFrom:
+        settings:
+          configMapRef:
+            ref: shared-config
+    pod:
+      volumes:
+        media:
+          type: pvc
+          ref: media
+          mounts:
+            /media: {}
+        tls:
+          type: secret
+          certRef: web
+          mounts:
+            /tls:
+              readOnly: true
+
+  worker:
+    container:
+      image:
+        repository: ghcr.io/example/app
+      command: [./worker]
+      ports:
+        metrics:
+          port: 9090
+    pod:
+      volumes:
+        media:
+          type: pvc
+          ref: media
+          mounts:
+            /library:
+              readOnly: true
+
+extras:
+  pvc:
+    media:
+      size: 100Gi
+      storageClass: nfs
+      accessModes: [ReadWriteMany]
+  configMap:
+    shared-config:
+      data:
+        a: b
+    config:
+      component: worker
+      data:
+        w: x
+  secret:
+    creds:
+      stringData:
+        api-key: zzz
+  certificate:
+    web: {}
+  httpRoute:
+    web:
+      hostnames:
+        - "app.{{ .Values.global.domain }}"
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /metrics
+          backendRefs:
+            - component: worker
+              port: metrics
+        - backendRefs:
+            - component: api

@@ -30,6 +30,14 @@
             "storeName": { "type": "string" },
             "kind": { "type": "string" }
           }
+        },
+        "certIssuer": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "kind": { "type": "string" }
+          }
         }
       }
     },
@@ -253,7 +261,8 @@
         "accessModes": { "type": "array", "items": { "type": "string" } },
         "volumeMode": { "type": "string" },
         "claimName": { "type": "string" },
-        "ref": { "type": "string", "description": "Key of an extras.configMap/extras.secret entry; resolves to <fullname>-<ref>" },
+        "ref": { "type": "string", "description": "Key of an extras entry of the matching type (pvc/configMap/secret); resolves to the extras resource name, validated at render time. For type: pvc this mounts the shared chart-scoped claim instead of emitting a component-scoped PVC." },
+        "certRef": { "type": "string", "description": "type: secret only — key of an extras.certificate entry; mounts the Secret that Certificate writes" },
         "name": { "type": "string", "description": "Verbatim external ConfigMap/Secret name (tpl-rendered)" },
         "items": { "type": "array" },
         "defaultMode": { "type": "integer" },
@@ -312,18 +321,7 @@
           "additionalProperties": {
             "anyOf": [
               { "type": "null" },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["size"],
-                "properties": {
-                  "size": { "type": "string" },
-                  "storageClass": { "type": ["string", "null"] },
-                  "accessModes": { "type": "array", "items": { "type": "string" } },
-                  "volumeMode": { "type": "string" },
-                  "mounts": { "$ref": "#/definitions/mounts" }
-                }
-              }
+              { "$ref": "#/definitions/pvcEntry" }
             ]
           }
         }
@@ -403,7 +401,9 @@
     "httpRoute": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Used for both component-scoped routes (components.<n>.httpRoute) and chart-scoped routes (extras.httpRoute.<key>). rules[].backendRefs[] entries accept `component: <name>` (+ optional `port` as a port NAME) which resolve to that component's Service. Chart-scoped routes must define rules; component-scoped routes default to a catch-all.",
       "properties": {
+        "component": { "type": "string", "description": "extras scope only: back-reference scoping this route (naming, labels, default backend) to a component" },
         "enabled": { "type": "boolean" },
         "hostnames": { "type": "array", "items": { "type": "string" } },
         "parentRefs": {
@@ -474,6 +474,49 @@
         "overrides": { "$ref": "#/definitions/overrides" }
       }
     },
+    "pvcEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size"],
+      "description": "PVC shape shared by extras.pvc and statefulset.volumeClaimTemplates (mounts apply in both; labels/annotations/overrides/component apply to extras entries)",
+      "properties": {
+        "size": { "type": "string" },
+        "storageClass": { "type": ["string", "null"] },
+        "accessModes": { "type": "array", "items": { "type": "string" } },
+        "volumeMode": { "type": "string" },
+        "mounts": { "$ref": "#/definitions/mounts" },
+        "component": { "type": "string", "description": "extras scope: component back-reference (naming + labels)" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
+    "certificate": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "cert-manager.io/v1 Certificate. Defaults: issuerRef from global.certIssuer, secretName <name>-tls, dnsNames [<name>.<global.domain>]. Consume from a component via volume { type: secret, certRef: <key> }.",
+      "properties": {
+        "dnsNames": { "type": "array", "items": { "type": "string" } },
+        "issuerRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "kind": { "type": "string" },
+            "group": { "type": "string" }
+          }
+        },
+        "secretName": { "type": "string" },
+        "commonName": { "type": "string" },
+        "duration": { "type": "string" },
+        "renewBefore": { "type": "string" },
+        "usages": { "type": "array", "items": { "type": "string" } },
+        "component": { "type": "string", "description": "component back-reference (naming + labels)" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "overrides": { "$ref": "#/definitions/overrides" }
+      }
+    },
     "serviceAccount": {
       "type": "object",
       "additionalProperties": false,
@@ -502,6 +545,7 @@
                   "tpl": { "type": "boolean" },
                   "data": { "$ref": "#/definitions/stringMap" },
                   "binaryData": { "$ref": "#/definitions/stringMap" },
+                  "component": { "type": "string", "description": "component back-reference (naming + labels)" },
                   "labels": { "$ref": "#/definitions/stringMap" },
                   "annotations": { "$ref": "#/definitions/stringMap" },
                   "overrides": { "$ref": "#/definitions/overrides" }
@@ -523,11 +567,31 @@
                   "tpl": { "type": "boolean" },
                   "stringData": { "$ref": "#/definitions/stringMap" },
                   "data": { "$ref": "#/definitions/stringMap" },
+                  "component": { "type": "string", "description": "component back-reference (naming + labels)" },
                   "labels": { "$ref": "#/definitions/stringMap" },
                   "annotations": { "$ref": "#/definitions/stringMap" },
                   "overrides": { "$ref": "#/definitions/overrides" }
                 }
               }
+            ]
+          }
+        },
+        "certificate": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              { "$ref": "#/definitions/certificate" }
+            ]
+          }
+        },
+        "httpRoute": {
+          "type": "object",
+          "description": "Chart-scoped HTTPRoutes (same shape as components.<n>.httpRoute): one hostname fanned across components via backendRef component: references. Rules required unless the entry has a component: back-ref.",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "null" },
+              { "$ref": "#/definitions/httpRoute" }
             ]
           }
         },
@@ -589,20 +653,7 @@
           "additionalProperties": {
             "anyOf": [
               { "type": "null" },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["size"],
-                "properties": {
-                  "size": { "type": "string" },
-                  "storageClass": { "type": ["string", "null"] },
-                  "accessModes": { "type": "array", "items": { "type": "string" } },
-                  "volumeMode": { "type": "string" },
-                  "labels": { "$ref": "#/definitions/stringMap" },
-                  "annotations": { "$ref": "#/definitions/stringMap" },
-                  "overrides": { "$ref": "#/definitions/overrides" }
-                }
-              }
+              { "$ref": "#/definitions/pvcEntry" }
             ]
           }
         },
@@ -618,7 +669,8 @@
                 "properties": {
                   "apiVersion": { "type": "string" },
                   "kind": { "type": "string" },
-                  "metadata": { "type": "object" }
+                  "metadata": { "type": "object" },
+                  "component": { "type": "string", "description": "component back-reference (naming + labels)" }
                 }
               }
             ]

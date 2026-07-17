@@ -14,10 +14,11 @@ one file per component (nicer ArgoCD diffs):
 {{- define "common.all" -}}
   {{- $box := dict -}}
   {{- include "common.resolve.components" (dict "ctx" . "box" $box) -}}
-  {{- range $name, $comp := $box.result }}
-    {{- include "common.render.component" (dict "ctx" $ "name" $name "component" $comp) }}
+  {{- $components := $box.result -}}
+  {{- range $name, $comp := $components }}
+    {{- include "common.render.component" (dict "ctx" $ "name" $name "component" $comp "components" $components) }}
   {{- end }}
-  {{- include "common.build.extras" (dict "ctx" . "box" $box) -}}
+  {{- include "common.build.extras" (dict "ctx" . "components" $components "box" $box) -}}
   {{- range $manifest := $box.result }}
 ---
 {{ toYaml $manifest }}
@@ -31,11 +32,12 @@ Input dict: { ctx: <root context>, name: <component name> }
 {{- define "common.component" -}}
   {{- $box := dict -}}
   {{- include "common.resolve.components" (dict "ctx" .ctx "box" $box) -}}
-  {{- $comp := get $box.result .name -}}
+  {{- $components := $box.result -}}
+  {{- $comp := get $components .name -}}
   {{- if not $comp -}}
     {{- fail (printf "common: component %q is not defined or not enabled" .name) -}}
   {{- end -}}
-  {{- include "common.render.component" (dict "ctx" .ctx "name" .name "component" $comp) -}}
+  {{- include "common.render.component" (dict "ctx" .ctx "name" .name "component" $comp "components" $components) -}}
 {{- end -}}
 
 {{/*
@@ -60,7 +62,7 @@ common.render.component (internal): emit all manifests for one component.
 ---
 {{ toYaml . }}
   {{- end }}
-  {{- include "common.build.httpRoute" (dict "ctx" $ctx "name" $name "component" $comp "box" $b) -}}
+  {{- include "common.build.httpRoute" (dict "ctx" $ctx "name" $name "component" $comp "components" .components "box" $b) -}}
   {{- with $b.result }}
 ---
 {{ toYaml . }}

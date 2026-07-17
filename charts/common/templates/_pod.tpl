@@ -36,17 +36,28 @@ Input dict:
     {{- if ne (kindOf $v) "invalid" -}}
       {{- $type := $v.type | default "" -}}
       {{- $vol := dict "name" $name -}}
+      {{- $b := dict -}}
+      {{- $where := printf "volume %q" $name -}}
       {{- if eq $type "pvc" -}}
-        {{- $claimName := printf "%s-%s" $resourceName $name -}}
-        {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
-        {{- $pvcs = append $pvcs (dict "name" $claimName "values" $v) -}}
+        {{- if $v.ref -}}
+          {{/* shared: mount the chart-scoped extras.pvc.<ref>; emit nothing */}}
+          {{- include "common.extras.lookup" (dict "ctx" $ctx "type" "pvc" "key" $v.ref "where" $where "box" $b) -}}
+          {{- $claimName := include "common.extras.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
+          {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
+        {{- else -}}
+          {{/* exclusive: component-scoped PVC, emitted with the component */}}
+          {{- $claimName := printf "%s-%s" $resourceName $name -}}
+          {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
+          {{- $pvcs = append $pvcs (dict "name" $claimName "values" $v) -}}
+        {{- end -}}
       {{- else if eq $type "existingClaim" -}}
         {{- if not $v.claimName -}}{{- fail (printf "common: volume %q (existingClaim) must set claimName" $name) -}}{{- end -}}
         {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" (tpl $v.claimName $ctx)) -}}
       {{- else if eq $type "configMap" -}}
         {{- $cmName := "" -}}
         {{- if $v.ref -}}
-          {{- $cmName = printf "%s-%s" (include "common.fullname" $ctx) $v.ref -}}
+          {{- include "common.extras.lookup" (dict "ctx" $ctx "type" "configMap" "key" $v.ref "where" $where "box" $b) -}}
+          {{- $cmName = include "common.extras.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
         {{- else if $v.name -}}
           {{- $cmName = tpl $v.name $ctx -}}
         {{- else -}}
@@ -59,11 +70,15 @@ Input dict:
       {{- else if eq $type "secret" -}}
         {{- $secName := "" -}}
         {{- if $v.ref -}}
-          {{- $secName = printf "%s-%s" (include "common.fullname" $ctx) $v.ref -}}
+          {{- include "common.extras.lookup" (dict "ctx" $ctx "type" "secret" "key" $v.ref "where" $where "box" $b) -}}
+          {{- $secName = include "common.extras.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
+        {{- else if $v.certRef -}}
+          {{/* mount the Secret an extras.certificate entry writes */}}
+          {{- $secName = include "common.ref.tlsSecret" (list $ctx $v.certRef) -}}
         {{- else if $v.name -}}
           {{- $secName = tpl $v.name $ctx -}}
         {{- else -}}
-          {{- fail (printf "common: volume %q (secret) must set `ref` (extras key) or `name`" $name) -}}
+          {{- fail (printf "common: volume %q (secret) must set `ref` (extras key), `certRef` (certificate key) or `name`" $name) -}}
         {{- end -}}
         {{- $src := dict "secretName" $secName -}}
         {{- include "common.lib.setIf" (dict "target" $src "key" "items" "value" $v.items) -}}

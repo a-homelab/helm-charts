@@ -1,0 +1,184 @@
+# Raw document order (components sorted, then extras in builder order):
+#   0: api Deployment    1: api Service      2: api ServiceAccount
+#   3: worker Deployment 4: worker Service   5: worker ServiceAccount
+#   6: ConfigMap t-common-tests-worker-config (component-scoped, key "config")
+#   7: ConfigMap t-common-tests-shared-config
+#   8: Secret t-common-tests-creds
+#   9: PVC t-common-tests-media
+#  10: Certificate t-common-tests-web
+#  11: HTTPRoute t-common-tests-web
+suite: shared resources across components
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+values:
+  - values/shared-resources.yaml
+tests:
+  - it: renders the shared resource set exactly once
+    asserts:
+      - hasDocuments:
+          count: 12
+      - isKind:
+          of: PersistentVolumeClaim
+        documentIndex: 9
+      - equal:
+          path: metadata.name
+          value: t-common-tests-media
+        documentIndex: 9
+      - equal:
+          path: spec.storageClassName
+          value: nfs
+        documentIndex: 9
+
+  - it: mounts the shared pvc from both components without emitting per-component PVCs
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: media
+            persistentVolumeClaim:
+              claimName: t-common-tests-media
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: media
+            persistentVolumeClaim:
+              claimName: t-common-tests-media
+        documentIndex: 3
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: media
+            mountPath: /media
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: media
+            mountPath: /library
+            readOnly: true
+        documentIndex: 3
+
+  - it: resolves env, valueFrom and envFrom refs to extras names
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CONFIG_NAME
+            value: t-common-tests-shared-config
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: t-common-tests-creds
+                key: api-key
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: t-common-tests-shared-config
+        documentIndex: 0
+
+  - it: scopes extras entries to a component via the back-reference
+    asserts:
+      - equal:
+          path: metadata.name
+          value: t-common-tests-worker-config
+        documentIndex: 6
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: worker
+        documentIndex: 6
+      - notExists:
+          path: metadata.labels["app.kubernetes.io/component"]
+        documentIndex: 7
+
+  - it: renders a certificate with issuer, secretName and dnsName defaults
+    asserts:
+      - isKind:
+          of: Certificate
+        documentIndex: 10
+      - equal:
+          path: spec.secretName
+          value: t-common-tests-web-tls
+        documentIndex: 10
+      - equal:
+          path: spec.dnsNames
+          value: [t-common-tests-web.example.com]
+        documentIndex: 10
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: letsencrypt-prod
+            kind: ClusterIssuer
+            group: cert-manager.io
+        documentIndex: 10
+
+  - it: mounts the certificate secret via certRef
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tls
+            secret:
+              secretName: t-common-tests-web-tls
+        documentIndex: 0
+
+  - it: fans one chart-scoped route across components with resolved backendRefs
+    asserts:
+      - isKind:
+          of: HTTPRoute
+        documentIndex: 11
+      - equal:
+          path: spec.hostnames
+          value: [app.example.com]
+        documentIndex: 11
+      - equal:
+          path: spec.parentRefs
+          value:
+            - name: internal
+              namespace: gateways
+        documentIndex: 11
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - name: t-common-tests-worker
+              port: 9090
+        documentIndex: 11
+      - equal:
+          path: spec.rules[1].backendRefs
+          value:
+            - name: t-common-tests-api
+              port: 8080
+        documentIndex: 11
+
+  - it: fails on a dangling volume ref
+    set:
+      components.api.pod.volumes.media.ref: nonexistent
+    asserts:
+      - failedTemplate:
+          errorMessage: 'common: volume "media" references extras.pvc.nonexistent, which is not defined'
+
+  - it: fails on a backendRef to an unknown component
+    set:
+      extras.httpRoute.web.rules:
+        - backendRefs:
+            - component: ghost
+    asserts:
+      - failedTemplate:
+          errorMessage: 'common: httpRoute t-common-tests-web: backendRef references unknown component "ghost"'
+
+  - it: fails on a chart-scoped route without rules
+    set:
+      extras.httpRoute.bare:
+        hostnames: [bare.example.com]
+    asserts:
+      - failedTemplate:
+          errorMessage: 'common: httpRoute t-common-tests-bare: chart-scoped routes must define rules (there is no default backend)'

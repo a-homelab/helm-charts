@@ -88,6 +88,43 @@ Cross-resource plumbing is computed at render time, never stored in values:
 
 Cascade (later wins): generated -> top-level -> component -> resource.
 
+### Shared resources: two scopes, and sharing = hoist + reference
+
+Every resource has one owner. Component scope (inside `components.<name>`,
+named `<componentResourceName>-<key>`) or chart scope (`extras.<type>.<key>`,
+named `<fullname>-<key>`). Sharing is never one component reaching into
+another — anything shared is hoisted to `extras` and consumed **by key**;
+the library resolves keys to rendered names and fails on dangling
+references at render time:
+
+| You write | Resolves to | Emits |
+|---|---|---|
+| volume `type: pvc` (inline) | claim `<component>-<key>` | component-scoped PVC |
+| volume `type: pvc, ref: k` | claim of `extras.pvc.k` | nothing |
+| volume `type: configMap/secret, ref: k` | that extras resource | nothing |
+| volume `type: secret, certRef: k` | `extras.certificate.k`'s secretName | nothing |
+| env `valueFrom` / `envFrom` `ref: k` | that extras resource | nothing |
+| route backendRef `component: c` | `c`'s Service + resolved port (name or first) | nothing |
+| extras entry `component: c` | named/labeled under `c` | component-scoped resource |
+
+`extras.httpRoute.<key>` fans one hostname across components (rules
+required, backendRefs by `component:`); `extras.certificate.<key>` renders
+a cert-manager Certificate (issuer from `global.certIssuer`, secret
+`<name>-tls`, dnsNames from `global.domain`).
+
+Inside any tpl-rendered string (env values, annotations, overrides), the
+same resolution is available as named templates:
+
+```yaml
+env:
+  CONFIG_NAME: '{{ include "common.ref" (list . "configMap" "config") }}'
+  TLS_SECRET: '{{ include "common.ref.tlsSecret" (list . "web") }}'
+```
+
+Deliberate non-feature: shared volumes do not auto-mount into components.
+Mount paths, readOnly and subPaths differ per consumer, so `pod.volumes`
+stays the single complete description of each component's filesystem.
+
 ### Escape hatches, three altitudes
 
 Every resource block accepts `overrides:` — tpl-rendered and deep-merged

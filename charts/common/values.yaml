@@ -43,6 +43,9 @@ global:
   externalSecrets:
     storeName: ""         # default secretStoreRef name
     kind: ClusterSecretStore
+  certIssuer:
+    name: ""              # default issuerRef for extras.certificate entries
+    kind: ClusterIssuer
 
 # -----------------------------------------------------------------------------
 # Defaults — component-shaped, merged under every component. Only put
@@ -196,8 +199,12 @@ components: {}
   #     overrides: {}
 
 # -----------------------------------------------------------------------------
-# Extras — chart-scoped resources, named <fullname>-<key>. Components
-# reference them via volume `ref:` or env valueFrom.
+# Extras — chart-scoped resources, named <fullname>-<key>. This is the
+# SHARED scope: components consume entries by key (volume ref:/certRef:,
+# env/envFrom ref:, backendRef component:, or the common.ref template) and
+# dangling references fail at render time. Any entry may instead declare
+# `component: <name>` to become component-scoped (named
+# <componentResourceName>-<key>, stamped with component labels).
 # -----------------------------------------------------------------------------
 extras: {}
   # configMap:
@@ -206,6 +213,9 @@ extras: {}
   #     data:
   #       config.yml: |
   #         ...
+  #   tuning:
+  #     component: worker         # component-scoped: named <componentResourceName>-tuning
+  #     data: { }                 # and stamped with the worker component's labels
   # secret:
   #   creds:
   #     stringData: { user: admin }
@@ -217,7 +227,22 @@ extras: {}
   #       api-key:
   #         remoteRef: { key: my-remote-key }
   # pvc:
-  #   media: { size: 100Gi, storageClass: nfs }
+  #   media: { size: 100Gi, storageClass: nfs, accessModes: [ReadWriteMany] }
+  #                               # mount from any component:
+  #                               #   volumes: { media: { type: pvc, ref: media, mounts: {...} } }
+  # certificate:
+  #   web: {}                     # cert-manager Certificate; defaults:
+  #                               #   issuerRef from global.certIssuer,
+  #                               #   secretName <fullname>-web-tls,
+  #                               #   dnsNames [<fullname>-web.<global.domain>]
+  #                               # mount via volume { type: secret, certRef: web }
+  # httpRoute:
+  #   web:                        # one hostname fanned across components;
+  #     hostnames: ["app.{{ .Values.global.domain }}"]
+  #     rules:                    # rules REQUIRED (no default backend)
+  #       - matches: [{ path: { type: PathPrefix, value: /api } }]
+  #         backendRefs: [{ component: api }]          # -> Service name + first port
+  #       - backendRefs: [{ component: worker, port: metrics }]   # port by NAME
   # rawResource:
   #   my-crd:
   #     apiVersion: example.io/v1

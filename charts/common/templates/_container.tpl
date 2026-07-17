@@ -5,10 +5,28 @@ Container building.
 */}}
 
 {{/*
+common.resolve.extrasRefInPlace (internal): if the given selector dict
+(configMapKeyRef / secretKeyRef / configMapRef / secretRef) uses
+`ref: <extras key>` instead of `name:`, resolve it to the rendered
+resource name in place.
+Input dict: { ctx, selector (dict or nil), type (extras type), where }
+*/}}
+{{- define "common.resolve.extrasRefInPlace" -}}
+  {{- if and .selector (eq (kindOf .selector) "map") .selector.ref -}}
+    {{- $b := dict -}}
+    {{- include "common.extras.lookup" (dict "ctx" .ctx "type" .type "key" .selector.ref "where" .where "box" $b) -}}
+    {{- $_ := set .selector "name" (include "common.extras.name" (dict "ctx" .ctx "key" .selector.ref "entry" $b.result)) -}}
+    {{- $_ := unset .selector "ref" -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
 common.build.env -> box.result (k8s env list)
 Map shape: keys are env var names; values are:
   string/number/bool -> {name, value} (strings tpl-rendered)
-  map                -> passed through with name injected ({value:...} or {valueFrom:...})
+  map                -> passed through with name injected ({value:...} or {valueFrom:...});
+                        valueFrom.configMapKeyRef/secretKeyRef accept
+                        `ref: <extras key>` in place of `name:`
   null               -> entry deleted
 */}}
 {{- define "common.build.env" -}}
@@ -25,6 +43,9 @@ Map shape: keys are env var names; values are:
       {{- if eq (kindOf $entry.value) "string" -}}
         {{- $_ := set $entry "value" (tpl $entry.value $ctx) -}}
       {{- end -}}
+      {{- $where := printf "env %s" $k -}}
+      {{- include "common.resolve.extrasRefInPlace" (dict "ctx" $ctx "selector" (dig "valueFrom" "configMapKeyRef" dict $entry) "type" "configMap" "where" $where) -}}
+      {{- include "common.resolve.extrasRefInPlace" (dict "ctx" $ctx "selector" (dig "valueFrom" "secretKeyRef" dict $entry) "type" "secret" "where" $where) -}}
       {{- $out = append $out $entry -}}
     {{- else -}}
       {{- $out = append $out (dict "name" $k "value" (printf "%v" $v)) -}}
@@ -100,6 +121,10 @@ Input dict:
   {{- include "common.build.env" (dict "ctx" $ctx "env" $v.env "box" $b) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "env" "value" $b.result) -}}
   {{- include "common.lib.mapToList" (dict "map" $v.envFrom "keyField" "" "box" $b) -}}
+  {{- range $e := ($b.result | default list) -}}
+    {{- include "common.resolve.extrasRefInPlace" (dict "ctx" $ctx "selector" (dig "configMapRef" dict $e) "type" "configMap" "where" "envFrom") -}}
+    {{- include "common.resolve.extrasRefInPlace" (dict "ctx" $ctx "selector" (dig "secretRef" dict $e) "type" "secret" "where" "envFrom") -}}
+  {{- end -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "envFrom" "value" $b.result) -}}
   {{- include "common.build.containerPorts" (dict "ports" $v.ports "box" $b) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "ports" "value" $b.result) -}}
