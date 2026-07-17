@@ -207,6 +207,23 @@ components:
     service: ~           # delete the inherited Service
 ```
 
+## Template layout
+
+Directories mirror the define namespaces, so any template is findable
+from its name (`common.build.httpRoute` -> `build/_httproute.tpl`):
+
+```
+templates/
+  _all.tpl              # entrypoints: common.all, common.component
+  lib/                  # common.lib.* primitives + names/refs, metadata,
+                        # resolution, library defaults — one file per concern
+  build/                # common.build.* — one file per built resource
+    controllers/        # one file per workload kind; _controller.tpl holds
+                        # shared assembly + dynamic kind dispatch, so a new
+                        # kind is a new file (common.build.controller.<kind>),
+                        # not an if/else edit
+```
+
 ## Values schema
 
 [`schema/values.schema.json`](schema/values.schema.json) validates the
