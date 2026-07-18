@@ -207,6 +207,118 @@ components:
     service: ~           # delete the inherited Service
 ```
 
+## Recipes
+
+Patterns that come up in practice (each snippet goes inside a component
+unless noted).
+
+### Env ordering and the three kinds of "variable"
+
+Env values can contain three different syntaxes, resolved at three
+different times:
+
+```yaml
+container:
+  env:
+    RENDER_TIME: "{{ .Release.Name }}-pg"   # Helm tpl, resolved at helm template
+    RUNTIME: k8s-router-$(POD_NAME)         # kubelet expansion, resolved in the pod
+    LITERAL: $SOME_VAR                      # plain string, passed through to the app
+```
+
+`$(NAME)` expansion only sees env entries that appear **earlier in the
+list** — and the env map renders alphabetically. When a reference would
+sort after its use, pin the order with `weight` (lower renders first,
+default 100):
+
+```yaml
+container:
+  env:
+    POD_NAME:
+      valueFrom: { fieldRef: { fieldPath: metadata.name } }
+      weight: 1                             # before NB_HOSTNAME, despite the alphabet
+    NB_HOSTNAME: k8s-router-$(POD_NAME)
+```
+
+To emit a literal `{{` (an app whose config looks like Go templates),
+escape it: `{{ "{{" }}`.
+
+### Roll pods when config changes
+
+Pod annotations are tpl-rendered, so hash the config they depend on:
+
+```yaml
+pod:
+  annotations:
+    checksum/config: '{{ .Values.appResources.configMap.config.data | toYaml | sha256sum }}'
+```
+
+### The volume trio: exclusive, shared, external
+
+```yaml
+pod:
+  volumes:
+    config:                                  # exclusive: PVC emitted with the component
+      type: pvc
+      size: 1Gi
+      mounts: { /config: {} }
+    media:                                   # shared: mounts appResources.pvc.media
+      type: pvc
+      ref: media
+      mounts: { /media: { subPath: TV } }
+    nas:                                     # external: claim owned by another chart
+      type: existingClaim
+      claimName: nas-media
+      mounts: { /nas: { readOnly: true } }
+```
+
+### Wire components together without hardcoding names
+
+```yaml
+container:
+  env:
+    DB_HOST: '{{ include "common.ref.serviceHost" (list . "postgres") }}'
+    DB_PASSWORD:
+      valueFrom:
+        secretKeyRef: { ref: db-creds, key: password }   # appResources.secret.db-creds
+```
+
+Both fail at render time if the target doesn't exist.
+
+### Same-image init containers, in order
+
+initContainers inherit the main container's image when they don't set
+one, and run in sorted key order — prefix keys to sequence them:
+
+```yaml
+initContainers:
+  10-wait-db: { command: [./wait-for, db] }
+  20-migrate: { command: [./migrate] }
+```
+
+### Expose a different service port
+
+```yaml
+container:
+  ports:
+    http:
+      port: 8080        # containerPort
+      expose: 80        # service-side port; targetPort stays the named port
+```
+
+### Delete inherited config from an overlay
+
+Explicit null removes at any depth — an env entry, a derived service
+port, a mount, or a whole resource:
+
+```yaml
+components:
+  worker:
+    container:
+      env: { DEBUG: ~ }
+    service: ~
+  main: ~                # environments that don't run this component at all
+```
+
 ## Template layout
 
 Directories mirror the define namespaces, so any template is findable
