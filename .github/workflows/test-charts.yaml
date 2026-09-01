@@ -24,13 +24,13 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
+      - name: Resolve test harness dependency
+        run: helm dependency update charts/common-tests
+
       - name: Lint
         run: |-
           helm lint charts/common --strict
           helm lint charts/common-tests --strict
-
-      - name: Resolve test harness dependency
-        run: helm dependency update charts/common-tests
 
       - name: Install helm-unittest
         run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.5.2
