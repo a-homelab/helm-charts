@@ -3,7 +3,7 @@
 Map & dict utilities: the map -> ordered-list boundary crossing, tpl
 rendering of map values, and conditional key setting.
 Conventions: builders return values by MUTATING a caller-supplied dict
-(the "box" pattern) — no yaml round-trips; explicit null means delete.
+(the "box" pattern) - no yaml round-trips; explicit null means delete.
 =============================================================================
 */}}
 
@@ -30,13 +30,14 @@ stripped from the output. Scalar entries are passed through as-is.
         {{- $entry = deepCopy $v -}}
         {{- if hasKey $entry "weight" -}}
           {{- $w = float64 (get $entry "weight") -}}
+          {{- if or (lt $w 0.0) (gt $w 999999.0) (ne $w (floor $w)) -}}{{- fail "common: weight must be an integer from 0 to 999999" -}}{{- end -}}
           {{- $entry = omit $entry "weight" -}}
         {{- end -}}
         {{- if $keyField -}}
           {{- $_ := set $entry $keyField $k -}}
         {{- end -}}
       {{- end -}}
-      {{- $_ := set $sorted (printf "%09.2f|%s" $w $k) $entry -}}
+      {{- $_ := set $sorted (printf "%06d|%s" (int $w) $k) $entry -}}
     {{- end -}}
   {{- end -}}
   {{- $out := list -}}
@@ -65,11 +66,11 @@ Input dict: { ctx: <root context>, map: <dict>, box: <dict> } -> box.result
 {{- end -}}
 
 {{/*
-common.lib.setIf: set key on dict only when value is non-empty.
+common.lib.setIf: set non-empty values, including explicit false and zero.
 Input dict: { target: <dict>, key: <string>, value: <any> }
 */}}
 {{- define "common.lib.setIf" -}}
-  {{- if .value -}}
+  {{- if or .value (has (kindOf .value) (list "bool" "int" "int64" "float64" "float32" "uint64")) -}}
     {{- $_ := set .target .key .value -}}
   {{- end -}}
 {{- end -}}

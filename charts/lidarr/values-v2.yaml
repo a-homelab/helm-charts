@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../common/schema/values.schema.json
 # Migration values for the new common library (see charts/common/README.md).
-# Verified manifest-equivalent to values.yaml + old library by
-# scripts/verify-common-migration.py.
+# Rendered and schema-checked as a migration example. Main component selectors
+# intentionally differ from the legacy library; see scripts/verify-common-migration.py.
 components:
   main:
     container:

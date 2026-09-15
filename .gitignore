@@ -86,3 +86,6 @@ gemini-debug.log
 
 # Additions on top of the upstream template
 .claude/worktrees/
+
+__pycache__/
+.pytest_cache/

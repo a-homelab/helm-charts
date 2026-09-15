@@ -18,7 +18,10 @@ Input dict: { ctx, name, component, pvcs (from podSpec build), box }
     {{- include "common.build.pvcSpec" (dict "values" $pvc.values "box" $b) -}}
     {{- $spec := $b.result -}}
     {{- include "common.metadata.build" (dict "ctx" $ctx "name" $pvc.name "componentName" $.name "component" $.component "labels" ($pvc.values.labels | default dict) "annotations" ($pvc.values.annotations | default dict) "box" $b) -}}
-    {{- $out = append $out (dict "apiVersion" "v1" "kind" "PersistentVolumeClaim" "metadata" $b.result "spec" $spec) -}}
+    {{- $manifest := dict "apiVersion" "v1" "kind" "PersistentVolumeClaim" "metadata" $b.result "spec" $spec -}}
+    {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" $pvc.values.overrides) -}}
+    {{- if ne $manifest.metadata.name $pvc.name -}}{{- fail "common: inline PVC overrides cannot change its name; use appResources.pvc for custom names" -}}{{- end -}}
+    {{- $out = append $out $manifest -}}
   {{- end -}}
   {{- $_ := set .box "result" $out -}}
 {{- end -}}

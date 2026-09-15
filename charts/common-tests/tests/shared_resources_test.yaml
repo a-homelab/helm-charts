@@ -162,19 +162,23 @@ tests:
   - it: renders string rawResources entries with tpl, name defaulting and managed labels
     set:
       rawResources:
-        policy: |
-          apiVersion: example.io/v1
-          kind: Policy
-          spec:
-            release: "{{ .Release.Name }}"
-        named: |
-          apiVersion: example.io/v1
-          kind: Policy
-          metadata:
-            name: my-explicit-name
-            labels:
-              custom: label
-          spec: {}
+        policy:
+          tpl: true
+          manifest: |
+            apiVersion: example.io/v1
+            kind: Policy
+            spec:
+              release: "{{ .Release.Name }}"
+        named:
+          tpl: true
+          manifest: |
+            apiVersion: example.io/v1
+            kind: Policy
+            metadata:
+              name: my-explicit-name
+              labels:
+                custom: label
+            spec: {}
     asserts:
       - hasDocuments:
           count: 14
@@ -227,7 +231,7 @@ tests:
         GHOST: '{{ include "common.ref.component" (list . "ghost") }}'
     asserts:
       - failedTemplate:
-          errorMessage: 'common.ref.component: component "ghost" is not declared'
+          errorMessage: 'common.ref.component: component "ghost" is not defined or enabled'
 
   - it: fails on a dangling volume ref
     set:
@@ -238,17 +242,17 @@ tests:
 
   - it: fails on a backendRef to an unknown component
     set:
-      appResources.httpRoute.web.rules:
+      appResources.route.web.rules:
         - backendRefs:
             - component: ghost
     asserts:
       - failedTemplate:
-          errorMessage: 'common: httpRoute t-common-tests-web: backendRef references unknown component "ghost"'
+          errorMessage: 'common: Service reference targets unknown or disabled component "ghost"'
 
   - it: fails on a chart-scoped route without rules
     set:
-      appResources.httpRoute.bare:
+      appResources.route.bare:
         hostnames: [bare.example.com]
     asserts:
       - failedTemplate:
-          errorMessage: 'common: httpRoute t-common-tests-bare: chart-scoped routes must define rules (there is no default backend)'
+          errorMessage: 'common: app-scoped routes require rules'

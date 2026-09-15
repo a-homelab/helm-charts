@@ -2,7 +2,7 @@
 =============================================================================
 Controller dispatch. Shared assembly (pod template, selector, metadata,
 overrides) lives here; kind-specific spec building lives in one file per
-kind (common.build.controller.<kind>), resolved dynamically — adding a
+kind (common.build.controller.<kind>), resolved dynamically - adding a
 controller kind is a new file, not an edit here.
 
 common.build.controller -> box.result (controller manifest dict), box.pvcs

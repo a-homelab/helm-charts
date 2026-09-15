@@ -46,7 +46,7 @@ Input dict:
           {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
         {{- else -}}
           {{/* exclusive: component-scoped PVC, emitted with the component */}}
-          {{- $claimName := printf "%s-%s" $resourceName $name -}}
+          {{- $claimName := include "common.safeName" (printf "%s-%s" $resourceName $name) -}}
           {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
           {{- $pvcs = append $pvcs (dict "name" $claimName "values" $v) -}}
         {{- end -}}
@@ -147,8 +147,8 @@ per-container mounts accumulator dict.
 
 {{/*
 common.build.podSpec -> box.result (PodSpec dict), box.pvcs (PVCs to emit)
-Assembles containers (main first, then sidecars sorted), initContainers
-(sorted; numeric key prefixes give explicit ordering), volumes, and all
+Assembles containers (main and sidecars sorted by weight then key), initContainers
+(sorted by weight then key), volumes, and all
 pod-level options. Applies pod.overrides last.
 Input dict: { ctx, name (component name), component (resolved), box }
 */}}
@@ -162,7 +162,7 @@ Input dict: { ctx, name (component name), component (resolved), box }
 
   {{- $vcts := dict -}}
   {{- if eq $comp.kind "StatefulSet" -}}
-    {{- $vcts = dig "statefulset" "volumeClaimTemplates" dict $comp -}}
+    {{- $vcts = get ($comp.statefulset | default dict) "volumeClaimTemplates" | default dict -}}
   {{- end -}}
   {{- include "common.build.volumes" (dict "ctx" $ctx "resourceName" $resourceName "mainContainer" $name "volumes" $pod.volumes "vcts" $vcts "box" $b) -}}
   {{- $volumes := $b.volumes -}}
@@ -170,24 +170,39 @@ Input dict: { ctx, name (component name), component (resolved), box }
   {{- $pvcs := $b.pvcs -}}
 
   {{/* main container, then sidecars sorted by key */}}
-  {{- $containers := list -}}
+  {{- $containers := dict -}}
   {{- include "common.build.container" (dict "ctx" $ctx "containerName" $name "values" $comp.container "mounts" (get $mounts $name) "box" $b) -}}
-  {{- $containers = append $containers $b.result -}}
+  {{- $_ := set $b.result "weight" (dig "weight" 100 $comp.container) -}}
+  {{- $_ := set $containers $name $b.result -}}
   {{- range $scName, $sc := ($comp.sidecars | default dict) -}}
     {{- if ne (kindOf $sc) "invalid" -}}
       {{- include "common.build.container" (dict "ctx" $ctx "containerName" $scName "values" $sc "inheritImage" $comp.container.image "mounts" (get $mounts $scName) "box" $b) -}}
-      {{- $containers = append $containers $b.result -}}
+      {{- $_ := set $b.result "weight" (dig "weight" 100 $sc) -}}
+      {{- $_ := set $containers $scName $b.result -}}
     {{- end -}}
   {{- end -}}
 
-  {{- $initContainers := list -}}
+  {{- include "common.lib.mapToList" (dict "map" $containers "box" $b) -}}
+  {{- $containers = $b.result -}}
+  {{- $initContainers := dict -}}
   {{- range $icName, $ic := ($comp.initContainers | default dict) -}}
     {{- if ne (kindOf $ic) "invalid" -}}
       {{- include "common.build.container" (dict "ctx" $ctx "containerName" $icName "values" $ic "inheritImage" $comp.container.image "mounts" (get $mounts $icName) "box" $b) -}}
-      {{- $initContainers = append $initContainers $b.result -}}
+      {{- $_ := set $b.result "weight" (dig "weight" 100 $ic) -}}
+      {{- $_ := set $initContainers $icName $b.result -}}
     {{- end -}}
   {{- end -}}
 
+  {{- include "common.lib.mapToList" (dict "map" $initContainers "box" $b) -}}
+  {{- $initContainers = $b.result -}}
+  {{- $targets := dict $name true -}}
+  {{- range $key, $v := merge (deepCopy ($comp.sidecars | default dict)) ($comp.initContainers | default dict) -}}
+    {{- if ne (kindOf $v) "invalid" -}}
+      {{- if eq $key $name -}}{{- fail (printf "common: container key %q duplicates the main container" $key) -}}{{- end -}}
+      {{- $_ := set $targets $key true -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $target, $_ := $mounts -}}{{- if not (hasKey $targets $target) -}}{{- fail (printf "common: mount references unknown container %q" $target) -}}{{- end -}}{{- end -}}
   {{- $spec := dict "containers" $containers -}}
   {{- include "common.lib.setIf" (dict "target" $spec "key" "initContainers" "value" $initContainers) -}}
   {{- $_ := set $spec "serviceAccountName" (include "common.resolve.serviceAccountName" (dict "ctx" $ctx "name" $name "component" $comp)) -}}
@@ -224,7 +239,7 @@ Input dict: { ctx, name (component name), component (resolved), box }
 
   {{/* Job / CronJob pods need a restart policy from the job block. */}}
   {{- if or (eq $comp.kind "Job") (eq $comp.kind "CronJob") -}}
-    {{- $_ := set $spec "restartPolicy" (dig "job" "restartPolicy" "OnFailure" $comp) -}}
+    {{- $_ := set $spec "restartPolicy" (($comp.job | default dict).restartPolicy | default "OnFailure") -}}
   {{- end -}}
   {{- include "common.lib.setIf" (dict "target" $spec "key" "restartPolicy" "value" $pod.restartPolicy) -}}
 

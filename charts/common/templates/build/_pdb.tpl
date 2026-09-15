@@ -14,6 +14,9 @@ Set exactly one of minAvailable / maxUnavailable.
   {{- $pdb := $comp.pdb | default dict -}}
   {{- $_ := unset .box "result" -}}
   {{- if $pdb.enabled -}}
+    {{- $min := ne (kindOf $pdb.minAvailable) "invalid" -}}
+    {{- $max := ne (kindOf $pdb.maxUnavailable) "invalid" -}}
+    {{- if eq $min $max -}}{{- fail "common: pdb requires exactly one of minAvailable or maxUnavailable" -}}{{- end -}}
     {{- $b := dict -}}
     {{- $resourceName := include "common.componentName" (dict "ctx" $ctx "name" .name) -}}
     {{- include "common.metadata.selectorLabels" (dict "ctx" $ctx "componentName" .name "box" $b) -}}

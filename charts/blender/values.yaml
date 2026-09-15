@@ -1,0 +1,79 @@
+mcp:
+  enabled: false
+  revision: 5f8ddaf6e987c4aa0c3467fcc548838b28f64477
+  sha256: f43469c8518c7021e0060e32cfe52e3beb126b0f62fbae7293106642a3ebda89
+
+components:
+  main:
+    kind: Deployment
+    deployment:
+      replicas: 1
+      strategy:
+        type: Recreate
+    container:
+      image:
+        repository: lscr.io/linuxserver/blender
+        tag: sha256:7dbfd0af8e75cde6fbe80cd0021a4819269d1d2fa9d854455c0fa18ffa14b118
+      env:
+        PUID: "1000"
+        PGID: "1000"
+        TZ: Etc/UTC
+      ports:
+        http:
+          port: 3000
+          expose: 3000
+        https:
+          port: 3001
+          expose: 3001
+      probes:
+        startup:
+          tcpSocket:
+            port: http
+          periodSeconds: 5
+          failureThreshold: 60
+        readiness:
+          tcpSocket:
+            port: http
+          periodSeconds: 10
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+        limits:
+          memory: 8Gi
+    pod:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      volumes:
+        config:
+          type: pvc
+          size: 10Gi
+          accessModes: [ReadWriteOnce]
+          annotations:
+            helm.sh/resource-policy: keep
+            argocd.argoproj.io/sync-options: Prune=false,Delete=false
+          mounts:
+            /config:
+              containers: [main, prepare]
+        workspace:
+          type: pvc
+          size: 50Gi
+          accessModes: [ReadWriteOnce]
+          annotations:
+            helm.sh/resource-policy: keep
+            argocd.argoproj.io/sync-options: Prune=false,Delete=false
+          mounts:
+            /workspace:
+              containers: [main, prepare]
+        shm:
+          type: emptyDir
+          medium: Memory
+          sizeLimit: 1Gi
+          mounts:
+            /dev/shm: {}
+    routes:
+      main:
+        enabled: false
+        rules:
+          - backendRefs:
+              - port: 3000

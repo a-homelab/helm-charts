@@ -14,12 +14,7 @@ The four propagation rules:
 
 {{/*
 common.metadata.selectorLabels -> box.result (dict)
-The component named "main" is reserved for single-component charts and
-gets NO component selector label (matching classic single-app charts, so
-migrations don't touch the immutable Deployment selector). Every other
-component gets app.kubernetes.io/component so siblings can never match
-each other's selectors — and mixing "main" with named components is
-rejected at resolve time for exactly that reason.
+Every component has its own selector identity, including main.
 Input dict: { ctx: <root>, componentName: <string> }
 */}}
 {{- define "common.metadata.selectorLabels" -}}
@@ -27,7 +22,7 @@ Input dict: { ctx: <root>, componentName: <string> }
     "app.kubernetes.io/name" (include "common.name" .ctx)
     "app.kubernetes.io/instance" .ctx.Release.Name
   -}}
-  {{- if and .componentName (ne .componentName "main") -}}
+  {{- if .componentName -}}
     {{- $_ := set $out "app.kubernetes.io/component" .componentName -}}
   {{- end -}}
   {{- $_ := set .box "result" $out -}}
@@ -36,7 +31,7 @@ Input dict: { ctx: <root>, componentName: <string> }
 {{/*
 common.metadata.standardLabels -> box.result (dict)
 Full generated label set for non-pod resources. part-of and component are
-added only for named (non-"main") components, mirroring selector behavior.
+added for component-scoped resources, including main.
 Input dict: { ctx: <root>, componentName: <string, may be ""> }
 */}}
 {{- define "common.metadata.standardLabels" -}}
@@ -47,7 +42,7 @@ Input dict: { ctx: <root>, componentName: <string, may be ""> }
     "app.kubernetes.io/name" (include "common.name" .ctx)
     "app.kubernetes.io/instance" .ctx.Release.Name
   -}}
-  {{- if and .componentName (ne .componentName "main") -}}
+  {{- if .componentName -}}
     {{- $_ := set $out "app.kubernetes.io/component" .componentName -}}
     {{- $_ := set $out "app.kubernetes.io/part-of" (include "common.name" .ctx) -}}
   {{- end -}}
@@ -110,6 +105,10 @@ Input dict: { ctx, componentName, component, box }
   {{- include "common.lib.merge" (dict "base" $labels "overlay" (.ctx.Values.labels | default dict)) -}}
   {{- include "common.lib.merge" (dict "base" $labels "overlay" (.component.labels | default dict)) -}}
   {{- include "common.lib.merge" (dict "base" $labels "overlay" (dig "pod" "labels" dict .component)) -}}
+  {{- include "common.metadata.selectorLabels" (dict "ctx" .ctx "componentName" .componentName "box" $b) -}}
+  {{- range $key, $value := $b.result -}}
+    {{- if ne (get $labels $key) $value -}}{{- fail (printf "common: pod label %q is reserved for the component selector" $key) -}}{{- end -}}
+  {{- end -}}
   {{- $meta := dict "labels" $labels -}}
   {{- $podAnnotations := dig "pod" "annotations" dict .component -}}
   {{- if $podAnnotations -}}

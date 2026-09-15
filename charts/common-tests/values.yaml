@@ -32,5 +32,6 @@ components:
     deployment:
       strategy:
         type: Recreate
-    httpRoute:
-      enabled: true
+    routes:
+      main:
+        enabled: true

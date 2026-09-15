@@ -17,13 +17,13 @@ If the release name already contains the chart name, use the release name.
 */}}
 {{- define "common.fullname" -}}
 {{- if .Values.fullnameOverride -}}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- include "common.safeName" .Values.fullnameOverride -}}
 {{- else -}}
 {{- $name := default .Chart.Name .Values.nameOverride -}}
 {{- if contains $name .Release.Name -}}
-{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- include "common.safeName" .Release.Name -}}
 {{- else -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- include "common.safeName" (printf "%s-%s" .Release.Name $name) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
@@ -34,11 +34,24 @@ common.componentName: resource name for a component. The component named
 Input dict: { ctx: <root context>, name: <component name> }
 */}}
 {{- define "common.componentName" -}}
-{{- if eq .name "main" -}}
-{{- include "common.fullname" .ctx -}}
-{{- else -}}
-{{- printf "%s-%s" (include "common.fullname" .ctx) .name | trunc 63 | trimSuffix "-" -}}
+  {{- $full := include "common.fullname" .ctx -}}
+  {{- if ne .name "main" -}}{{- $full = printf "%s-%s" $full .name -}}{{- end -}}
+  {{- include "common.safeName" $full -}}
 {{- end -}}
+
+{{- define "common.safeName" -}}
+  {{- if gt (len .) 63 -}}
+    {{- printf "%s-%s" (. | trunc 54 | trimSuffix "-") (. | sha256sum | trunc 8) -}}
+  {{- else -}}{{- . -}}{{- end -}}
+{{- end -}}
+
+{{- define "common.resourceName" -}}
+  {{- $name := include "common.fullname" .ctx -}}
+  {{- if .component -}}{{- $name = include "common.componentName" (dict "ctx" .ctx "name" .component) -}}{{- end -}}
+  {{- if or (not .component) (ne .key "main") -}}{{- $name = printf "%s-%s" $name .key -}}{{- end -}}
+  {{- if has (.values.kind | default "") (list "ClusterRole" "ClusterRoleBinding") -}}{{- $name = printf "%s-%s" (include "common.namespace" .ctx) $name -}}{{- end -}}
+  {{- with .values.name -}}{{- $name = tpl . $.ctx -}}{{- end -}}
+  {{- include "common.safeName" $name -}}
 {{- end -}}
 
 {{/*
@@ -57,15 +70,22 @@ common.namespace: release namespace with override.
 
 {{/*
 common.appResources.lookup -> box.result (the appResources entry dict)
-Fails with a clear message when the key does not exist — every reference
+Fails with a clear message when the key does not exist - every reference
 into appResources goes through here, so dangling refs die at render time.
 Input dict: { ctx, type (appResources type key), key, where (for errors), box }
 */}}
 {{- define "common.appResources.lookup" -}}
   {{- $byType := get (.ctx.Values.appResources | default dict) .type | default dict -}}
   {{- $entry := get $byType .key -}}
-  {{- if or (not (hasKey $byType .key)) (eq (kindOf $entry) "invalid") -}}
+  {{- if or (not (hasKey $byType .key)) (eq (kindOf $entry) "invalid") (and (hasKey $entry "enabled") (not $entry.enabled)) -}}
     {{- fail (printf "common: %s references appResources.%s.%s, which is not defined" (.where | default "ref") .type .key) -}}
+  {{- end -}}
+  {{- $namespace := dig "metadata" "namespace" (include "common.namespace" .ctx) ($entry.overrides | default dict) -}}
+  {{- if ne (tpl $namespace .ctx) (include "common.namespace" .ctx) -}}{{- fail "common: appResources references must remain in the release namespace" -}}{{- end -}}
+  {{- if $entry.component -}}
+    {{- $b := dict -}}
+    {{- include "common.resolve.components" (dict "ctx" .ctx "box" $b) -}}
+    {{- if not (hasKey $b.result $entry.component) -}}{{- fail (printf "common: appResources.%s.%s references unknown or disabled component %q" .type .key $entry.component) -}}{{- end -}}
   {{- end -}}
   {{- $_ := set .box "result" $entry -}}
 {{- end -}}
@@ -77,12 +97,14 @@ Component scope (component:): <componentResourceName>-<key>
 Input dict: { ctx, key, entry (the appResources entry dict) }
 */}}
 {{- define "common.appResources.name" -}}
-{{- $component := (.entry | default dict).component | default "" -}}
-{{- if $component -}}
-{{- printf "%s-%s" (include "common.componentName" (dict "ctx" .ctx "name" $component)) .key -}}
-{{- else -}}
-{{- printf "%s-%s" (include "common.fullname" .ctx) .key -}}
-{{- end -}}
+  {{- $name := include "common.resourceName" (dict "ctx" .ctx "component" "" "key" .key "values" .entry) -}}
+  {{- if .entry.component -}}
+    {{- $name = include "common.safeName" (printf "%s-%s" (include "common.componentName" (dict "ctx" .ctx "name" .entry.component)) .key) -}}
+  {{- end -}}
+  {{- if and .entry.component (has (.entry.kind | default "") (list "ClusterRole" "ClusterRoleBinding")) -}}{{- $name = include "common.safeName" (printf "%s-%s" (include "common.namespace" .ctx) $name) -}}{{- end -}}
+  {{- with .entry.name -}}{{- $name = tpl . $.ctx -}}{{- end -}}
+  {{- with (dig "metadata" "name" "" (.entry.overrides | default dict)) -}}{{- $name = tpl . $.ctx -}}{{- end -}}
+  {{- $name -}}
 {{- end -}}
 
 {{/*
@@ -101,7 +123,7 @@ Input: list of [ctx, appResources type, key].
 {{- end -}}
 
 {{/*
-common.ref.component: the resource name of a component — its Deployment,
+common.ref.component: the resource name of a component - its Deployment,
 Service and (default) ServiceAccount all share this name. Validated
 against declared components.
 Usage inside any tpl-rendered string:
@@ -110,14 +132,9 @@ Usage inside any tpl-rendered string:
 {{- define "common.ref.component" -}}
 {{- $ctx := index . 0 -}}
 {{- $name := index . 1 -}}
-{{- $declared := $ctx.Values.components | default dict -}}
-{{- if $declared -}}
-{{- if or (not (hasKey $declared $name)) (eq (kindOf (get $declared $name)) "invalid") -}}
-{{- fail (printf "common.ref.component: component %q is not declared" $name) -}}
-{{- end -}}
-{{- else if ne $name "main" -}}
-{{- fail (printf "common.ref.component: component %q is not declared (only the implicit \"main\" exists)" $name) -}}
-{{- end -}}
+{{- $b := dict -}}
+{{- include "common.resolve.components" (dict "ctx" $ctx "box" $b) -}}
+{{- if not (hasKey $b.result $name) -}}{{- fail (printf "common.ref.component: component %q is not defined or enabled" $name) -}}{{- end -}}
 {{- include "common.componentName" (dict "ctx" $ctx "name" $name) -}}
 {{- end -}}
 
@@ -126,8 +143,18 @@ common.ref.serviceHost: in-cluster DNS name of a component's Service
 (<serviceName>.<namespace>.svc).
 Usage: API_URL: 'http://{{ include "common.ref.serviceHost" (list . "api") }}:8080'
 */}}
+{{- define "common.ref.service" -}}
+  {{- $key := "main" -}}{{- if gt (len .) 2 -}}{{- $key = index . 2 -}}{{- end -}}
+  {{- $b := dict -}}
+  {{- include "common.resolve.service" (dict "ctx" (index . 0) "name" (index . 1) "service" $key "box" $b) -}}
+  {{- $b.result.metadata.name -}}
+{{- end -}}
+
 {{- define "common.ref.serviceHost" -}}
-{{- printf "%s.%s.svc" (include "common.ref.component" .) (include "common.namespace" (index . 0)) -}}
+  {{- $key := "main" -}}{{- if gt (len .) 2 -}}{{- $key = index . 2 -}}{{- end -}}
+  {{- $b := dict -}}
+  {{- include "common.resolve.service" (dict "ctx" (index . 0) "name" (index . 1) "service" $key "box" $b) -}}
+  {{- printf "%s.%s.svc" $b.result.metadata.name $b.result.metadata.namespace -}}
 {{- end -}}
 
 {{/*
@@ -139,5 +166,19 @@ Usage: {{ include "common.ref.tlsSecret" (list . "web") }}
 {{- $key := index . 1 -}}
 {{- $b := dict -}}
 {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "certificate" "key" $key "where" "common.ref.tlsSecret" "box" $b) -}}
-{{- $b.result.secretName | default (printf "%s-tls" (include "common.appResources.name" (dict "ctx" $ctx "key" $key "entry" $b.result))) -}}
+{{- $name := $b.result.secretName | default (printf "%s-tls" (include "common.appResources.name" (dict "ctx" $ctx "key" $key "entry" $b.result))) -}}
+{{- tpl (dig "spec" "secretName" $name ($b.result.overrides | default dict)) $ctx -}}
+{{- end -}}
+
+{{- define "common.checksum.configMap" -}}
+  {{- $ctx := index . 0 -}}{{- $key := index . 1 -}}{{- $b := dict -}}
+  {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "configMap" "key" $key "where" "checksum" "box" $b) -}}
+  {{- $v := $b.result -}}{{- $data := $v.data | default dict -}}
+  {{- if $v.tpl -}}
+    {{- include "common.lib.tplMap" (dict "ctx" $ctx "map" $data "box" $b) -}}{{- $data = $b.result -}}
+  {{- end -}}
+  {{- $m := dict "data" $data "binaryData" ($v.binaryData | default dict) -}}
+  {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $m "overrides" (pick ($v.overrides | default dict) "data" "binaryData")) -}}
+  {{- include "common.lib.cleanNulls" $m -}}
+  {{- toJson $m | sha256sum -}}
 {{- end -}}

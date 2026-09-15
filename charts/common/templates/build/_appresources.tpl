@@ -1,14 +1,14 @@
 {{/*
 =============================================================================
 Application-scoped typed resources: appResources.<type>.<name>.
-Types: configMap, secret, externalSecret, pvc, certificate, httpRoute.
+Types: configMap, secret, externalSecret, pvc, certificate, route, listenerSet.
 
 Scoping: entries are app-scoped by default (named <fullname>-<key>, no
 component label). An entry may declare `component: <name>` to become
 component-scoped: named <componentResourceName>-<key> and stamped with
 that component's labels. Components consume appResources by KEY (volume
 ref:, certRef:, env/envFrom ref:, backendRef component:, or the
-common.ref template) — never by rendered name.
+common.ref template) - never by rendered name.
 
 Each builder -> box.result (list of manifest dicts).
 =============================================================================
@@ -50,7 +50,7 @@ Input dict: { ctx, components (resolved map), box }
   {{- $b := dict -}}
 
   {{- range $name, $v := ($appResources.configMap | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
+    {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
       {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $manifest := dict "apiVersion" "v1" "kind" "ConfigMap" "metadata" $m.meta -}}
       {{- $data := $v.data | default dict -}}
@@ -66,7 +66,7 @@ Input dict: { ctx, components (resolved map), box }
   {{- end -}}
 
   {{- range $name, $v := ($appResources.secret | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
+    {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
       {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $manifest := dict "apiVersion" "v1" "kind" "Secret" "metadata" $m.meta "type" ($v.type | default "Opaque") -}}
       {{- $stringData := $v.stringData | default dict -}}
@@ -82,7 +82,7 @@ Input dict: { ctx, components (resolved map), box }
   {{- end -}}
 
   {{- range $name, $v := ($appResources.externalSecret | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
+    {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
       {{- $globalES := dig "externalSecrets" dict ($ctx.Values.global | default dict) -}}
       {{- $storeName := dig "storeRef" "name" "" $v | default ($globalES.storeName | default "") -}}
       {{- if not $storeName -}}
@@ -115,7 +115,7 @@ Input dict: { ctx, components (resolved map), box }
   {{- end -}}
 
   {{- range $name, $v := ($appResources.pvc | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
+    {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
       {{- include "common.build.pvcSpec" (dict "values" $v "box" $b) -}}
       {{- $spec := $b.result -}}
       {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
@@ -128,7 +128,7 @@ Input dict: { ctx, components (resolved map), box }
   {{/* cert-manager.io/v1 Certificate. Defaults: secretName <name>-tls,
        issuerRef from global.certIssuer, dnsNames <name>.<global.domain>. */}}
   {{- range $name, $v := ($appResources.certificate | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
+    {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
       {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $global := $ctx.Values.global | default dict -}}
       {{- $issuerName := dig "issuerRef" "name" "" $v | default (dig "certIssuer" "name" "" $global) -}}
@@ -163,29 +163,37 @@ Input dict: { ctx, components (resolved map), box }
     {{- end -}}
   {{- end -}}
 
-  {{/* Chart-scoped HTTPRoutes: one hostname fanned across components.
-       Rules are required (no default backend) and backendRefs use
-       `component:` references. With a `component:` back-ref the route is
-       component-scoped and that component becomes the default backend. */}}
-  {{- range $name, $v := ($appResources.httpRoute | default dict) -}}
-    {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
-      {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
-      {{- $compName := $v.component | default "" -}}
-      {{- $defaultHost := include "common.fullname" $ctx -}}
-      {{- if $compName -}}
-        {{- $defaultHost = include "common.componentName" (dict "ctx" $ctx "name" $compName) -}}
+  {{- if hasKey $appResources "httpRoute" -}}{{- fail "common: replace appResources.httpRoute with appResources.route" -}}{{- end -}}
+  {{- range $collection, $builder := dict "route" "common.build.routeManifest" "listenerSet" "common.build.listenerSetManifest" -}}
+    {{- range $key, $v := (get $appResources $collection | default dict) -}}
+      {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
+        {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $key "entry" $v "box" $m) -}}
+        {{- $compName := $v.component | default "" -}}
+        {{- include $builder (dict "ctx" $ctx "route" $v "resourceName" $m.name "componentName" $compName "component" (get $components $compName | default dict) "components" $components "defaultComponent" $compName "defaultHost" $m.name "box" $b) -}}
+        {{- $out = append $out $b.result -}}
       {{- end -}}
-      {{- include "common.build.httpRouteManifest" (dict
-            "ctx" $ctx "route" $v "resourceName" $m.name
-            "componentName" $compName
-            "component" (get $components $compName | default dict)
-            "components" $components
-            "defaultComponent" $compName
-            "defaultHost" $defaultHost
-            "box" $b) -}}
-      {{- $out = append $out $b.result -}}
     {{- end -}}
   {{- end -}}
 
+  {{- range $collection, $builder := dict "role" "common.build.roleManifest" "roleBinding" "common.build.bindingManifest" "networkPolicy" "common.build.networkPolicyManifest" "serviceMonitor" "common.build.monitorManifest" "podMonitor" "common.build.monitorManifest" -}}
+    {{- range $key, $v := (get $appResources $collection | default dict) -}}
+      {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
+        {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $key "entry" $v "box" $m) -}}
+        {{- include $builder (dict "ctx" $ctx "entry" $v "metadata" $m.meta "componentName" ($v.component | default "") "components" $components "kind" (ternary "ServiceMonitor" "PodMonitor" (eq $collection "serviceMonitor")) "box" $b) -}}
+        {{- $out = append $out $b.result -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $collection, $kind := dict "gateway" "Gateway" "referenceGrant" "ReferenceGrant" -}}
+    {{- range $key, $v := (get $appResources $collection | default dict) -}}
+      {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
+        {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $key "entry" $v "box" $m) -}}
+        {{- $api := "gateway.networking.k8s.io/v1" -}}{{- if eq $kind "ReferenceGrant" -}}{{- $api = "gateway.networking.k8s.io/v1beta1" -}}{{- end -}}
+        {{- $manifest := dict "apiVersion" $api "kind" $kind "metadata" $m.meta "spec" ($v.spec | default dict) -}}
+        {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" $v.overrides) -}}
+        {{- $out = append $out $manifest -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
   {{- $_ := set .box "result" $out -}}
 {{- end -}}

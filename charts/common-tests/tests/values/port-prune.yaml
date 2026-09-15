@@ -7,6 +7,7 @@ components:
         ports:
           metrics:
             port: 9090
-    service:
-      ports:
-        http: ~
+    services:
+      main:
+        ports:
+          metrics: {}

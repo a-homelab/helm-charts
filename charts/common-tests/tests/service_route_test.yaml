@@ -1,4 +1,4 @@
-suite: service port derivation and httpRoute wiring
+suite: Service port selection and route wiring
 templates:
   - templates/all.yaml
 release:
@@ -20,6 +20,7 @@ tests:
           value:
             app.kubernetes.io/name: common-tests
             app.kubernetes.io/instance: t
+            app.kubernetes.io/component: main
         documentIndex: 2
 
   - it: uses expose for the service-side port
@@ -41,6 +42,8 @@ tests:
 
   - it: includes sidecar ports in the service
     set:
+      components.main.routes.main.rules:
+        - backendRefs: [{port: http}]
       components.main.sidecars.metrics:
         image:
           repository: prom/exporter
@@ -57,7 +60,7 @@ tests:
             targetPort: metrics
         documentIndex: 2
 
-  - it: prunes derived ports via null
+  - it: selects only explicitly listed Service ports
     values:
       - values/port-prune.yaml
     asserts:
@@ -72,13 +75,13 @@ tests:
 
   - it: omits the service when disabled or when no ports exist
     set:
-      components.main.service.enabled: false
-      components.main.httpRoute.enabled: false
+      components.main.services.main.enabled: false
+      components.main.routes.main.enabled: false
     asserts:
       - hasDocuments:
           count: 3
 
-  - it: builds httpRoute defaults from global context and the service
+  - it: builds route defaults from global context and the service
     asserts:
       - equal:
           path: spec.hostnames
@@ -100,10 +103,11 @@ tests:
 
   - it: tpl-renders explicit hostnames and fills backendRef defaults in rules
     set:
-      components.main.httpRoute.hostnames:
+      components.main.routes.main.hostnames:
         - "app.{{ .Values.global.domain }}"
-      components.main.httpRoute.rules:
-        - matches:
+      components.main.routes.main.rules:
+        - backendRefs: [{}]
+          matches:
             - path:
                 type: PathPrefix
                 value: /api
@@ -125,7 +129,7 @@ tests:
 
   - it: attaches to explicit parentRefs keyed by gateway name
     set:
-      components.main.httpRoute.parentRefs:
+      components.main.routes.main.parentRefs:
         public:
           namespace: gateways
           sectionName: https

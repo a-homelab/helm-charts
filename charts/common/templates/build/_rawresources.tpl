@@ -1,45 +1,22 @@
-{{/*
-=============================================================================
-Raw manifests: top-level `rawResources` map, rendered verbatim.
-=============================================================================
-*/}}
-
-{{/*
-common.build.rawResources -> box.result (list of manifests)
-Top-level `rawResources` map: key -> full manifest, verbatim. Entries are
-either a MAP (structured manifest) or a STRING (literal YAML, so
-manifests can be pasted from any project's docs) — both are tpl-rendered.
-The only managed touches: standard labels are merged under the manifest's
-own labels (ArgoCD tracking), namespace is defaulted, and metadata.name
-defaults to <fullname>-<key> when the manifest omits it. Spec content is
-never modified; refs/back-refs are deliberately not supported here — if
-something needs referencing, it deserves a typed appResources home.
-Input dict: { ctx, box }
-*/}}
 {{- define "common.build.rawResources" -}}
-  {{- $ctx := .ctx -}}
-  {{- $out := list -}}
-  {{- $m := dict -}}
-  {{- range $name, $v := ($ctx.Values.rawResources | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
-      {{- $manifest := dict -}}
-      {{- if eq (kindOf $v) "string" -}}
-        {{- $manifest = tpl $v $ctx | fromYaml -}}
-        {{- if $manifest.Error -}}
-          {{- fail (printf "common: rawResources.%s is not valid YAML: %s" $name $manifest.Error) -}}
-        {{- end -}}
-      {{- else -}}
-        {{- $manifest = tpl (toYaml $v) $ctx | fromYaml -}}
+  {{- $out := list -}}{{- $b := dict -}}
+  {{- range $key, $v := (.ctx.Values.rawResources | default dict) -}}
+    {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
+      {{- if not (hasKey $v "manifest") -}}{{- fail (printf "common: rawResources.%s requires manifest (and optional scope, tpl, enabled)" $key) -}}{{- end -}}
+      {{- $m := deepCopy $v.manifest -}}
+      {{- if or $v.tpl (eq (kindOf $m) "string") -}}
+        {{- $yaml := $m -}}{{- if ne (kindOf $m) "string" -}}{{- $yaml = toYaml $m -}}{{- end -}}
+        {{- if $v.tpl -}}{{- $yaml = tpl $yaml $.ctx -}}{{- end -}}
+        {{- if regexMatch "(?m)^---[ \t]*(?:#.*)?$" $yaml -}}{{- fail (printf "common: rawResources.%s must contain one YAML document without document separators" $key) -}}{{- end -}}
+        {{- $m = fromYaml $yaml -}}
+        {{- if $m.Error -}}{{- fail (printf "common: rawResources.%s is not valid YAML: %s" $key $m.Error) -}}{{- end -}}
       {{- end -}}
-      {{- if or (not $manifest.apiVersion) (not $manifest.kind) -}}
-        {{- fail (printf "common: rawResources.%s must set apiVersion and kind" $name) -}}
-      {{- end -}}
-      {{- include "common.metadata.build" (dict "ctx" $ctx "name" (printf "%s-%s" (include "common.fullname" $ctx) $name) "componentName" "" "labels" dict "annotations" dict "box" $m) -}}
-      {{- $meta := $m.result -}}
-      {{/* the manifest's own metadata wins over the managed defaults */}}
-      {{- include "common.lib.merge" (dict "base" $meta "overlay" ($manifest.metadata | default dict)) -}}
-      {{- $_ := set $manifest "metadata" $meta -}}
-      {{- $out = append $out $manifest -}}
+      {{- include "common.metadata.build" (dict "ctx" $.ctx "name" (include "common.safeName" (printf "%s-%s" (include "common.fullname" $.ctx) $key)) "componentName" "" "labels" dict "annotations" dict "box" $b) -}}
+      {{- $meta := $b.result -}}
+      {{- include "common.lib.merge" (dict "base" $meta "overlay" ($m.metadata | default dict) "keepNulls" true) -}}
+      {{- if eq ($v.scope | default "Namespaced") "Cluster" -}}{{- $_ := unset $meta "namespace" -}}{{- end -}}
+      {{- $_ := set $m "metadata" $meta -}}
+      {{- $out = append $out $m -}}
     {{- end -}}
   {{- end -}}
   {{- $_ := set .box "result" $out -}}

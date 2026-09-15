@@ -92,15 +92,15 @@ tests:
       - failedTemplate:
           errorMessage: "common: components.main is enabled but container.image.repository is not set"
 
-  - it: rejects mixing the reserved main component with named components
+  - it: allows adding named components alongside main
     set:
       components.api:
         container:
           image:
             repository: ghcr.io/example/app
     asserts:
-      - failedTemplate:
-          errorMessage: 'common: the component name "main" is reserved for single-component charts (it renders without a component selector label). Name every component explicitly in multi-component charts.'
+      - hasDocuments:
+          count: 7
 
   - it: renders a custom tpl-rendered container name
     set:

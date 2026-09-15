@@ -5,21 +5,24 @@ release:
   name: t
   namespace: test
 tests:
-  - it: generates the standard label set on controllers (main gets no component/part-of)
+  - it: generates the standard label set including main component identity
     asserts:
       - isSubset:
           path: metadata.labels
           content:
             app.kubernetes.io/name: common-tests
             app.kubernetes.io/instance: t
+            app.kubernetes.io/component: main
             app.kubernetes.io/managed-by: Helm
             helm.sh/chart: common-tests-0.1.0
         documentIndex: 0
-      - notExists:
+      - equal:
           path: metadata.labels["app.kubernetes.io/component"]
+          value: main
         documentIndex: 0
-      - notExists:
+      - equal:
           path: metadata.labels["app.kubernetes.io/part-of"]
+          value: common-tests
         documentIndex: 0
 
   - it: locks selector labels to name+instance, ignoring user labels
@@ -34,6 +37,7 @@ tests:
           value:
             app.kubernetes.io/name: common-tests
             app.kubernetes.io/instance: t
+            app.kubernetes.io/component: main
         documentIndex: 0
 
   - it: keeps volatile generated labels off the pod template
@@ -89,7 +93,7 @@ tests:
     set:
       labels:
         team: media
-      components.main.service:
+      components.main.services.main:
         labels:
           team: overridden
         annotations:

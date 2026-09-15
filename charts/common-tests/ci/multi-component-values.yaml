@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../../common/schema/values.schema.json
 # Multi-component exercise: shared defaults, api with sidecar + init +
 # configMap volume + route, worker without service, nightly cronjob.
-# Also exercises: delete-by-null (service: ~, env FOO: ~), tolerations map,
+# Also exercises: disabled Services, inherited env deletion, tolerations map,
 # overrides at container/pod/resource altitude, extras, hpa, pdb.
 global:
   domain: example.com
@@ -32,11 +32,11 @@ defaults:
 components:
   main: ~                                  # delete the component declared by the harness values.yaml
   api:
+    remove: [/container/env/DEPRECATED]
     container:
       image:
         repository: ghcr.io/example/app
       env:
-        DEPRECATED: ~                      # delete inherited default
         DB_HOST: "{{ .Release.Name }}-pg-rw"
       ports:
         http:
@@ -78,13 +78,15 @@ components:
               readOnly: true
       annotations:
         checksum/config: '{{ .Values.appResources.configMap | toYaml | sha256sum }}'
-    service:
-      ports:
-        http: ~                            # prune app port; only expose proxy
-    httpRoute:
-      enabled: true
-      hostnames:
-        - "app.{{ .Values.global.domain }}"
+    services:
+      main:
+        ports:
+          proxy: {}
+    routes:
+      main:
+        enabled: true
+        hostnames:
+          - "app.{{ .Values.global.domain }}"
     hpa:
       enabled: true
       min: 2
@@ -99,7 +101,9 @@ components:
       image:
         repository: ghcr.io/example/app
       command: [./worker]
-    service: ~                             # delete the whole inherited Service block
+    services:
+      main:
+        enabled: false
     deployment:
       replicas: 2
 
@@ -129,7 +133,8 @@ appResources:
             key: example-api-key
 rawResources:
   widget:
-    apiVersion: example.io/v1
-    kind: Widget
-    spec:
-      size: 3
+    manifest:
+      apiVersion: example.io/v1
+      kind: Widget
+      spec:
+        size: 3

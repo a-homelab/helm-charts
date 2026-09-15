@@ -63,7 +63,7 @@ tests:
 
   - it: merges resource overrides on services
     set:
-      components.main.service.overrides:
+      components.main.services.main.overrides:
         spec:
           sessionAffinity: ClientIP
     asserts:

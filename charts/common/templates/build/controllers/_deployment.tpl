@@ -6,8 +6,8 @@ Reads the component's `deployment` block. Omits replicas when hpa.enabled.
   {{- $comp := .component -}}
   {{- $d := $comp.deployment | default dict -}}
   {{- $spec := dict -}}
-  {{- if not (dig "hpa" "enabled" false $comp) -}}
-    {{- $_ := set $spec "replicas" (int ($d.replicas | default 1)) -}}
+  {{- if not (($comp.hpa | default dict).enabled) -}}
+    {{- include "common.lib.setIf" (dict "target" $spec "key" "replicas" "value" $d.replicas) -}}
   {{- end -}}
   {{- if ne (kindOf $d.revisionHistoryLimit) "invalid" -}}
     {{- $_ := set $spec "revisionHistoryLimit" (int $d.revisionHistoryLimit) -}}

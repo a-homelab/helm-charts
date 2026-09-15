@@ -5,12 +5,12 @@ description: |
   components (workloads), typed appResources and raw manifests entirely through values;
   a single `{{ include "common.all" . }}` renders every resource. Values
   resolve through a layered deep-merge (library defaults -> defaults ->
-  component) with delete-by-null, map-shaped collections everywhere, and
+  component) with explicit removal, map-shaped identity collections, and
   per-resource `overrides` escape hatches at container, pod, and resource
   altitude.
 type: library
-version: 1.0.0-alpha.1
-kubeVersion: ">=1.26.0-0"
+version: 1.0.0-alpha.2
+kubeVersion: ">=1.31.0-0"
 keywords:
   - common
   - library

@@ -1,59 +1,58 @@
-{{/*
-=============================================================================
-Merging: the resolution deep-merge (delete-by-null) and the overrides
-escape hatch built on top of it.
-Conventions: builders return values by MUTATING a caller-supplied dict
-(the "box" pattern) — no yaml round-trips; explicit null means delete.
-=============================================================================
-*/}}
-
-{{/*
-common.lib.merge: deep-merge .overlay into .base, MUTATING .base.
-Semantics (deliberately different from sprig mergeOverwrite):
-  - map + map        -> recurse
-  - overlay is null  -> DELETE the key from base (render-time semantics),
-                        or keep it as a null tombstone when keepNulls is
-                        true (resolution semantics: the null must survive
-                        the defaults chain so it can delete derived
-                        entries — e.g. service.ports pruning — at render
-                        time; every map->list boundary skips nulls)
-  - anything else    -> overlay wins, including false, 0 and ""
-Iterative worklist implementation: no yaml round-trips, preserves types.
-Input dict: { base: <dict>, overlay: <dict>, keepNulls: <bool, optional> }
-*/}}
 {{- define "common.lib.merge" -}}
+  {{- $base := .base -}}
   {{- $keepNulls := .keepNulls | default false -}}
-  {{- $work := list (dict "b" .base "o" (.overlay | default dict)) -}}
-  {{- range until 1000 -}}
-    {{- if $work -}}
-      {{- $f := first $work -}}
-      {{- $work = rest $work -}}
-      {{- range $k, $v := $f.o -}}
-        {{- if eq (kindOf $v) "invalid" -}}
-          {{- if $keepNulls -}}
-            {{- $_ := set $f.b $k nil -}}
-          {{- else -}}
-            {{- $_ := unset $f.b $k -}}
-          {{- end -}}
-        {{- else if and (eq (kindOf $v) "map") (hasKey $f.b $k) (eq (kindOf (get $f.b $k)) "map") -}}
-          {{- $work = append $work (dict "b" (get $f.b $k) "o" $v) -}}
-        {{- else -}}
-          {{- $_ := set $f.b $k (deepCopy $v) -}}
-        {{- end -}}
-      {{- end -}}
+  {{- range $key, $value := (.overlay | default dict) -}}
+    {{- if eq (kindOf $value) "invalid" -}}
+      {{- if $keepNulls -}}{{- $_ := set $base $key nil -}}{{- else -}}{{- $_ := unset $base $key -}}{{- end -}}
+    {{- else if kindIs "map" $value -}}
+      {{- $nested := get $base $key -}}
+      {{- if not (kindIs "map" $nested) -}}{{- $nested = dict -}}{{- $_ := set $base $key $nested -}}{{- end -}}
+      {{- include "common.lib.merge" (dict "base" $nested "overlay" $value "keepNulls" $keepNulls) -}}
+    {{- else -}}
+      {{- $_ := set $base $key (deepCopy $value) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
 
-{{/*
-common.lib.applyOverrides: tpl-render an overrides block and deep-merge it
-onto a built resource dict (mutates .target). Strings inside overrides may
-use full Helm templating against the root context.
-Input dict: { ctx: <root context>, target: <dict>, overrides: <dict> }
-*/}}
 {{- define "common.lib.applyOverrides" -}}
   {{- if .overrides -}}
+    {{- $identity := pick .target "apiVersion" "kind" -}}
     {{- $rendered := tpl (toYaml .overrides) .ctx | fromYaml -}}
+    {{- if $rendered.Error -}}{{- fail (printf "common: invalid overrides: %s" $rendered.Error) -}}{{- end -}}
     {{- include "common.lib.merge" (dict "base" .target "overlay" $rendered) -}}
+    {{- range $key, $value := $identity -}}
+      {{- if ne (get $.target $key) $value -}}{{- fail (printf "common: overrides cannot change managed resource %s; use rawResources for a different API or kind" $key) -}}{{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* Null tombstones must survive derivation, but never enter typed manifests. */}}
+{{- define "common.lib.cleanNulls" -}}
+  {{- if kindIs "map" . -}}
+    {{- range $key, $value := . -}}
+      {{- if eq (kindOf $value) "invalid" -}}{{- $_ := unset $ $key -}}
+      {{- else -}}{{- include "common.lib.cleanNulls" $value -}}{{- end -}}
+    {{- end -}}
+  {{- else if kindIs "slice" . -}}
+    {{- range . -}}{{- include "common.lib.cleanNulls" . -}}{{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* JSON pointers preserve deletion intent through Helm's values coalescing. */}}
+{{- define "common.lib.remove" -}}
+  {{- $target := .target -}}
+  {{- range $path := (.paths | default list) -}}
+    {{- if not (hasPrefix "/" $path) -}}{{- fail "common: remove entries must be JSON pointers starting with /" -}}{{- end -}}
+    {{- $parts := splitList "/" (trimPrefix "/" $path) -}}
+    {{- $parent := $target -}}
+    {{- range $index, $part := $parts -}}
+      {{- $key := $part | replace "~1" "/" | replace "~0" "~" -}}
+      {{- if eq $index (sub (len $parts) 1) -}}
+        {{- $_ := set $parent $key nil -}}
+      {{- else -}}
+        {{- if not (kindIs "map" (get $parent $key)) -}}{{- fail (printf "common: remove path %q crosses a missing or non-map parent; define an explicit map before removing its entries" $path) -}}{{- end -}}
+        {{- $parent = get $parent $key -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}

@@ -1,6 +1,6 @@
 {{/*
 =============================================================================
-Library defaults — the first layer of the component resolution chain:
+Library defaults - the first layer of the component resolution chain:
 
   libraryDefaults -> .Values.defaults -> .Values.components.<name>
 
@@ -53,7 +53,6 @@ pod:
   priorityClassName: ""
   runtimeClassName: ""
   schedulerName: ""
-  hostNetwork: false
   enableServiceLinks: false
   dnsPolicy: ""
   dnsConfig: {}
@@ -88,23 +87,10 @@ cronjob:
 
 overrides: {}
 
-service:
-  enabled: true
-  type: ClusterIP
-  clusterIP: ""
-  labels: {}
-  annotations: {}
-  ports: {}
-  overrides: {}
-
-httpRoute:
-  enabled: false
-  hostnames: []
-  parentRefs: {}
-  rules: []
-  labels: {}
-  annotations: {}
-  overrides: {}
+services: {}
+routes: {}
+listenerSets: {}
+remove: []
 
 hpa:
   enabled: false

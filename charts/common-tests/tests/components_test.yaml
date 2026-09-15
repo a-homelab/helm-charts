@@ -55,7 +55,7 @@ tests:
           value: 50m
         documentIndex: 7
 
-  - it: deletes an inherited env entry only in the component that nulled it
+  - it: removes an inherited env entry only from the selected component
     asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
@@ -139,7 +139,7 @@ tests:
                 averageUtilization: 80
         documentIndex: 4
 
-  - it: deletes the worker service via null and keeps explicit replicas
+  - it: disables the worker Service and keeps explicit replicas
     asserts:
       - equal:
           path: spec.replicas

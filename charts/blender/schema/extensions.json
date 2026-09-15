@@ -1,0 +1,24 @@
+{
+  "properties": {
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "revision",
+        "sha256"
+      ]
+    }
+  }
+}

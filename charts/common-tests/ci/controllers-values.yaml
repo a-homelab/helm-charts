@@ -34,7 +34,9 @@ components:
     container:
       image:
         repository: ghcr.io/example/agent
-    service: ~
+    services:
+      main:
+        enabled: false
     serviceAccount:
       enabled: false
     pod:
@@ -55,6 +57,8 @@ components:
       restartPolicy: Never
       backoffLimit: 2
       ttlSecondsAfterFinished: 300
-    service: ~
+    services:
+      main:
+        enabled: false
     serviceAccount:
       enabled: false

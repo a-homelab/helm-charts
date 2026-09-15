@@ -31,27 +31,27 @@ Map shape: keys are env var names; values are:
 */}}
 {{- define "common.build.env" -}}
   {{- $ctx := .ctx -}}
-  {{- $out := list -}}
+  {{- $out := dict -}}
   {{- range $k, $v := (.env | default dict) -}}
     {{- $kind := kindOf $v -}}
     {{- if eq $kind "invalid" -}}
     {{- else if eq $kind "string" -}}
-      {{- $out = append $out (dict "name" $k "value" (tpl $v $ctx)) -}}
+      {{- $_ := set $out $k (dict "value" (tpl $v $ctx)) -}}
     {{- else if eq $kind "map" -}}
       {{- $entry := deepCopy $v -}}
       {{- $_ := set $entry "name" $k -}}
-      {{- if eq (kindOf $entry.value) "string" -}}
-        {{- $_ := set $entry "value" (tpl $entry.value $ctx) -}}
+      {{- if ne (kindOf $entry.value) "invalid" -}}
+        {{- $_ := set $entry "value" (tpl (toString $entry.value) $ctx) -}}
       {{- end -}}
       {{- $where := printf "env %s" $k -}}
-      {{- include "common.resolve.refInPlace" (dict "ctx" $ctx "selector" (dig "valueFrom" "configMapKeyRef" dict $entry) "type" "configMap" "where" $where) -}}
-      {{- include "common.resolve.refInPlace" (dict "ctx" $ctx "selector" (dig "valueFrom" "secretKeyRef" dict $entry) "type" "secret" "where" $where) -}}
-      {{- $out = append $out $entry -}}
+      {{- include "common.resolve.refInPlace" (dict "ctx" $ctx "selector" (($entry.valueFrom | default dict).configMapKeyRef) "type" "configMap" "where" $where) -}}
+      {{- include "common.resolve.refInPlace" (dict "ctx" $ctx "selector" (($entry.valueFrom | default dict).secretKeyRef) "type" "secret" "where" $where) -}}
+      {{- $_ := set $out $k $entry -}}
     {{- else -}}
-      {{- $out = append $out (dict "name" $k "value" (printf "%v" $v)) -}}
+      {{- $_ := set $out $k (dict "value" (printf "%v" $v)) -}}
     {{- end -}}
   {{- end -}}
-  {{- $_ := set .box "result" $out -}}
+  {{- include "common.lib.mapToList" (dict "map" $out "keyField" "name" "box" .box) -}}
 {{- end -}}
 
 {{/*
@@ -60,17 +60,17 @@ Port map entries: { port: <int, required>, protocol: TCP|UDP|SCTP, expose: <serv
 `expose` and `appProtocol` are service-side and dropped here.
 */}}
 {{- define "common.build.containerPorts" -}}
-  {{- $out := list -}}
+  {{- $out := dict -}}
   {{- range $name, $p := (.ports | default dict) -}}
     {{- if ne (kindOf $p) "invalid" -}}
-      {{- if not $p.port -}}
-        {{- fail (printf "common: port %q must set `port`" $name) -}}
-      {{- end -}}
-      {{- $entry := dict "name" $name "containerPort" (int $p.port) "protocol" ($p.protocol | default "TCP") -}}
-      {{- $out = append $out $entry -}}
+      {{- if or (not $p.port) (lt (int $p.port) 1) (gt (int $p.port) 65535) -}}{{- fail (printf "common: port %q must set port from 1 to 65535" $name) -}}{{- end -}}
+      {{- $entry := omit $p "expose" "appProtocol" "port" -}}
+      {{- $_ := set $entry "containerPort" (int $p.port) -}}
+      {{- $_ := set $entry "protocol" ($p.protocol | default "TCP") -}}
+      {{- $_ := set $out $name $entry -}}
     {{- end -}}
   {{- end -}}
-  {{- $_ := set .box "result" $out -}}
+  {{- include "common.lib.mapToList" (dict "map" $out "keyField" "name" "box" .box) -}}
 {{- end -}}
 
 {{/*
@@ -93,7 +93,9 @@ Input dict:
   {{- $image := $v.image | default dict -}}
   {{- if not $image.repository -}}
     {{- if .inheritImage -}}
-      {{- $image = deepCopy .inheritImage -}}
+      {{- $inherited := deepCopy .inheritImage -}}
+      {{- include "common.lib.merge" (dict "base" $inherited "overlay" $image) -}}
+      {{- $image = $inherited -}}
     {{- else -}}
       {{- fail (printf "common: container %q has no image.repository and nothing to inherit" .containerName) -}}
     {{- end -}}

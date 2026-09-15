@@ -80,7 +80,7 @@ appResources:
         api-key: zzz
   certificate:
     web: {}
-  httpRoute:
+  route:
     web:
       hostnames:
         - "app.{{ .Values.global.domain }}"

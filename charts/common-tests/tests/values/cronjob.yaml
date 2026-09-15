@@ -10,8 +10,12 @@ components:
       suspend: false
     job:
       backoffLimit: 1
-    service: ~
-    httpRoute: ~
+    services:
+      main:
+        enabled: false
+    routes:
+      main:
+        enabled: false
     pod:
       volumes:
         config: ~

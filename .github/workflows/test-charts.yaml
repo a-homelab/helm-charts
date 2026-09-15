@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "charts/**"
+      - "scripts/**"
+      - ".github/workflows/test-common.yaml"
       - ".github/workflows/test-charts.yaml"
   push:
     branches:
@@ -11,6 +13,8 @@ on:
       - feat/common-v2
     paths:
       - "charts/**"
+      - "scripts/**"
+      - ".github/workflows/test-common.yaml"
       - ".github/workflows/test-charts.yaml"
 
 env:
@@ -18,44 +22,15 @@ env:
 
 jobs:
   test:
-    name: Lint, unit tests, schema validation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Resolve test harness dependency
-        run: helm dependency update charts/common-tests
-
-      - name: Lint
-        run: |-
-          helm lint charts/common --strict
-          helm lint charts/common-tests --strict
-
-      - name: Install helm-unittest
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.5.2
-
-      - name: Run unit tests
-        run: helm unittest charts/common-tests
-
-      - name: Render fixtures
-        run: |-
-          helm template t charts/common-tests > /dev/null
-          helm template t charts/common-tests -f charts/common-tests/ci/multi-component-values.yaml > /dev/null
-          helm template t charts/common-tests -f charts/common-tests/ci/controllers-values.yaml > /dev/null
-
-      - name: Validate fixtures against values schema
-        run: |-
-          pipx run check-jsonschema \
-            --schemafile charts/common/schema/values.schema.json \
-            charts/common-tests/values.yaml \
-            charts/common-tests/ci/multi-component-values.yaml \
-            charts/common-tests/ci/controllers-values.yaml
+    uses: ./.github/workflows/test-common.yaml
 
   # Pre-release publishing from the feature branch so the alpha chart can be
   # consumed and tested before merge. Stable releases stay on main via
   # build-push-charts.yaml.
   publish-prerelease:
+    concurrency:
+      group: publish-common-chart
+      cancel-in-progress: false
     name: Publish pre-release chart
     runs-on: ubuntu-latest
     needs: test
@@ -63,6 +38,10 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.22.0
 
       - name: Extract version
         id: extract-version
@@ -88,6 +67,16 @@ jobs:
         env:
           HELM_INTERNAL_REGISTRY_USERNAME: ${{ secrets.HELM_INTERNAL_REGISTRY_USERNAME }}
           HELM_INTERNAL_REGISTRY_PASSWORD: ${{ secrets.HELM_INTERNAL_REGISTRY_PASSWORD }}
+
+      - name: Require immutable registry policy and a new chart version
+        run: |-
+          python -m pip install requests==2.32.5
+          python scripts/check_chart_release.py --registry https://registry.benfu.me --project "${HARBOR_PROJECT}" --chart common --version "${CHART_VERSION}"
+        env:
+          HARBOR_USERNAME: ${{ secrets.HELM_INTERNAL_REGISTRY_USERNAME }}
+          HARBOR_PASSWORD: ${{ secrets.HELM_INTERNAL_REGISTRY_PASSWORD }}
+          CHART_VERSION: ${{ steps.extract-version.outputs.chart-version }}
+          HARBOR_PROJECT: helm
 
       - name: Push chart
         run: |-
