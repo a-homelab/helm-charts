@@ -12,7 +12,14 @@ env:
   KUBECTL_VALIDATE_VERSION: v0.0.4
 
 jobs:
+  validate-common:
+    uses: ./.github/workflows/test-common.yaml
+
   build-push:
+    concurrency:
+      group: publish-common-chart
+      cancel-in-progress: false
+    needs: validate-common
     name: Build and push charts
     runs-on: ubuntu-latest
     strategy:
@@ -24,6 +31,10 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
       
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.22.0
+
       - name: Lint
         run: helm lint charts/${{ matrix.chart.chart }} --strict --debug
 
@@ -35,7 +46,8 @@ jobs:
       - name: Extract version
         id: extract-version
         run: |-
-          echo "chart-version="$(cat charts/${{ matrix.chart.chart }}/Chart.yaml | yq '.version')"" >> "${GITHUB_OUTPUT}"
+          version="$(yq '.version' charts/${{ matrix.chart.chart }}/Chart.yaml)"
+          echo "chart-version=${version}" >> "${GITHUB_OUTPUT}"
       
       - name: Login to the helm registry
         run: |-

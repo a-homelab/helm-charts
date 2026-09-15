@@ -1,0 +1,17 @@
+components:
+  main:
+    container:
+      env:
+        NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,video,display
+      resources:
+        requests:
+          nvidia.com/gpu: 1
+        limits:
+          nvidia.com/gpu: 1
+    pod:
+      runtimeClassName: nvidia
+      tolerations:
+        nvidia:
+          key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule

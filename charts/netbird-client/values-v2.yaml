@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../common/schema/values.schema.json
+# Migration values for the new common library; verified manifest-equivalent
+# by scripts/verify-common-migration.py.
+components:
+  main:
+    container:
+      name: '{{ include "common.fullname" . }}'
+      image:
+        repository: netbirdio/netbird
+      securityContext:
+        capabilities:
+          add:
+            - NET_ADMIN
+            - SYS_RESOURCE
+            - SYS_ADMIN
+      env:
+        NB_SETUP_KEY: "0000000000-0000-0000-0000-0000000000" # replace with your setup key
+        NB_HOSTNAME: netbird-k8s-router # name that will appear in the management UI
+        NB_LOG_LEVEL: info
+      ports:
+        udp:
+          port: 1 # port doesn't matter here
+          protocol: UDP

@@ -1,0 +1,90 @@
+# Exercises the controllers fixture. Raw document order (components sorted):
+#   0: db StatefulSet   1: db Service   2: db ServiceAccount
+#   3: migrate Job      4: node-agent DaemonSet
+suite: controller kinds (StatefulSet, DaemonSet, Job, CronJob)
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+values:
+  - ../ci/controllers-values.yaml
+tests:
+  - it: renders the controller fixture set
+    asserts:
+      - hasDocuments:
+          count: 5
+      - isKind:
+          of: StatefulSet
+        documentIndex: 0
+      - isKind:
+          of: Job
+        documentIndex: 3
+      - isKind:
+          of: DaemonSet
+        documentIndex: 4
+
+  - it: wires statefulset serviceName to the component service and applies kind settings
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: t-common-tests-db
+        documentIndex: 0
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentIndex: 0
+      - equal:
+          path: spec.podManagementPolicy
+          value: Parallel
+        documentIndex: 0
+      - equal:
+          path: spec.persistentVolumeClaimRetentionPolicy.whenDeleted
+          value: Retain
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: false
+        documentIndex: 0
+
+  - it: configures the daemonset for host networking with tolerations
+    asserts:
+      - equal:
+          path: spec.template.spec.hostNetwork
+          value: true
+        documentIndex: 4
+      - equal:
+          path: spec.template.spec.dnsPolicy
+          value: ClusterFirstWithHostNet
+        documentIndex: 4
+      - contains:
+          path: spec.template.spec.tolerations
+          content:
+            key: node-role.kubernetes.io/control-plane
+            operator: Exists
+        documentIndex: 4
+      - notExists:
+          path: spec.replicas
+        documentIndex: 4
+
+  - it: applies the job block and its pod restart policy
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 2
+        documentIndex: 3
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 300
+        documentIndex: 3
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+        documentIndex: 3
+
+  - it: fails fast when a cronjob has no schedule
+    set:
+      components.db.kind: CronJob
+    asserts:
+      - failedTemplate:
+          errorMessage: "common: components.db has kind CronJob but cronjob.schedule is not set"

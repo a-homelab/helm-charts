@@ -1,0 +1,60 @@
+suite: cronjob kind reusing the shared pod template
+templates:
+  - templates/all.yaml
+release:
+  name: t
+  namespace: test
+values:
+  - values/cronjob.yaml
+tests:
+  - it: renders only the CronJob when service, route, SA and volumes are nulled
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: CronJob
+        documentIndex: 0
+
+  - it: applies cronjob settings and the job block to the jobTemplate
+    asserts:
+      - equal:
+          path: spec.schedule
+          value: "0 3 * * *"
+        documentIndex: 0
+      - equal:
+          path: spec.timeZone
+          value: America/Chicago
+        documentIndex: 0
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+        documentIndex: 0
+      - equal:
+          path: spec.suspend
+          value: false
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.backoffLimit
+          value: 1
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.restartPolicy
+          value: OnFailure
+        documentIndex: 0
+
+  - it: keeps the shared pod template (env, securityContext) inside the jobTemplate
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: TZ
+            value: America/Chicago
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.securityContext.fsGroup
+          value: 1000
+        documentIndex: 0
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.serviceAccountName
+          value: default
+        documentIndex: 0

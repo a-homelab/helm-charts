@@ -1,0 +1,13 @@
+components:
+  main:
+    sidecars:
+      metrics:
+        image:
+          repository: prom/exporter
+        ports:
+          metrics:
+            port: 9090
+    services:
+      main:
+        ports:
+          metrics: {}

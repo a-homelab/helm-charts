@@ -1,0 +1,22 @@
+# Turn the default main component into a CronJob. The Service and route
+# are dropped; only the CronJob (and SA + PVC) render.
+components:
+  main:
+    kind: CronJob
+    cronjob:
+      schedule: "0 3 * * *"
+      timeZone: America/Chicago
+      concurrencyPolicy: Forbid
+      suspend: false
+    job:
+      backoffLimit: 1
+    services:
+      main:
+        enabled: false
+    routes:
+      main:
+        enabled: false
+    pod:
+      volumes:
+        config: ~
+    serviceAccount: ~

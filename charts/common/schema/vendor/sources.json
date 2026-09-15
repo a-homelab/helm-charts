@@ -1,0 +1,82 @@
+{
+  "kubernetes-1.31.0.json": {
+    "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/1360e239a56dcf2e5c7f99e61ccbaca1ea07036a/v1.31.0/_definitions.json",
+    "sha256": "c588bcd318298193c3774dbe58d2e2356b8e847eafa2a1d53c52bf4eea089517"
+  },
+  "kubernetes-1.32.0.json": {
+    "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/1360e239a56dcf2e5c7f99e61ccbaca1ea07036a/v1.32.0/_definitions.json",
+    "sha256": "9963f50d824263f4b44860c6a6f72d5489cdb8bef01cfcdb9a87ed7f3af16e9b"
+  },
+  "kubernetes-1.33.0.json": {
+    "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/1360e239a56dcf2e5c7f99e61ccbaca1ea07036a/v1.33.0/_definitions.json",
+    "sha256": "58ea1d4c5b1c7d13fecab9aaad1a2a3187607b704219ddf1794211bfcb3cdb12"
+  },
+  "kubernetes-1.34.0.json": {
+    "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/1360e239a56dcf2e5c7f99e61ccbaca1ea07036a/v1.34.0/_definitions.json",
+    "sha256": "20c1170fc31e4e0021067e9d9c4969eee2ad54bbf851cb83239d69438a3de774"
+  },
+  "kubernetes-1.35.0.json": {
+    "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/1360e239a56dcf2e5c7f99e61ccbaca1ea07036a/v1.35.0/_definitions.json",
+    "sha256": "8390593209c0aa7d759c14b4f8609f2f7b1ecb010d1b99cf1ce29643a14870bb"
+  },
+  "kubernetes-1.36.0.json": {
+    "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/1360e239a56dcf2e5c7f99e61ccbaca1ea07036a/v1.36.0/_definitions.json",
+    "sha256": "a9e98cdc6ab09980f23b5e987a5f11d0ec1fc838187efb92f347ccf38ed8fd65"
+  },
+  "kubernetes-1.37.0.json": {
+    "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/1360e239a56dcf2e5c7f99e61ccbaca1ea07036a/v1.37.0/_definitions.json",
+    "sha256": "e1d22fd4a24696a48ed62cbc5facd39b3ff64293f8605b0dc6e7df0f32ed0c40"
+  },
+  "certificates.yaml": {
+    "url": "https://github.com/cert-manager/cert-manager/releases/download/v1.21.2/cert-manager.crds.yaml",
+    "sha256": "262fef78478492cd35b73a1b227106b7802f9c056361d1f561d04b32d751337f"
+  },
+  "gateway-httproutes.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml",
+    "sha256": "b53571cb0ebec76f61e42ef634f10dd53988982ecbc23f137f61ae560978fb60"
+  },
+  "gateway-grpcroutes.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/standard/gateway.networking.k8s.io_grpcroutes.yaml",
+    "sha256": "62c22830b25e30ef5fd725f95d04d1f38e037a947d557115df83fa41dac20a79"
+  },
+  "gateway-tlsroutes.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/standard/gateway.networking.k8s.io_tlsroutes.yaml",
+    "sha256": "32e2f858418df10f30d7fd919c810138de12734ceca4f83e4e061d9f309a7423"
+  },
+  "gateway-tcproutes.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/experimental/gateway.networking.k8s.io_tcproutes.yaml",
+    "sha256": "ad8cd724a575a9d425dad0cb9c83d5fdb0333c718dbb657d633087bb74bc9019"
+  },
+  "gateway-udproutes.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/experimental/gateway.networking.k8s.io_udproutes.yaml",
+    "sha256": "40b220b094c30a63c39545865feb5b9709e9db407ea61df23a9da4bc61956b2b"
+  },
+  "gateway-listenersets.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/standard/gateway.networking.k8s.io_listenersets.yaml",
+    "sha256": "3d1dec3c5dd0ed432a38c85dcb480d54827d84fa9141e7886148fdd7cf0049a9"
+  },
+  "gateway-gateways.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/standard/gateway.networking.k8s.io_gateways.yaml",
+    "sha256": "2377a440b259c47d0fe5c052b5cc0fb7d2a497718392b1043a985b4bdb5a3d9f"
+  },
+  "gateway-gatewayclasses.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml",
+    "sha256": "7b84226d27349bf2a15101242197aa7071962d4721714c1c7aabba57c57f81d1"
+  },
+  "gateway-referencegrants.yaml": {
+    "url": "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.5.0/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml",
+    "sha256": "b777920af820b1a61e0cf9f141f14c09f61338d848abfed177ade3629481c4fe"
+  },
+  "servicemonitors.yaml": {
+    "url": "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.0/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml",
+    "sha256": "10a5f90038608d9a2758d5a8700e1be5adbaff5d6355a52fa7b6e8488b71156d"
+  },
+  "podmonitors.yaml": {
+    "url": "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.94.0/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml",
+    "sha256": "96fcdcd7f9b4e3f37d8fd1e0848d3cfd25de6691ca8412c4f5db294027574242"
+  },
+  "externalsecrets.yaml": {
+    "url": "https://raw.githubusercontent.com/external-secrets/external-secrets/helm-chart-2.10.0/deploy/crds/bundle.yaml",
+    "sha256": "948a27467c69d01db0c4d1975a1409cfeb6716aa5a3278b3de91aeb7569ec151"
+  }
+}

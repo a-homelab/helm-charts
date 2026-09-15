@@ -1,0 +1,22 @@
+name: Test Charts
+
+on:
+  pull_request:
+    paths:
+      - "charts/**"
+      - "scripts/**"
+      - ".github/workflows/test-common.yaml"
+      - ".github/workflows/test-charts.yaml"
+  push:
+    branches:
+      - main
+      - feat/common-v2
+    paths:
+      - "charts/**"
+      - "scripts/**"
+      - ".github/workflows/test-common.yaml"
+      - ".github/workflows/test-charts.yaml"
+
+jobs:
+  test:
+    uses: ./.github/workflows/test-common.yaml

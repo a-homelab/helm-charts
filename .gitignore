@@ -9,6 +9,7 @@ dist/
 **/charts/*.tgz
 
 # End of https://www.gitignore.io/api/helm
+charts/common-tests/charts/
 
 # Created from https://github.com/github/gitignore/blob/main/Global/Agents.gitignore
 
@@ -85,3 +86,6 @@ gemini-debug.log
 
 # Additions on top of the upstream template
 .claude/worktrees/
+
+__pycache__/
+.pytest_cache/
