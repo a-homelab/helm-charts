@@ -40,7 +40,7 @@ through a deployment benchmark.
 | Checksums could miss changes to templated config. | The checksum helper hashes rendered ConfigMap data. |
 | Per-component entrypoints lacked a shared-resource counterpart. | `common.resources` emits app/raw resources once. |
 | Migration normalization hid meaningful empty objects. | Only known metadata/container-resource empties are normalized; removal of `emptyDir: {}` remains a real difference. |
-| Stable publishing depended only on lint. | Both publication workflows depend on the shared validation workflow. The breaking chart receives a new alpha.2 version and consumers pin it. |
+| Stable publishing depended only on lint. | Publication depends on the shared validation workflow. The breaking chart receives a new alpha.2 version and consumers pin it. |
 
 ## Additional gaps closed
 
@@ -55,9 +55,8 @@ through a deployment benchmark.
   kinds, supporting resources, and invalid native/CEL cases.
 - Istio 1.31 traffic through direct and ListenerSet routes, named Service backend
   resolution, unauthorized ListenerSet rejection, cross-namespace ReferenceGrant enforcement and RBAC permission checks.
-- Publishing fails closed on reused versions, registry errors or absent immutable
-  policies. The companion Harbor GitOps job establishes and reconciles those
-  policies. Publication workflows share concurrency and depend on the full suite.
+- Main-branch publication depends on the full validation suite and uses ordinary
+  Helm package/push commands. Harbor owns native tag-policy enforcement.
 
 ## Platform boundaries
 
@@ -75,9 +74,6 @@ through a deployment benchmark.
 - Workload selector changes require recreation of preexisting controllers. Helm
   coalesces structured nulls before templates run; component `remove` and literal
   raw manifests preserve deletion intent and literal nulls respectively.
-- Registry policy activation is separate from the chart implementation. Deploy
-  the Harbor reconciliation before publishing; this review does not deploy a
-  registry policy or chart release.
 
 Consumer updates cover Blender, Mi Casa and Mi Casa Shared, plus the Blender
 GitOps values. The older application charts still depend on the legacy library;
@@ -86,16 +82,13 @@ their values-v2 files are migration examples, not silently upgraded deployments.
 ## Verification
 
 - 80 Helm unit tests pass.
-- 69 common integration tests and 14 release guard tests pass with both Helm
-  3.22.0 and 4.3.0 (83 tests per version).
+- 69 common integration tests pass with both Helm 3.22.0 and 4.3.0.
 - Seven Blender tests and seven consumer render scenarios pass; migration
   examples are included in the common integration suite.
 - Kubernetes 1.31.9, 1.36.4 and 1.37.0 admit all five workload kinds and the
   supporting-resource fixture, and reject the invalid native/CEL cases.
 - Istio 1.31.0 passes direct/ListenerSet HTTP traffic, named backend, RBAC,
   forbidden ListenerSet and cross-namespace ReferenceGrant tests.
-- Harbor reconciliation has three passing tests for idempotence, enabling its
-  existing rule, preserving unrelated rules and pagination. Its three rendered
-  Kubernetes objects validate; Helm lint and workflow actionlint pass.
+- Helm lint and workflow actionlint pass.
 - Checksum-locked output snapshots reproduce, and generated consumer schemas
   match the canonical input contract.

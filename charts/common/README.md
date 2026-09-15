@@ -490,14 +490,11 @@ Upstream schema URLs and SHA-256 digests live in `schema/vendor/sources.json`.
 committed output snapshots and rejects changed upstream bytes. Vendor snapshots
 are excluded from the Helm archive; consumer input schemas are self-contained.
 
-Both publication workflows require validation, share a publication concurrency
-group, and check Harbor before pushing. A preexisting chart version, unreadable
-registry, or missing immutable-tag policy blocks publication. The Harbor resources
-chart in kubernetes-manifests reconciles an all-tags immutable rule for the
-`common` repository in `helm` and `helm-internal`, using the existing admin Secret.
-Deploy that GitOps change before publishing; CI credentials must be able to read
-project details and immutable rules. Every published change needs a new chart
-version and updated consumer pins.
+Pull requests run the validation suite. After merge, the main-branch publishing
+workflow packages the chart and pushes it with Helm. Chart versions and consumer
+dependency pins remain explicit; publish changes under a new chart version.
+Registry tag policies are configured and enforced natively in Harbor. The chart
+and CI do not create policies, manage robot permissions, or call Harbor's admin API.
 
 ## Migrating from alpha.1
 

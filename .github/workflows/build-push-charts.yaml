@@ -57,16 +57,6 @@ jobs:
           HELM_INTERNAL_REGISTRY_USERNAME: ${{ secrets.HELM_INTERNAL_REGISTRY_USERNAME }}
           HELM_INTERNAL_REGISTRY_PASSWORD: ${{ secrets.HELM_INTERNAL_REGISTRY_PASSWORD }}
 
-      - name: Require immutable registry policy and a new chart version
-        run: |-
-          python -m pip install requests==2.32.5
-          python scripts/check_chart_release.py --registry https://registry.benfu.me --project "${HARBOR_PROJECT}" --chart common --version "${CHART_VERSION}"
-        env:
-          HARBOR_USERNAME: ${{ secrets.HELM_INTERNAL_REGISTRY_USERNAME }}
-          HARBOR_PASSWORD: ${{ secrets.HELM_INTERNAL_REGISTRY_PASSWORD }}
-          CHART_VERSION: ${{ steps.extract-version.outputs.chart-version }}
-          HARBOR_PROJECT: ${{ matrix.chart.registry == 'public' && 'helm' || 'helm-internal' }}
-
       - name: Push chart
         if: matrix.chart.registry == 'public'
         run: |-
