@@ -1,1 +1,1 @@
-{{- include "common.hpa" (dict "rootCtx" $ "hpaValues" $.Values.dashboard "componentName" "dashboard") -}}
+{{- include "common.hpa" (dict "rootCtx" $ "hpaValues" $.Values.relay "componentName" "relay") -}}
