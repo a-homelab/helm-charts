@@ -9,7 +9,6 @@ components:
         limits:
           nvidia.com/gpu: 1
     pod:
-      runtimeClassName: nvidia
       tolerations:
         nvidia:
           key: nvidia.com/gpu

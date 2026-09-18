@@ -47,7 +47,7 @@ def test_nvidia_and_mcp_example():
     )
     pod = resources["Deployment"]["spec"]["template"]["spec"]
     container = pod["containers"][0]
-    assert pod["runtimeClassName"] == "nvidia"
+    assert not pod.get("runtimeClassName")
     assert container["resources"]["requests"]["nvidia.com/gpu"] == 1
     assert container["resources"]["limits"]["nvidia.com/gpu"] == 1
     env = {item["name"]: item["value"] for item in container["env"]}
@@ -74,7 +74,7 @@ def test_nvidia_and_mcp_example():
         "components.main.deployment.strategy.type=RollingUpdate",
         "components.main.kind=StatefulSet",
         "components.main.hpa.enabled=true",
-        "mcp.revision=main",
+        "mcp.version=main",
         "mcp.sha256=bad",
     ],
 )
@@ -136,7 +136,7 @@ def test_prepare_inherits_image_and_accepts_resource_overrides():
 
 
 def test_disabled_mcp_does_not_require_valid_pins():
-    resources = render("--set", "mcp.revision=unused", "--set", "mcp.sha256=unused")
+    resources = render("--set", "mcp.version=unused", "--set", "mcp.sha256=unused")
     pod = resources["Deployment"]["spec"]["template"]["spec"]
     env = {item["name"]: item["value"] for item in pod["initContainers"][0]["env"]}
     assert env["MCP_ENABLED"] == "false"

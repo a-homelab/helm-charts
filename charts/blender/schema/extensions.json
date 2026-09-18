@@ -7,7 +7,7 @@
         "enabled": {
           "type": "boolean"
         },
-        "revision": {
+        "version": {
           "type": "string"
         },
         "sha256": {
@@ -16,7 +16,7 @@
       },
       "required": [
         "enabled",
-        "revision",
+        "version",
         "sha256"
       ]
     }
@@ -101,8 +101,8 @@
         "properties": {
           "mcp": {
             "properties": {
-              "revision": {
-                "pattern": "^[a-f0-9]{40}$"
+              "version": {
+                "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
               },
               "sha256": {
                 "pattern": "^[a-f0-9]{64}$"

@@ -1,7 +1,7 @@
 mcp:
   enabled: false
-  revision: 5f8ddaf6e987c4aa0c3467fcc548838b28f64477
-  sha256: f43469c8518c7021e0060e32cfe52e3beb126b0f62fbae7293106642a3ebda89
+  version: 1.0.3
+  sha256: a7a9da816192502e5a0a202a396444e266b47d8fc4f74ad4698048bd43040707
 
 appResources:
   configMap:
@@ -23,7 +23,6 @@ appResources:
           requests:
             storage: 10Gi
         accessModes: [ReadWriteOnce]
-      component: main
     workspace:
       metadata:
         annotations:
@@ -34,7 +33,6 @@ appResources:
           requests:
             storage: 50Gi
         accessModes: [ReadWriteOnce]
-      component: main
 components:
   main:
     kind: Deployment
@@ -45,7 +43,7 @@ components:
     container:
       image:
         repository: lscr.io/linuxserver/blender
-        tag: sha256:7dbfd0af8e75cde6fbe80cd0021a4819269d1d2fa9d854455c0fa18ffa14b118
+        tag: 5.2.2-ls240
       env:
         PUID: "1000"
         PGID: "1000"
@@ -98,7 +96,7 @@ components:
           PUID: '{{ .Values.components.main.container.env.PUID }}'
           PGID: '{{ .Values.components.main.container.env.PGID }}'
           MCP_ENABLED: '{{ .Values.mcp.enabled }}'
-          MCP_REVISION: '{{ .Values.mcp.revision }}'
+          MCP_VERSION: '{{ .Values.mcp.version }}'
           MCP_SHA256: '{{ .Values.mcp.sha256 }}'
         resources:
           requests:
