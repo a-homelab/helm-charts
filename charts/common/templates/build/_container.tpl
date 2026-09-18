@@ -83,7 +83,6 @@ Input dict:
   containerName: rendered container name
   values:        container-shaped values
   inheritImage:  main container's image dict; used when values.image.repository is empty
-  mounts:        volumeMount list assigned to this container (may be empty)
   box:           result box
 */}}
 {{- define "common.build.container" -}}
@@ -138,7 +137,8 @@ Input dict:
   {{- include "common.lib.setIf" (dict "target" $c "key" "securityContext" "value" $v.securityContext) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "lifecycle" "value" $v.lifecycle) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "restartPolicy" "value" $v.restartPolicy) -}}
-  {{- include "common.lib.setIf" (dict "target" $c "key" "volumeMounts" "value" .mounts) -}}
+  {{- include "common.lib.nativeMap" (dict "ctx" $ctx "map" $v.volumeMounts "keyField" "" "box" $b) -}}
+  {{- include "common.lib.setIf" (dict "target" $c "key" "volumeMounts" "value" $b.result) -}}
   {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $c "overrides" $v.overrides) -}}
   {{- $_ := set .box "result" $c -}}
 {{- end -}}

@@ -105,15 +105,15 @@ tests:
           count: 6
       - isKind:
           of: ConfigMap
-        documentIndex: 5
+        documentIndex: 4
       - equal:
           path: metadata.name
           value: t-common-tests-config
-        documentIndex: 5
+        documentIndex: 4
       - equal:
           path: data["config.yml"]
           value: "log: info"
-        documentIndex: 5
+        documentIndex: 4
 
   - it: tpl-renders configMap data only when opted in
     set:
@@ -128,8 +128,8 @@ tests:
       - equal:
           path: data.release
           value: t
-        documentIndex: 5
+        documentIndex: 4
       - equal:
           path: data.release
           value: "{{ .Release.Name }}"
-        documentIndex: 6
+        documentIndex: 5

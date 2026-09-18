@@ -1,182 +1,21 @@
-{{/*
-=============================================================================
-Pod building: volumes (definition + mounts in one place) and the PodSpec.
-=============================================================================
-*/}}
-
-{{/*
-common.build.volumes
-Processes pod.volumes (and, for StatefulSets, volumeClaimTemplates) into:
-  box.volumes -> pod spec volumes list
-  box.mounts  -> dict: containerName -> volumeMounts list
-  box.pvcs    -> list of {name, values} PVCs the component must emit
-Volume entry shape:
-  type: pvc | existingClaim | configMap | secret | emptyDir | hostPath | nfs | custom
-  <type-specific fields>
-  mounts:                       # map keyed by mount path
-    /some/path: {}              # -> main container
-    /other: { containers: [sidecar-name], readOnly: true, subPath: x }
-Input dict:
-  ctx:            root context
-  resourceName:   component resource name (PVC name prefix)
-  mainContainer:  name of the main container (default mount target)
-  volumes:        pod.volumes map
-  vcts:           statefulset volumeClaimTemplates map (mounts wiring only)
-  box:            result box
-*/}}
-{{- define "common.build.volumes" -}}
-  {{- $ctx := .ctx -}}
-  {{- $resourceName := .resourceName -}}
-  {{- $mainContainer := .mainContainer -}}
-  {{- $volumes := list -}}
-  {{- $mounts := dict -}}
-  {{- $pvcs := list -}}
-
-  {{- range $name, $v := (.volumes | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
-      {{- $type := $v.type | default "" -}}
-      {{- $vol := dict "name" $name -}}
-      {{- $b := dict -}}
-      {{- $where := printf "volume %q" $name -}}
-      {{- if eq $type "pvc" -}}
-        {{- if $v.ref -}}
-          {{/* shared: mount the chart-scoped appResources.pvc.<ref>; emit nothing */}}
-          {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "pvc" "key" $v.ref "where" $where "box" $b) -}}
-          {{- $claimName := include "common.appResources.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
-          {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
-        {{- else -}}
-          {{/* exclusive: component-scoped PVC, emitted with the component */}}
-          {{- $claimName := include "common.safeName" (printf "%s-%s" $resourceName $name) -}}
-          {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" $claimName) -}}
-          {{- $pvcs = append $pvcs (dict "name" $claimName "values" $v) -}}
-        {{- end -}}
-      {{- else if eq $type "existingClaim" -}}
-        {{- if not $v.claimName -}}{{- fail (printf "common: volume %q (existingClaim) must set claimName" $name) -}}{{- end -}}
-        {{- $_ := set $vol "persistentVolumeClaim" (dict "claimName" (tpl $v.claimName $ctx)) -}}
-      {{- else if eq $type "configMap" -}}
-        {{- $cmName := "" -}}
-        {{- if $v.ref -}}
-          {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "configMap" "key" $v.ref "where" $where "box" $b) -}}
-          {{- $cmName = include "common.appResources.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
-        {{- else if $v.name -}}
-          {{- $cmName = tpl $v.name $ctx -}}
-        {{- else -}}
-          {{- fail (printf "common: volume %q (configMap) must set `ref` (appResources key) or `name`" $name) -}}
-        {{- end -}}
-        {{- $src := dict "name" $cmName -}}
-        {{- include "common.lib.setIf" (dict "target" $src "key" "items" "value" $v.items) -}}
-        {{- include "common.lib.setIf" (dict "target" $src "key" "defaultMode" "value" $v.defaultMode) -}}
-        {{- $_ := set $vol "configMap" $src -}}
-      {{- else if eq $type "secret" -}}
-        {{- $secName := "" -}}
-        {{- if $v.ref -}}
-          {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "secret" "key" $v.ref "where" $where "box" $b) -}}
-          {{- $secName = include "common.appResources.name" (dict "ctx" $ctx "key" $v.ref "entry" $b.result) -}}
-        {{- else if $v.certRef -}}
-          {{/* mount the Secret an appResources.certificate entry writes */}}
-          {{- $secName = include "common.ref.tlsSecret" (list $ctx $v.certRef) -}}
-        {{- else if $v.name -}}
-          {{- $secName = tpl $v.name $ctx -}}
-        {{- else -}}
-          {{- fail (printf "common: volume %q (secret) must set `ref` (appResources key), `certRef` (certificate key) or `name`" $name) -}}
-        {{- end -}}
-        {{- $src := dict "secretName" $secName -}}
-        {{- include "common.lib.setIf" (dict "target" $src "key" "items" "value" $v.items) -}}
-        {{- include "common.lib.setIf" (dict "target" $src "key" "defaultMode" "value" $v.defaultMode) -}}
-        {{- $_ := set $vol "secret" $src -}}
-      {{- else if eq $type "emptyDir" -}}
-        {{- $src := dict -}}
-        {{- include "common.lib.setIf" (dict "target" $src "key" "medium" "value" $v.medium) -}}
-        {{- include "common.lib.setIf" (dict "target" $src "key" "sizeLimit" "value" $v.sizeLimit) -}}
-        {{- $_ := set $vol "emptyDir" $src -}}
-      {{- else if eq $type "hostPath" -}}
-        {{- if not (hasKey $v "path") -}}{{- fail (printf "common: volume %q (hostPath) must set path" $name) -}}{{- end -}}
-        {{- $src := dict "path" (tpl $v.path $ctx) -}}
-        {{- include "common.lib.setIf" (dict "target" $src "key" "type" "value" $v.hostPathType) -}}
-        {{- $_ := set $vol "hostPath" $src -}}
-      {{- else if eq $type "nfs" -}}
-        {{- if or (not $v.server) (not $v.path) -}}{{- fail (printf "common: volume %q (nfs) must set server and path" $name) -}}{{- end -}}
-        {{- $_ := set $vol "nfs" (dict "server" $v.server "path" $v.path) -}}
-      {{- else if eq $type "custom" -}}
-        {{- if not $v.spec -}}{{- fail (printf "common: volume %q (custom) must set spec" $name) -}}{{- end -}}
-        {{- include "common.lib.merge" (dict "base" $vol "overlay" $v.spec) -}}
-      {{- else -}}
-        {{- fail (printf "common: volume %q has unknown type %q" $name $type) -}}
-      {{- end -}}
-      {{- $volumes = append $volumes $vol -}}
-      {{- include "common.build.mounts" (dict "volName" $name "entry" $v "mainContainer" $mainContainer "mounts" $mounts) -}}
-    {{- end -}}
-  {{- end -}}
-
-  {{/* StatefulSet volumeClaimTemplates: mounts wiring only (no pod volume). */}}
-  {{- range $name, $v := (.vcts | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
-      {{- include "common.build.mounts" (dict "volName" $name "entry" $v "mainContainer" $mainContainer "mounts" $mounts) -}}
-    {{- end -}}
-  {{- end -}}
-
-  {{- $_ := set .box "volumes" $volumes -}}
-  {{- $_ := set .box "mounts" $mounts -}}
-  {{- $_ := set .box "pvcs" $pvcs -}}
-{{- end -}}
-
-{{/*
-common.build.mounts (internal): wire one volume's mounts map into the
-per-container mounts accumulator dict.
-*/}}
-{{- define "common.build.mounts" -}}
-  {{- $volName := .volName -}}
-  {{- $mainContainer := .mainContainer -}}
-  {{- $mounts := .mounts -}}
-  {{- range $path, $m := (.entry.mounts | default dict) -}}
-    {{- if ne (kindOf $m) "invalid" -}}
-      {{- $m = $m | default dict -}}
-      {{- $vm := dict "name" $volName "mountPath" $path -}}
-      {{- include "common.lib.setIf" (dict "target" $vm "key" "readOnly" "value" $m.readOnly) -}}
-      {{- include "common.lib.setIf" (dict "target" $vm "key" "subPath" "value" $m.subPath) -}}
-      {{- include "common.lib.setIf" (dict "target" $vm "key" "subPathExpr" "value" $m.subPathExpr) -}}
-      {{- include "common.lib.setIf" (dict "target" $vm "key" "mountPropagation" "value" $m.mountPropagation) -}}
-      {{- $targets := $m.containers | default (list $mainContainer) -}}
-      {{- range $t := $targets -}}
-        {{- $existing := get $mounts $t | default list -}}
-        {{- $_ := set $mounts $t (append $existing $vm) -}}
-      {{- end -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-
-{{/*
-common.build.podSpec -> box.result (PodSpec dict), box.pvcs (PVCs to emit)
-Assembles containers (main and sidecars sorted by weight then key), initContainers
-(sorted by weight then key), volumes, and all
-pod-level options. Applies pod.overrides last.
-Input dict: { ctx, name (component name), component (resolved), box }
-*/}}
 {{- define "common.build.podSpec" -}}
   {{- $ctx := .ctx -}}
   {{- $name := .name -}}
   {{- $comp := .component -}}
   {{- $pod := $comp.pod | default dict -}}
   {{- $b := dict -}}
-  {{- $resourceName := include "common.componentName" (dict "ctx" $ctx "name" $name) -}}
-
-  {{- $vcts := dict -}}
-  {{- if eq $comp.kind "StatefulSet" -}}
-    {{- $vcts = get ($comp.statefulset | default dict) "volumeClaimTemplates" | default dict -}}
-  {{- end -}}
-  {{- include "common.build.volumes" (dict "ctx" $ctx "resourceName" $resourceName "mainContainer" $name "volumes" $pod.volumes "vcts" $vcts "box" $b) -}}
-  {{- $volumes := $b.volumes -}}
-  {{- $mounts := $b.mounts -}}
-  {{- $pvcs := $b.pvcs -}}
+  {{- include "common.lib.nativeMap" (dict "ctx" $ctx "map" $pod.volumes "keyField" "name" "box" $b) -}}
+  {{- $volumes := $b.result -}}
 
   {{/* main container, then sidecars sorted by key */}}
   {{- $containers := dict -}}
-  {{- include "common.build.container" (dict "ctx" $ctx "containerName" $name "values" $comp.container "mounts" (get $mounts $name) "box" $b) -}}
+  {{- include "common.build.container" (dict "ctx" $ctx "containerName" $name "values" $comp.container "box" $b) -}}
   {{- $_ := set $b.result "weight" (dig "weight" 100 $comp.container) -}}
   {{- $_ := set $containers $name $b.result -}}
   {{- range $scName, $sc := ($comp.sidecars | default dict) -}}
     {{- if ne (kindOf $sc) "invalid" -}}
-      {{- include "common.build.container" (dict "ctx" $ctx "containerName" $scName "values" $sc "inheritImage" $comp.container.image "mounts" (get $mounts $scName) "box" $b) -}}
+      {{- if eq $scName $name -}}{{- fail (printf "common: container key %q duplicates the main container" $name) -}}{{- end -}}
+      {{- include "common.build.container" (dict "ctx" $ctx "containerName" $scName "values" $sc "inheritImage" $comp.container.image "box" $b) -}}
       {{- $_ := set $b.result "weight" (dig "weight" 100 $sc) -}}
       {{- $_ := set $containers $scName $b.result -}}
     {{- end -}}
@@ -187,7 +26,8 @@ Input dict: { ctx, name (component name), component (resolved), box }
   {{- $initContainers := dict -}}
   {{- range $icName, $ic := ($comp.initContainers | default dict) -}}
     {{- if ne (kindOf $ic) "invalid" -}}
-      {{- include "common.build.container" (dict "ctx" $ctx "containerName" $icName "values" $ic "inheritImage" $comp.container.image "mounts" (get $mounts $icName) "box" $b) -}}
+      {{- if eq $icName $name -}}{{- fail (printf "common: container key %q duplicates the main container" $name) -}}{{- end -}}
+      {{- include "common.build.container" (dict "ctx" $ctx "containerName" $icName "values" $ic "inheritImage" $comp.container.image "box" $b) -}}
       {{- $_ := set $b.result "weight" (dig "weight" 100 $ic) -}}
       {{- $_ := set $initContainers $icName $b.result -}}
     {{- end -}}
@@ -195,14 +35,6 @@ Input dict: { ctx, name (component name), component (resolved), box }
 
   {{- include "common.lib.mapToList" (dict "map" $initContainers "box" $b) -}}
   {{- $initContainers = $b.result -}}
-  {{- $targets := dict $name true -}}
-  {{- range $key, $v := merge (deepCopy ($comp.sidecars | default dict)) ($comp.initContainers | default dict) -}}
-    {{- if ne (kindOf $v) "invalid" -}}
-      {{- if eq $key $name -}}{{- fail (printf "common: container key %q duplicates the main container" $key) -}}{{- end -}}
-      {{- $_ := set $targets $key true -}}
-    {{- end -}}
-  {{- end -}}
-  {{- range $target, $_ := $mounts -}}{{- if not (hasKey $targets $target) -}}{{- fail (printf "common: mount references unknown container %q" $target) -}}{{- end -}}{{- end -}}
   {{- $spec := dict "containers" $containers -}}
   {{- include "common.lib.setIf" (dict "target" $spec "key" "initContainers" "value" $initContainers) -}}
   {{- $_ := set $spec "serviceAccountName" (include "common.resolve.serviceAccountName" (dict "ctx" $ctx "name" $name "component" $comp)) -}}
@@ -245,11 +77,10 @@ Input dict: { ctx, name (component name), component (resolved), box }
 
   {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $spec "overrides" $pod.overrides) -}}
   {{- $_ := set .box "result" $spec -}}
-  {{- $_ := set .box "pvcs" $pvcs -}}
 {{- end -}}
 
 {{/*
-common.build.podTemplate -> box.result (PodTemplateSpec dict), box.pvcs
+common.build.podTemplate -> box.result (PodTemplateSpec dict)
 */}}
 {{- define "common.build.podTemplate" -}}
   {{- $b := dict -}}
@@ -257,5 +88,4 @@ common.build.podTemplate -> box.result (PodTemplateSpec dict), box.pvcs
   {{- $meta := $b.result -}}
   {{- include "common.build.podSpec" (dict "ctx" .ctx "name" .name "component" .component "box" $b) -}}
   {{- $_ := set .box "result" (dict "metadata" $meta "spec" $b.result) -}}
-  {{- $_ := set .box "pvcs" $b.pvcs -}}
 {{- end -}}

@@ -1,8 +1,7 @@
 {{/*
 common.build.controller.statefulset -> box.result ({apiVersion, kind, spec})
 Reads the component's `statefulset` block. serviceName defaults to the
-component's Service; volumeClaimTemplates share the pvc spec builder (their
-mounts are wired into containers by common.build.volumes).
+component's Service; volumeClaimTemplates contain native PVC metadata and spec.
 */}}
 {{- define "common.build.controller.statefulset" -}}
   {{- $comp := .component -}}
@@ -25,9 +24,10 @@ mounts are wired into containers by common.build.volumes).
   {{- $vcts := list -}}
   {{- range $vctName, $vct := ($s.volumeClaimTemplates | default dict) -}}
     {{- if ne (kindOf $vct) "invalid" -}}
-      {{- include "common.build.pvcSpec" (dict "values" $vct "box" $b) -}}
-      {{- $claim := dict "metadata" (dict "name" $vctName "labels" ($vct.labels | default dict) "annotations" ($vct.annotations | default dict)) "spec" $b.result -}}
-      {{- include "common.lib.applyOverrides" (dict "ctx" $.ctx "target" $claim "overrides" $vct.overrides) -}}
+      {{- include "common.build.pvcSpec" (dict "ctx" $.ctx "values" $vct "box" $b) -}}
+      {{- $claim := dict "metadata" (merge (dict "name" $vctName) (deepCopy ($vct.metadata | default dict))) "spec" $b.result -}}
+      {{- if hasKey ($vct.metadata | default dict) "name" -}}{{- fail "common: volumeClaimTemplate metadata.name comes from its map key" -}}{{- end -}}
+      {{- $claim = tpl (toYaml $claim) $.ctx | fromYaml -}}
       {{- if ne $claim.metadata.name $vctName -}}{{- fail "common: volumeClaimTemplate overrides cannot change its name" -}}{{- end -}}
       {{- $vcts = append $vcts $claim -}}
     {{- end -}}

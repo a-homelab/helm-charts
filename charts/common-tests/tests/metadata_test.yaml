@@ -67,7 +67,7 @@ tests:
       - equal:
           path: metadata.labels.team
           value: media
-        documentIndex: 2
+        documentIndex: 1
       - equal:
           path: spec.template.metadata.labels.team
           value: media
@@ -102,8 +102,8 @@ tests:
       - equal:
           path: metadata.labels.team
           value: overridden
-        documentIndex: 2
+        documentIndex: 1
       - equal:
           path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
           value: t.example.com
-        documentIndex: 2
+        documentIndex: 1

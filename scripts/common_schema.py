@@ -26,6 +26,8 @@ def compose(extension=None):
                 )
             schema[key].update(extra)
         schema.setdefault("required", []).extend(extension.get("required", []))
+        if extension.get("allOf"):
+            schema.setdefault("allOf", []).extend(extension["allOf"])
     Draft7Validator.check_schema(schema)
     return schema
 
@@ -153,7 +155,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("chart", type=Path, help="Consumer chart directory")
     parser.add_argument(
-        "--extensions", type=Path, help="Additional root properties/definitions"
+        "--extensions",
+        type=Path,
+        help="Additional properties, definitions and allOf constraints",
     )
     parser.add_argument(
         "--check", action="store_true", help="Fail if the generated schema differs"

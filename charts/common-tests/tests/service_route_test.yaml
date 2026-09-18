@@ -14,14 +14,14 @@ tests:
               port: 8989
               protocol: TCP
               targetPort: http
-        documentIndex: 2
+        documentIndex: 1
       - equal:
           path: spec.selector
           value:
             app.kubernetes.io/name: common-tests
             app.kubernetes.io/instance: t
             app.kubernetes.io/component: main
-        documentIndex: 2
+        documentIndex: 1
 
   - it: uses expose for the service-side port
     set:
@@ -34,7 +34,7 @@ tests:
             port: 80
             protocol: TCP
             targetPort: http
-        documentIndex: 2
+        documentIndex: 1
       - equal:
           path: spec.template.spec.containers[0].ports[0].containerPort
           value: 8989
@@ -43,7 +43,7 @@ tests:
   - it: includes sidecar ports in the service
     set:
       components.main.routes.main.rules:
-        - backendRefs: [{port: http}]
+        - backendRefs: [port: http]
       components.main.sidecars.metrics:
         image:
           repository: prom/exporter
@@ -58,7 +58,7 @@ tests:
             port: 9090
             protocol: TCP
             targetPort: metrics
-        documentIndex: 2
+        documentIndex: 1
 
   - it: selects only explicitly listed Service ports
     values:
@@ -71,7 +71,7 @@ tests:
               port: 9090
               protocol: TCP
               targetPort: metrics
-        documentIndex: 2
+        documentIndex: 1
 
   - it: omits the service when disabled or when no ports exist
     set:
@@ -86,20 +86,20 @@ tests:
       - equal:
           path: spec.hostnames
           value: [t-common-tests.example.com]
-        documentIndex: 3
+        documentIndex: 2
       - equal:
           path: spec.parentRefs
           value:
             - name: internal
               namespace: gateways
-        documentIndex: 3
+        documentIndex: 2
       - equal:
           path: spec.rules
           value:
             - backendRefs:
                 - name: t-common-tests
                   port: 8989
-        documentIndex: 3
+        documentIndex: 2
 
   - it: tpl-renders explicit hostnames and fills backendRef defaults in rules
     set:
@@ -115,17 +115,17 @@ tests:
       - equal:
           path: spec.hostnames
           value: [app.example.com]
-        documentIndex: 3
+        documentIndex: 2
       - equal:
           path: spec.rules[0].backendRefs
           value:
             - name: t-common-tests
               port: 8989
-        documentIndex: 3
+        documentIndex: 2
       - equal:
           path: spec.rules[0].matches[0].path.value
           value: /api
-        documentIndex: 3
+        documentIndex: 2
 
   - it: attaches to explicit parentRefs keyed by gateway name
     set:
@@ -140,4 +140,4 @@ tests:
             - name: public
               namespace: gateways
               sectionName: https
-        documentIndex: 3
+        documentIndex: 2

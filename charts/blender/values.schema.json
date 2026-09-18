@@ -759,6 +759,16 @@
         },
         "overrides": {
           "$ref": "#/definitions/overrides"
+        },
+        "volumeMounts": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Map keyed by mount ID. Values use native VolumeMount fields, including explicit name and mountPath. IDs are not emitted.",
+          "additionalProperties": {
+            "$ref": "#/definitions/storage.io.k8s.api.core.v1.VolumeMount"
+          }
         }
       }
     },
@@ -1008,190 +1018,314 @@
       }
     },
     "volume": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "type"
-      ],
       "properties": {
-        "type": {
-          "enum": [
-            "pvc",
-            "existingClaim",
-            "configMap",
-            "secret",
-            "emptyDir",
-            "hostPath",
-            "nfs",
-            "custom"
-          ]
-        },
-        "size": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "storageClass": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "accessModes": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "volumeMode": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "claimName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "ref": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "Key of an appResources entry of the matching type (pvc/configMap/secret); resolves to the appResources resource name, validated at render time. For type: pvc this mounts the shared chart-scoped claim instead of emitting a component-scoped PVC."
-        },
-        "certRef": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "type: secret only \u2014 key of an appResources.certificate entry; mounts the Secret that Certificate writes"
-        },
-        "name": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "Verbatim external ConfigMap/Secret name (tpl-rendered)"
-        },
-        "items": {
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "defaultMode": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "medium": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "sizeLimit": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "path": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "hostPathType": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "server": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "spec": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "description": "Raw volume source for type: custom"
-        },
-        "labels": {
-          "$ref": "#/definitions/stringMap"
-        },
-        "annotations": {
-          "$ref": "#/definitions/stringMap"
-        },
-        "mounts": {
-          "$ref": "#/definitions/mounts"
-        },
-        "overrides": {
-          "$ref": "#/definitions/overrides"
-        }
-      }
-    },
-    "mounts": {
-      "type": "object",
-      "description": "Map keyed by mount path",
-      "additionalProperties": {
-        "anyOf": [
-          {
-            "type": "null"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "containers": {
-                "type": [
-                  "array",
-                  "null"
-                ],
-                "items": {
-                  "type": "string"
-                }
-              },
-              "readOnly": {
-                "type": [
-                  "boolean",
-                  "null"
-                ]
-              },
-              "subPath": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "subPathExpr": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "mountPropagation": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
+        "awsElasticBlockStore": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.AWSElasticBlockStoreVolumeSource"
+            },
+            {
+              "type": "null"
             }
-          }
-        ]
-      }
+          ]
+        },
+        "azureDisk": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.AzureDiskVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "azureFile": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.AzureFileVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cephfs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.CephFSVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cinder": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.CinderVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "configMap": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ConfigMapVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "csi": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.CSIVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "downwardAPI": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.DownwardAPIVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "emptyDir": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.EmptyDirVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ephemeral": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.EphemeralVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fc": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.FCVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flexVolume": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.FlexVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flocker": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.FlockerVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gcePersistentDisk": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.GCEPersistentDiskVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gitRepo": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.GitRepoVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "glusterfs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.GlusterfsVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hostPath": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.HostPathVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "image": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ImageVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "iscsi": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ISCSIVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nfs": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.NFSVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "persistentVolumeClaim": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "photonPersistentDisk": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "portworxVolume": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.PortworxVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projected": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ProjectedVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quobyte": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.QuobyteVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rbd": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.RBDVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scaleIO": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ScaleIOVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.SecretVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "storageos": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.StorageOSVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vsphereVolume": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "description": "Map value uses Kubernetes 1.37 Volume fields; name comes from the map key. Partial overlays are validated after resolution."
     },
     "deployment": {
       "type": "object",
@@ -1257,14 +1391,7 @@
             "null"
           ],
           "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/definitions/pvcEntry"
-              }
-            ]
+            "$ref": "#/definitions/claimTemplate"
           }
         },
         "service": {
@@ -1707,63 +1834,28 @@
     "pvcEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "size"
-      ],
-      "description": "PVC shape shared by appResources.pvc and statefulset.volumeClaimTemplates (mounts apply in both; labels/annotations/overrides/component apply to appResources entries)",
       "properties": {
-        "size": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "storageClass": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "accessModes": {
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "volumeMode": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "mounts": {
-          "$ref": "#/definitions/mounts"
+        "enabled": {
+          "type": "boolean"
         },
         "component": {
           "type": [
             "string",
             "null"
-          ],
-          "description": "appResources back-ref: component back-reference (naming + labels)"
+          ]
         },
-        "labels": {
-          "$ref": "#/definitions/stringMap"
+        "metadata": {
+          "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
         },
-        "annotations": {
-          "$ref": "#/definitions/stringMap"
-        },
-        "overrides": {
-          "$ref": "#/definitions/overrides"
+        "spec": {
+          "$ref": "#/definitions/storage.io.k8s.api.core.v1.PersistentVolumeClaimSpec"
         }
       }
     },
     "certificate": {
       "type": "object",
       "additionalProperties": false,
-      "description": "cert-manager.io/v1 Certificate. Defaults: issuerRef from global.certIssuer, secretName <name>-tls, dnsNames [<name>.<global.domain>]. Consume from a component via volume { type: secret, certRef: <key> }.",
+      "description": "cert-manager.io/v1 Certificate. Mount its Secret using common.ref.tlsSecret in secret.secretName.",
       "properties": {
         "dnsNames": {
           "type": [
@@ -12109,8 +12201,2523 @@
           "additionalProperties": false
         }
       }
+    },
+    "claimTemplate": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "creationTimestamp": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "deletionGracePeriodSeconds": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "deletionTimestamp": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "finalizers": {
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "generateName": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "generation": {
+              "format": "int64",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "managedFields": {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "namespace": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ownerReferences": {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "resourceVersion": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "selfLink": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "uid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false
+        },
+        "spec": {
+          "$ref": "#/definitions/storage.io.k8s.api.core.v1.PersistentVolumeClaimSpec"
+        }
+      }
+    },
+    "storage.io.k8s.api.core.v1.AWSElasticBlockStoreVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "partition": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "volumeID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.AzureDiskVolumeSource": {
+      "properties": {
+        "cachingMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "diskName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "diskURI": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.AzureFileVolumeSource": {
+      "properties": {
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shareName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.CephFSVolumeSource": {
+      "properties": {
+        "monitors": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretFile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "secretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "user": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.LocalObjectReference": {
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.CinderVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "volumeID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ConfigMapVolumeSource": {
+      "properties": {
+        "defaultMode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "defaultUser": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "items": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.api.core.v1.KeyToPath"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "optional": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.KeyToPath": {
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.CSIVolumeSource": {
+      "properties": {
+        "driver": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "nodePublishSecretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "volumeAttributes": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.DownwardAPIVolumeSource": {
+      "properties": {
+        "defaultMode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "defaultUser": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "items": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.api.core.v1.DownwardAPIVolumeFile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.DownwardAPIVolumeFile": {
+      "properties": {
+        "fieldRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ObjectFieldSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resourceFieldRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ResourceFieldSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "user": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ObjectFieldSelector": {
+      "properties": {
+        "apiVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fieldPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ResourceFieldSelector": {
+      "properties": {
+        "containerName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "divisor": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resource": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.apimachinery.pkg.api.resource.Quantity": {
+      "oneOf": [
+        {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      ]
+    },
+    "storage.io.k8s.api.core.v1.EmptyDirVolumeSource": {
+      "properties": {
+        "medium": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sizeLimit": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.api.resource.Quantity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.EphemeralVolumeSource": {
+      "properties": {
+        "volumeClaimTemplate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.PersistentVolumeClaimTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.PersistentVolumeClaimTemplate": {
+      "properties": {
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spec": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.PersistentVolumeClaimSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta": {
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "creationTimestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deletionGracePeriodSeconds": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "deletionTimestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finalizers": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "generateName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "generation": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "managedFields": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ownerReferences": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "resourceVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selfLink": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.apimachinery.pkg.apis.meta.v1.Time": {
+      "format": "date-time",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "storage.io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry": {
+      "properties": {
+        "apiVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fieldsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fieldsV1": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "manager": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subresource": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "storage.io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference": {
+      "properties": {
+        "apiVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blockOwnerDeletion": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "controller": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.PersistentVolumeClaimSpec": {
+      "properties": {
+        "accessModes": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "dataSource": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.TypedLocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dataSourceRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.TypedObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resources": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.VolumeResourceRequirements"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "storageClassName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volumeAttributesClassName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volumeMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volumeName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.TypedLocalObjectReference": {
+      "properties": {
+        "apiGroup": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.TypedObjectReference": {
+      "properties": {
+        "apiGroup": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.VolumeResourceRequirements": {
+      "properties": {
+        "limits": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.api.resource.Quantity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "requests": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.api.resource.Quantity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector": {
+      "properties": {
+        "matchExpressions": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "matchLabels": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement": {
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operator": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "values": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.FCVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lun": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "targetWWNs": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "wwids": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.FlexVolumeSource": {
+      "properties": {
+        "driver": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "options": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.FlockerVolumeSource": {
+      "properties": {
+        "datasetName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "datasetUUID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.GCEPersistentDiskVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "partition": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pdName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.GitRepoVolumeSource": {
+      "properties": {
+        "directory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "repository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.GlusterfsVolumeSource": {
+      "properties": {
+        "endpoints": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.HostPathVolumeSource": {
+      "properties": {
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ImageVolumeSource": {
+      "properties": {
+        "pullPolicy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ISCSIVolumeSource": {
+      "properties": {
+        "chapAuthDiscovery": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "chapAuthSession": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "initiatorName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "iqn": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "iscsiInterface": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lun": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "portals": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "targetPortal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.NFSVolumeSource": {
+      "properties": {
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "server": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource": {
+      "properties": {
+        "claimName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pdID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.PortworxVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "volumeID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ProjectedVolumeSource": {
+      "properties": {
+        "defaultMode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "defaultUser": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.api.core.v1.VolumeProjection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.VolumeProjection": {
+      "properties": {
+        "clusterTrustBundle": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ClusterTrustBundleProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "configMap": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ConfigMapProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "downwardAPI": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.DownwardAPIProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "podCertificate": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.PodCertificateProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.SecretProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serviceAccountToken": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.ServiceAccountTokenProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ClusterTrustBundleProjection": {
+      "properties": {
+        "labelSelector": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "optional": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "signerName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ConfigMapProjection": {
+      "properties": {
+        "items": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.api.core.v1.KeyToPath"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "optional": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.DownwardAPIProjection": {
+      "properties": {
+        "items": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.api.core.v1.DownwardAPIVolumeFile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.PodCertificateProjection": {
+      "properties": {
+        "certificateChainPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "credentialBundlePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keyPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keyType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxExpirationSeconds": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "signerName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "userAnnotations": {
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.SecretProjection": {
+      "properties": {
+        "items": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.api.core.v1.KeyToPath"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "optional": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ServiceAccountTokenProjection": {
+      "properties": {
+        "audience": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expirationSeconds": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.QuobyteVolumeSource": {
+      "properties": {
+        "group": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "registry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tenant": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volume": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.RBDVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "keyring": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "monitors": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "pool": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "user": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.ScaleIOVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gateway": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "protectionDomain": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sslEnabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "storageMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "storagePool": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "system": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volumeName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.SecretVolumeSource": {
+      "properties": {
+        "defaultMode": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "defaultUser": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "items": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/storage.io.k8s.api.core.v1.KeyToPath"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "optional": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.StorageOSVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "secretRef": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/storage.io.k8s.api.core.v1.LocalObjectReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "volumeName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volumeNamespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource": {
+      "properties": {
+        "fsType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "storagePolicyID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "storagePolicyName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "volumePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
+    },
+    "storage.io.k8s.api.core.v1.VolumeMount": {
+      "properties": {
+        "bindMountOptions": {
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "mountPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mountPropagation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "readOnly": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "recursiveReadOnly": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subPathExpr": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
-  "required": []
+  "required": [],
+  "allOf": [
+    {
+      "properties": {
+        "components": {
+          "type": "object",
+          "required": [
+            "main"
+          ],
+          "properties": {
+            "main": {
+              "type": "object",
+              "required": [
+                "kind",
+                "deployment"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "Deployment"
+                },
+                "deployment": {
+                  "type": "object",
+                  "required": [
+                    "replicas",
+                    "strategy"
+                  ],
+                  "properties": {
+                    "replicas": {
+                      "const": 1
+                    },
+                    "strategy": {
+                      "type": "object",
+                      "required": [
+                        "type"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "Recreate"
+                        }
+                      }
+                    }
+                  }
+                },
+                "hpa": {
+                  "properties": {
+                    "enabled": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "components"
+      ]
+    },
+    {
+      "if": {
+        "properties": {
+          "mcp": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "mcp"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mcp": {
+            "properties": {
+              "revision": {
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "sha256": {
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -13,7 +13,14 @@
   {{- end -}}
   {{- $names := dict -}}{{- $ports := dict -}}
   {{- $volumes := dict -}}
-  {{- range $v := ($template.spec.volumes | default list) -}}{{- $_ := set $volumes $v.name true -}}{{- end -}}
+  {{- range $v := ($template.spec.volumes | default list) -}}
+    {{- if not $v.name -}}{{- fail "common: volume name is required" -}}{{- end -}}
+    {{- if hasKey $volumes $v.name -}}{{- fail (printf "common: duplicate volume name %q" $v.name) -}}{{- end -}}
+    {{- $source := omit (deepCopy $v) "name" -}}
+    {{- include "common.lib.cleanNulls" $source -}}
+    {{- if ne (len $source) 1 -}}{{- fail (printf "common: volume %q requires exactly one source" $v.name) -}}{{- end -}}
+    {{- $_ := set $volumes $v.name true -}}
+  {{- end -}}
   {{- range $v := ($m.spec.volumeClaimTemplates | default list) -}}
     {{- if hasKey $volumes $v.metadata.name -}}{{- fail (printf "common: volumeClaimTemplate %q duplicates a pod volume" $v.metadata.name) -}}{{- end -}}
     {{- $_ := set $volumes $v.metadata.name true -}}
@@ -29,6 +36,8 @@
     {{- end -}}
     {{- $paths := dict -}}
     {{- range $mount := ($c.volumeMounts | default list) -}}
+      {{- if or (not $mount.name) (not $mount.mountPath) -}}{{- fail (printf "common: container %s volumeMounts require name and mountPath" $c.name) -}}{{- end -}}
+      {{- if and $mount.subPath $mount.subPathExpr -}}{{- fail "common: subPath and subPathExpr are mutually exclusive" -}}{{- end -}}
       {{- if not (hasKey $volumes $mount.name) -}}{{- fail (printf "common: container %s mounts unknown volume %s" $c.name $mount.name) -}}{{- end -}}
       {{- if hasKey $paths $mount.mountPath -}}{{- fail (printf "common: container %s mounts path %s more than once" $c.name $mount.mountPath) -}}{{- end -}}
       {{- $_ := set $paths $mount.mountPath true -}}

@@ -268,15 +268,23 @@ def main():
         for kind in ["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"]:
             component = {
                 "kind": kind,
-                "container": values["components"]["main"]["container"],
+                "container": copy.deepcopy(values["components"]["main"]["container"]),
             }
             if kind == "CronJob":
                 component["cronjob"] = {"schedule": "0 * * * *"}
             if kind == "StatefulSet":
                 component["statefulset"] = {
                     "volumeClaimTemplates": {
-                        "data": {"size": "1Gi", "mounts": {"/data": {}}}
+                        "data": {
+                            "spec": {
+                                "accessModes": ["ReadWriteOnce"],
+                                "resources": {"requests": {"storage": "1Gi"}},
+                            }
+                        }
                     }
+                }
+                component["container"]["volumeMounts"] = {
+                    "data": {"name": "data", "mountPath": "/data"}
                 }
             if kind == "Deployment":
                 component["hpa"] = {"enabled": True, "min": 1, "max": 3}
@@ -307,8 +315,44 @@ def main():
                 "-",
                 data=controller_docs,
             )
+        storage_values = ROOT / "charts/common-tests/ci/storage-values.yaml"
+        (chart / "values.yaml").write_text(storage_values.read_text())
+        storage_docs = run(
+            "helm",
+            "template",
+            "storage-mounts",
+            str(chart),
+            "-n",
+            "apps",
+            "--kube-version",
+            version,
+        ).stdout
+        storage_job = next(
+            d for d in yaml.safe_load_all(storage_docs) if d and d["kind"] == "Job"
+        )
+        validate_manifest(storage_job, version)
+        run(*kube, "apply", "-f", "-", data=storage_docs)
+        run(
+            *kube,
+            "wait",
+            "--for=condition=Complete",
+            "job/" + storage_job["metadata"]["name"],
+            "-n",
+            "apps",
+            "--timeout=150s",
+        )
+        output = run(
+            *kube,
+            "logs",
+            "job/" + storage_job["metadata"]["name"],
+            "-n",
+            "apps",
+            "-c",
+            "main",
+        ).stdout
+        assert "Independent volume mounts passed" in output, output
         print(
-            f"PASS {version}: {len(docs)} admitted resources plus all five workload kinds; invalid native and Gateway CEL cases rejected",
+            f"PASS {version}: {len(docs)} admitted resources plus all five workload kinds; invalid native and Gateway CEL cases rejected; init/main read-only mounts verified",
             flush=True,
         )
         if not args.gateway:

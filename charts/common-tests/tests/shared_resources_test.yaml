@@ -235,10 +235,16 @@ tests:
 
   - it: fails on a dangling volume ref
     set:
-      components.api.pod.volumes.media.ref: nonexistent
+      components:
+        api:
+          pod:
+            volumes:
+              media:
+                persistentVolumeClaim:
+                  claimName: '{{ include "common.ref" (list . "pvc" "nonexistent") }}'
     asserts:
       - failedTemplate:
-          errorMessage: 'common: volume "media" references appResources.pvc.nonexistent, which is not defined'
+          errorMessage: 'common: common.ref references appResources.pvc.nonexistent, which is not defined'
 
   - it: fails on a backendRef to an unknown component
     set:

@@ -1,0 +1,54 @@
+components:
+  main:
+    kind: Job
+    serviceAccount:
+      enabled: false
+    services:
+      main:
+        enabled: false
+    routes:
+      main:
+        enabled: false
+    container:
+      image:
+        repository: busybox
+        tag: 1.37.0
+      command: [sh, -ec]
+      args:
+        - |
+          test "$(cat /workspace/exports/marker)" = prepared
+          test "$(cat /exports/marker)" = prepared
+          if touch /workspace/should-be-read-only; then exit 1; fi
+          if touch /exports/should-be-read-only; then exit 1; fi
+          echo 'Independent volume mounts passed'
+      volumeMounts:
+        config: null
+        workspace:
+          name: workspace
+          mountPath: /workspace
+          readOnly: true
+        exports:
+          name: workspace
+          mountPath: /exports
+          subPath: exports
+          readOnly: true
+    initContainers:
+      prepare:
+        command: [sh, -ec]
+        args: ['mkdir -p /workspace/exports; echo prepared > /workspace/exports/marker']
+        volumeMounts:
+          workspace:
+            name: workspace
+            mountPath: /workspace
+            readOnly: false
+    pod:
+      volumes:
+        config: null
+        workspace:
+          emptyDir: {}
+    job:
+      backoffLimit: 0
+      activeDeadlineSeconds: 120
+appResources:
+  pvc:
+    config: null

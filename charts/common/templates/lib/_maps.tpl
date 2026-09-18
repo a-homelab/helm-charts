@@ -74,3 +74,18 @@ Input dict: { target: <dict>, key: <string>, value: <any> }
     {{- $_ := set .target .key .value -}}
   {{- end -}}
 {{- end -}}
+
+{{/* Preserve native fields and template references at the map-to-list boundary. */}}
+{{- define "common.lib.nativeMap" -}}
+  {{- $entries := dict -}}
+  {{- range $key, $value := (.map | default dict) -}}
+    {{- if ne (kindOf $value) "invalid" -}}
+      {{- $entry := tpl (toYaml $value) $.ctx | fromYaml -}}
+      {{- if $entry.Error -}}{{- fail (printf "common: invalid native entry %q: %s" $key $entry.Error) -}}{{- end -}}
+      {{- include "common.lib.cleanNulls" $entry -}}
+      {{- if and $.keyField (hasKey $entry $.keyField) -}}{{- fail (printf "common: entry %q gets %s from its map key" $key $.keyField) -}}{{- end -}}
+      {{- $_ := set $entries $key $entry -}}
+    {{- end -}}
+  {{- end -}}
+  {{- include "common.lib.mapToList" (dict "map" $entries "keyField" .keyField "box" .box) -}}
+{{- end -}}

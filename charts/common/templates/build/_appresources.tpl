@@ -6,9 +6,8 @@ Types: configMap, secret, externalSecret, pvc, certificate, route, listenerSet.
 Scoping: entries are app-scoped by default (named <fullname>-<key>, no
 component label). An entry may declare `component: <name>` to become
 component-scoped: named <componentResourceName>-<key> and stamped with
-that component's labels. Components consume appResources by KEY (volume
-ref:, certRef:, env/envFrom ref:, backendRef component:, or the
-common.ref template) - never by rendered name.
+that component's labels. Components resolve managed resources with common.ref in native volume fields,
+env/envFrom ref entries, or backend references.
 
 Each builder -> box.result (list of manifest dicts).
 =============================================================================
@@ -116,11 +115,11 @@ Input dict: { ctx, components (resolved map), box }
 
   {{- range $name, $v := ($appResources.pvc | default dict) -}}
     {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
-      {{- include "common.build.pvcSpec" (dict "values" $v "box" $b) -}}
+      {{- include "common.build.pvcSpec" (dict "ctx" $ctx "values" $v "box" $b) -}}
       {{- $spec := $b.result -}}
       {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $manifest := dict "apiVersion" "v1" "kind" "PersistentVolumeClaim" "metadata" $m.meta "spec" $spec -}}
-      {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" $v.overrides) -}}
+      {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" (dict "metadata" ($v.metadata | default dict))) -}}
       {{- $out = append $out $manifest -}}
     {{- end -}}
   {{- end -}}

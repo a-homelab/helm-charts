@@ -33,26 +33,40 @@ components:
           port: 8081
         http-web:
           port: 8080
+      volumeMounts:
+        data:
+          name: data
+          mountPath: /data
+        rcp:
+          name: rcp
+          mountPath: /dev/ttyACM0
+        tunnel:
+          name: tunnel
+          mountPath: /dev/net/tun
     pod:
       volumes:
         data:
-          type: pvc
-          size: 1Gi
-          storageClass: my-storage-class
-          mounts:
-            /data: {}
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "data") }}'
         rcp:
-          type: hostPath
-          path: "{{ .Values.rcpDeviceHostPath }}"
-          hostPathType: CharDevice
-          mounts:
-            /dev/ttyACM0: {}
+          hostPath:
+            path: "{{ .Values.rcpDeviceHostPath }}"
+            type: CharDevice
         tunnel:
-          type: hostPath
-          path: /dev/net/tun
-          hostPathType: CharDevice
-          mounts:
-            /dev/net/tun: {}
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
     deployment:
       strategy:
         type: Recreate
+appResources:
+  pvc:
+    data:
+      spec:
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: my-storage-class
+        accessModes:
+          - ReadWriteOnce
+      component: main

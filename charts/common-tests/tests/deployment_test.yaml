@@ -14,16 +14,16 @@ tests:
         documentIndex: 0
       - isKind:
           of: PersistentVolumeClaim
-        documentIndex: 1
+        documentIndex: 4
       - isKind:
           of: Service
-        documentIndex: 2
+        documentIndex: 1
       - isKind:
           of: HTTPRoute
-        documentIndex: 3
+        documentIndex: 2
       - isKind:
           of: ServiceAccount
-        documentIndex: 4
+        documentIndex: 3
 
   - it: names main-component resources with the bare fullname
     asserts:
@@ -113,7 +113,12 @@ tests:
 
   - it: skips disabled components entirely
     set:
-      components.main.enabled: false
+      components:
+        main:
+          enabled: false
+      appResources:
+        pvc:
+          config:
     asserts:
       - hasDocuments:
           count: 0

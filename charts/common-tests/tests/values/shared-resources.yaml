@@ -10,7 +10,7 @@ global:
     name: letsencrypt-prod
 
 components:
-  main: ~
+  main:
   api:
     container:
       image:
@@ -29,20 +29,22 @@ components:
         settings:
           configMapRef:
             ref: shared-config
+      volumeMounts:
+        media:
+          name: media
+          mountPath: /media
+        tls:
+          name: tls
+          mountPath: /tls
+          readOnly: true
     pod:
       volumes:
         media:
-          type: pvc
-          ref: media
-          mounts:
-            /media: {}
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "media") }}'
         tls:
-          type: secret
-          certRef: web
-          mounts:
-            /tls:
-              readOnly: true
-
+          secret:
+            secretName: '{{ include "common.ref.tlsSecret" (list . "web") }}'
   worker:
     container:
       image:
@@ -51,21 +53,26 @@ components:
       ports:
         metrics:
           port: 9090
+      volumeMounts:
+        media:
+          name: media
+          mountPath: /library
+          readOnly: true
     pod:
       volumes:
         media:
-          type: pvc
-          ref: media
-          mounts:
-            /library:
-              readOnly: true
-
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "media") }}'
 appResources:
   pvc:
     media:
-      size: 100Gi
-      storageClass: nfs
-      accessModes: [ReadWriteMany]
+      spec:
+        resources:
+          requests:
+            storage: 100Gi
+        accessModes: [ReadWriteMany]
+        storageClassName: nfs
+    config:
   configMap:
     shared-config:
       data:

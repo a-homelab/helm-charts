@@ -5,7 +5,7 @@ overrides) lives here; kind-specific spec building lives in one file per
 kind (common.build.controller.<kind>), resolved dynamically - adding a
 controller kind is a new file, not an edit here.
 
-common.build.controller -> box.result (controller manifest dict), box.pvcs
+common.build.controller -> box.result (controller manifest dict)
 Input dict: { ctx, name (component name), component (resolved), box }
 =============================================================================
 */}}
@@ -22,7 +22,6 @@ Input dict: { ctx, name (component name), component (resolved), box }
 
   {{- include "common.build.podTemplate" (dict "ctx" $ctx "name" $name "component" $comp "box" $b) -}}
   {{- $podTemplate := $b.result -}}
-  {{- $pvcs := $b.pvcs -}}
 
   {{- include "common.metadata.selectorLabels" (dict "ctx" $ctx "componentName" $name "box" $b) -}}
   {{- $selector := dict "matchLabels" $b.result -}}
@@ -38,5 +37,4 @@ Input dict: { ctx, name (component name), component (resolved), box }
 
   {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" $comp.overrides) -}}
   {{- $_ := set .box "result" $manifest -}}
-  {{- $_ := set .box "pvcs" $pvcs -}}
 {{- end -}}

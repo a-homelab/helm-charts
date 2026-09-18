@@ -3,6 +3,11 @@
 A LinuxServer Blender desktop built with the `common` library chart. The chart
 contains no house data or application-specific modeling behavior.
 
+`templates/all.yaml` only calls `common.all`. Values define the bootstrap
+ConfigMap, init container, volumes and rollout checksum. The init container
+inherits the main container's image. The schema extension enforces the single
+writer Deployment settings and validates MCP pins when enabled.
+
 ## Installation
 
 ```sh
@@ -18,8 +23,9 @@ The pinned ARM image may contain a different Blender version; verify it separate
 The chart creates a single Deployment with `Recreate`, a 10 GiB `/config` PVC,
 a 50 GiB `/workspace` PVC, and a 1 GiB memory-backed `/dev/shm`. Config and workspace
 claims are retained on Helm uninstall and Argo CD deletion/pruning. Back them up
-separately; retention is not a backup. Resource sizes and storage classes are ordinary
-`components.main` overrides from `common`.
+separately; retention is not a backup. Claim sizes and storage classes are configured under
+`appResources.pvc.<name>.spec.resources.requests.storage` and
+`appResources.pvc.<name>.spec.storageClassName`.
 
 The HTTP service on port 3000 is for a TLS-terminating, authenticated reverse proxy.
 Port 3001 provides the container's self-signed HTTPS endpoint for a private tunnel.
@@ -29,17 +35,21 @@ health. There is deliberately no liveness restart tied to a busy Blender process
 
 ## NVIDIA
 
+`examples/nvidia-values.yaml` demonstrates the GPU settings. Copy and adapt them
+into your application's own values override; deployed instances should own their
+runtime class, resource allocation and scheduling settings. To render the example:
+
 ```sh
-helm upgrade --install blender charts/blender \
-  --namespace blender --create-namespace \
-  -f charts/blender/profiles/nvidia.yaml
+helm template blender charts/blender \
+  --namespace blender \
+  -f charts/blender/examples/nvidia-values.yaml
 ```
 
-This profile selects `runtimeClassName: nvidia`, requests and limits one
+The example selects `runtimeClassName: nvidia`, requests and limits one
 `nvidia.com/gpu`, and requests compute, utility, graphics, video and display driver
 capabilities. It leaves device selection to the NVIDIA device plugin. Override the
 runtime class for clusters using a different handler. Node selection and tolerations
-remain normal `components.main.pod` settings. CPU installations omit the profile.
+remain normal `components.main.pod` settings. CPU installations omit these overrides.
 
 Do not set `NVIDIA_VISIBLE_DEVICES=all`: the allocated device must come from the
 device plugin. With NVIDIA time slicing, one allocation is a shared slot, not an
@@ -69,7 +79,10 @@ outbound HTTPS to `raw.githubusercontent.com`. A mismatch fails startup.
 The addon is staged outside persistent user preferences and enabled by a startup
 module for interactive Blender only. It starts on loopback port 9876. The chart
 does not expose that port through a Service or HTTPRoute. Background render processes
-do not load the bridge. A bootstrap checksum rolls the pod when managed scripts change.
+do not load the bridge. The user-scripts directory is an emptyDir mounted in both
+containers; it stays empty when MCP is disabled. A bootstrap checksum rolls the
+pod when the rendered ConfigMap changes. MCP settings are init-container
+environment values, so changing them also updates the pod template.
 
 Run the matching MCP server on the agent's machine and tunnel to the pod:
 

@@ -80,7 +80,7 @@ Input dict: { ctx, type (appResources type key), key, where (for errors), box }
   {{- if or (not (hasKey $byType .key)) (eq (kindOf $entry) "invalid") (and (hasKey $entry "enabled") (not $entry.enabled)) -}}
     {{- fail (printf "common: %s references appResources.%s.%s, which is not defined" (.where | default "ref") .type .key) -}}
   {{- end -}}
-  {{- $namespace := dig "metadata" "namespace" (include "common.namespace" .ctx) ($entry.overrides | default dict) -}}
+  {{- $namespace := dig "metadata" "namespace" (dig "namespace" (include "common.namespace" .ctx) ($entry.metadata | default dict)) ($entry.overrides | default dict) -}}
   {{- if ne (tpl $namespace .ctx) (include "common.namespace" .ctx) -}}{{- fail "common: appResources references must remain in the release namespace" -}}{{- end -}}
   {{- if $entry.component -}}
     {{- $b := dict -}}
@@ -102,6 +102,7 @@ Input dict: { ctx, key, entry (the appResources entry dict) }
     {{- $name = include "common.safeName" (printf "%s-%s" (include "common.componentName" (dict "ctx" .ctx "name" .entry.component)) .key) -}}
   {{- end -}}
   {{- if and .entry.component (has (.entry.kind | default "") (list "ClusterRole" "ClusterRoleBinding")) -}}{{- $name = include "common.safeName" (printf "%s-%s" (include "common.namespace" .ctx) $name) -}}{{- end -}}
+  {{- with (dig "name" "" (.entry.metadata | default dict)) -}}{{- $name = tpl . $.ctx -}}{{- end -}}
   {{- with .entry.name -}}{{- $name = tpl . $.ctx -}}{{- end -}}
   {{- with (dig "metadata" "name" "" (.entry.overrides | default dict)) -}}{{- $name = tpl . $.ctx -}}{{- end -}}
   {{- $name -}}

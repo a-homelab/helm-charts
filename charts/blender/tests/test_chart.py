@@ -36,12 +36,14 @@ def test_cpu_workspace_has_no_gpu_or_mcp_exposure():
     assert volumes["shm"]["emptyDir"] == {"medium": "Memory", "sizeLimit": "1Gi"}
     assert "persistentVolumeClaim" in volumes["config"]
     assert "persistentVolumeClaim" in volumes["workspace"]
-    assert "user-scripts" not in volumes
+    assert volumes["user-scripts"]["emptyDir"] == {}
+    init_env = {item["name"]: item["value"] for item in pod["initContainers"][0]["env"]}
+    assert init_env["MCP_ENABLED"] == "false"
 
 
-def test_nvidia_and_mcp_profile():
+def test_nvidia_and_mcp_example():
     resources = render(
-        "-f", str(CHART / "profiles/nvidia.yaml"), "--set", "mcp.enabled=true"
+        "-f", str(CHART / "examples/nvidia-values.yaml"), "--set", "mcp.enabled=true"
     )
     pod = resources["Deployment"]["spec"]["template"]["spec"]
     container = pod["containers"][0]
@@ -70,6 +72,7 @@ def test_nvidia_and_mcp_profile():
     [
         "components.main.deployment.replicas=2",
         "components.main.deployment.strategy.type=RollingUpdate",
+        "components.main.kind=StatefulSet",
         "components.main.hpa.enabled=true",
         "mcp.revision=main",
         "mcp.sha256=bad",
@@ -92,4 +95,48 @@ def test_rejects_unsafe_authoring_configuration(setting):
         text=True,
     )
     assert result.returncode != 0
-    assert "blender:" in result.stderr
+    assert "schema" in result.stderr.lower()
+    assert setting.split("=")[0].split(".")[-1] in result.stderr
+
+
+def test_bootstrap_files_and_checksum_follow_values():
+    resources = render()
+    assert resources["ConfigMap"]["data"] == {
+        name: (CHART / "files" / name).read_text()
+        for name in ("prepare.py", "mcp_autostart.py", "verify_gpu.py")
+    }
+    changed = render(
+        "--set-string",
+        "appResources.configMap.bootstrap.data.prepare\\.py=custom bootstrap",
+    )
+    assert changed["ConfigMap"]["data"]["prepare.py"] == "custom bootstrap"
+    before = resources["Deployment"]["spec"]["template"]["metadata"]["annotations"]
+    after = changed["Deployment"]["spec"]["template"]["metadata"]["annotations"]
+    assert before["checksum/blender-bootstrap"] != after["checksum/blender-bootstrap"]
+
+
+def test_prepare_inherits_image_and_accepts_resource_overrides():
+    resources = render(
+        "--set-string",
+        "components.main.container.image.tag=custom",
+        "--set-string",
+        "components.main.container.env.PUID=1234",
+        "--set-string",
+        "components.main.container.env.PGID=5678",
+        "--set-string",
+        "components.main.initContainers.prepare.resources.limits.memory=512Mi",
+    )
+    pod = resources["Deployment"]["spec"]["template"]["spec"]
+    init = pod["initContainers"][0]
+    assert init["image"] == pod["containers"][0]["image"]
+    assert init["image"].endswith(":custom")
+    assert init["resources"]["limits"]["memory"] == "512Mi"
+    env = {item["name"]: item["value"] for item in init["env"]}
+    assert (env["PUID"], env["PGID"]) == ("1234", "5678")
+
+
+def test_disabled_mcp_does_not_require_valid_pins():
+    resources = render("--set", "mcp.revision=unused", "--set", "mcp.sha256=unused")
+    pod = resources["Deployment"]["spec"]["template"]["spec"]
+    env = {item["name"]: item["value"] for item in pod["initContainers"][0]["env"]}
+    assert env["MCP_ENABLED"] == "false"

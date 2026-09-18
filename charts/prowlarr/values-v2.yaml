@@ -15,16 +15,28 @@ components:
       ports:
         http:
           port: 9696
+      volumeMounts:
+        config:
+          name: config
+          mountPath: /config
     pod:
       securityContext:
         fsGroup: 1000
       volumes:
         config:
-          type: pvc
-          size: 1Gi
-          storageClass: my-storage-class
-          mounts:
-            /config: {}
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "config") }}'
     deployment:
       strategy:
         type: Recreate
+appResources:
+  pvc:
+    config:
+      spec:
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: my-storage-class
+        accessModes:
+          - ReadWriteOnce
+      component: main

@@ -22,30 +22,33 @@ components:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
+      volumeMounts:
+        config:
+          name: config
+          mountPath: /config/recyclarr.yml
+          subPath: recyclarr.yml
+          readOnly: true
+        data:
+          name: data
+          mountPath: /config
+        tmpfs:
+          name: tmpfs
+          mountPath: /tmp
     pod:
       securityContext:
         fsGroup: 1000
       volumes:
         config:
-          type: configMap
-          ref: config
-          defaultMode: 0400
-          mounts:
-            /config/recyclarr.yml:
-              subPath: recyclarr.yml
-              readOnly: true
+          configMap:
+            name: '{{ include "common.ref" (list . "configMap" "config") }}'
+            defaultMode: 0400
         data:
-          type: pvc
-          size: 1Gi
-          storageClass: my-storage-class
-          mounts:
-            /config: {}
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "data") }}'
         tmpfs:
-          type: emptyDir
-          medium: Memory
-          sizeLimit: 1Gi
-          mounts:
-            /tmp: {}
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
     cronjob:
       schedule: "0 * * * *"
       concurrencyPolicy: Forbid
@@ -63,3 +66,13 @@ appResources:
             instance_name:
               base_url: http://localhost:1234
               api_key: f7e74ba6c80046e39e076a27af5a8444
+  pvc:
+    data:
+      spec:
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: my-storage-class
+        accessModes:
+          - ReadWriteOnce
+      component: main

@@ -1,6 +1,6 @@
 dependencies:
 - name: common
+  version: 1.0.0-alpha.3
   repository: oci://registry.benfu.me/helm
-  version: 1.0.0-alpha.2
-digest: sha256:183fc549347e6b42cb2f0f04fe15c76ee44ab26e41a544b239b5effab564d628
-generated: '2026-09-14T21:56:11.826575+00:00'
+digest: sha256:672b0f390d206c0bbc2870d63b6eaec2f81f52f27d7d626fefc8dbba2866112b
+generated: '2026-09-18T05:41:03.085177+00:00'

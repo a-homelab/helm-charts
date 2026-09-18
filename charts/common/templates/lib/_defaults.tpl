@@ -28,6 +28,7 @@ container:
   env: {}
   envFrom: {}
   ports: {}
+  volumeMounts: {}
   probes:
     liveness: {}
     readiness: {}

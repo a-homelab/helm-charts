@@ -4,7 +4,7 @@ Common turns a consumer chart's values into workloads and their supporting
 resources. Put `{{- include "common.all" . }}` in `templates/all.yaml`, add this
 library as a dependency, and describe the application in `values.yaml`.
 
-This is the breaking `1.0.0-alpha.2` contract. Update consumers together with the
+This is the breaking `1.0.0-alpha.3` contract. Update consumers together with the
 library. Alpha.1 values are not compatible.
 
 ## A small application
@@ -50,7 +50,8 @@ then `latest`; a `sha256:` tag uses a digest reference.
 | `routes` | Many | Hosts, protocols, filters and attachment policies can differ. |
 | `listenerSets` | Many | Each set attaches listeners to one Gateway. |
 | `container`, `sidecars`, `initContainers` | One main, many others | Containers share the component's PodSpec. |
-| `pod.volumes`, `statefulset.volumeClaimTemplates` | Many | Each volume has its own source, mounts and storage settings. |
+| `pod.volumes`, `container.volumeMounts` | Many | Native volume sources and independent mounts for each container. |
+| `statefulset.volumeClaimTemplates` | Many | Native PVC metadata and spec, keyed by claim name. |
 | `hpa` | Zero or one | Multiple autoscalers would compete to scale this same workload. |
 | `pdb` | Zero or one | One disruption policy for this component's shared pod selector. |
 | `serviceAccount` | One selected account | Kubernetes selects one account for a pod; it may be existing. |
@@ -234,29 +235,94 @@ Gateway API meaning because backend references are already a list.
 ## Shared resources and storage
 
 `appResources` supports `configMap`, `secret`, `externalSecret`, `pvc`,
-`certificate`, `route` and `listenerSet`, each as a named map. Entries support
-`enabled`, `name`, `component`, labels, annotations and overrides.
+`certificate`, `route` and `listenerSet`, each as a named map. Most entries support
+`enabled`, `name`, `component`, labels, annotations and overrides. PVC entries use
+native `metadata` and `spec` as described below.
 
 - ConfigMap `data` and Secret `stringData` evaluate templates only with `tpl: true`.
 - ExternalSecret uses `storeRef`, `target`, `data` and `dataFrom`. Shared defaults
   are under `global.externalSecrets`.
 - Certificate supports `dnsNames`, `secretName`, `issuerRef`, duration and usages.
   Shared issuer defaults are under `global.certIssuer`.
-- PVC uses `size`, `storageClass`, `accessModes` and `volumeMode`. An explicit
-  empty storageClass disables default storage-class selection.
+- PVC uses native `metadata` and `spec`, including `spec.storageClassName`,
+  `spec.accessModes` and `spec.resources.requests.storage`. Set
+  `spec.storageClassName: ""` to disable default storage-class selection. PVC entries
+  also accept `enabled` and the optional `component` naming/label back-reference.
 
-Define volumes and mounts together under `pod.volumes`. Supported types are
-`pvc`, `existingClaim`, `configMap`, `secret`, `emptyDir`, `hostPath`, `nfs` and
-`custom`. Mount map keys are paths. A mount targets the main container unless
-`containers: [<logical container keys>]` is supplied. Unknown targets and duplicate
-mount paths fail rendering.
+Define `pod.volumes` as a map keyed by volume name. Each value contains native
+Kubernetes Volume source fields such as `emptyDir`, `persistentVolumeClaim`,
+`configMap`, `secret`, `projected`, `csi` or `ephemeral`. The chart supplies `name`
+from the key; do not repeat it in the value. Exactly one source is required.
 
-Use `ref` for a managed ConfigMap, Secret or PVC, `certRef` for a certificate's
-Secret, or native `name`/`claimName` for external resources. Inline PVCs and
-StatefulSet claim templates accept metadata and spec overrides, including snapshot
-data sources. Their names are locked to preserve volume wiring; use appResources
-for separately named PVCs. StatefulSet claim templates and pod volumes must have
-distinct names.
+Define `volumeMounts` independently in `container`, each `sidecars` entry, and
+each `initContainers` entry. The map key is a logical mount ID used only for Helm
+overrides. Each value contains native VolumeMount fields, including explicit
+`name` and `mountPath`. The same volume can be mounted multiple times in one
+container and with different paths, permissions or subpaths in other containers.
+
+```yaml
+appResources:
+  pvc:
+    workspace:
+      metadata:
+        annotations:
+          helm.sh/resource-policy: keep
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 50Gi
+
+components:
+  main:
+    pod:
+      volumes:
+        workspace:
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "workspace") }}'
+    container:
+      volumeMounts:
+        workspace:
+          name: workspace
+          mountPath: /workspace
+          readOnly: true
+        exports:
+          name: workspace
+          mountPath: /exports
+          subPath: exports
+          readOnly: true
+    initContainers:
+      prepare:
+        volumeMounts:
+          workspace:
+            name: workspace
+            mountPath: /workspace
+            readOnly: false
+```
+
+An override can change only `container.volumeMounts.workspace.readOnly` without
+repeating the mount or replacing other mounts. Omitted entries inherit normally;
+null removes explicit map entries during merging. Use the component `remove`
+JSON pointers when removing inherited defaults across values layers. Removing a
+volume does not remove mounts or delete a separately declared PVC: update all
+references explicitly. Changing a volume's source requires removing the old
+source field as well as adding the new one.
+
+Resource-name strings support templates. Use `common.ref` in native `claimName`,
+`configMap.name` or `secret.secretName`, and `common.ref.tlsSecret` for a
+Certificate's Secret. Literal names reference existing resources directly.
+
+PVCs are created only by `appResources.pvc`. A Pod volume only references a claim.
+StatefulSet `volumeClaimTemplates` is a map of native PVC `metadata` and `spec`
+objects; its key supplies `metadata.name`. Containers mount those claims by the
+same name. Claim templates and explicit pod volumes must have distinct names.
+Unknown mount references, duplicate volume names, duplicate mount paths within a
+container, and conflicting subpath settings fail rendering.
+
+Storage input schemas use the vendored Kubernetes 1.37 field definitions with
+required fields relaxed for partial overlays. Validate final manifests against
+the actual target Kubernetes version; newer fields can require newer versions
+or feature gates.
 
 ## References, templates and overrides
 
@@ -441,8 +507,10 @@ python scripts/common_schema.py charts/my-app --extensions charts/my-app/schema/
 python scripts/common_schema.py charts/my-app --check
 ```
 
-An extension JSON file supplies additional root `properties`, `definitions`, and
-optional `required` keys. It cannot replace common keys. Structural chart keys are
+An extension JSON file supplies additional root `properties`, `definitions`,
+optional `required` keys, and `allOf` constraints. Use `allOf` to narrow common
+values for an application, such as requiring one Deployment replica, without
+replacing common definitions. Structural chart keys are
 strict; arbitrary Kubernetes fields belong in the documented overrides. Input
 schemas accept partial overlays; rendering checks required resolved values and
 managed relationships. The integration suite also validates native outputs.
@@ -469,7 +537,8 @@ Schema checks do not execute CEL, admission webhooks, or controllers.
 
 The disposable-cluster suite admits all five workload kinds and supporting
 resources on Kubernetes 1.31, 1.36 and 1.37. It checks rejection of invalid native
-and Gateway CEL configurations. Kubernetes 1.36 with Istio 1.31 also verifies HTTP
+and Gateway CEL configurations, and runs a Job that verifies writable init mounts
+and read-only main-container mounts of the same volume. Kubernetes 1.36 with Istio 1.31 also verifies HTTP
 traffic through direct Gateway and ListenerSet attachments, multiple named
 Services, denied ListenerSet attachment, cross-namespace ReferenceGrant enforcement, and RBAC authorization. Other controllers,
 CNIs and optional operators need their own runtime compatibility tests.
@@ -496,6 +565,26 @@ dependency pins remain explicit; publish changes under a new chart version.
 Registry tag policies are configured and enforced natively in Harbor. The chart
 and CI do not create policies, manage robot permissions, or call Harbor's admin API.
 
+## Migrating the storage contract
+
+This is a breaking values change; publish it with a new common chart version.
+
+- Replace `pod.volumes.<name>.type` and flattened fields with the native source
+  object. For example, `type: emptyDir, medium: Memory` becomes
+  `emptyDir: {medium: Memory}`; `type: custom` becomes its source object directly.
+- Move every nested `mounts` entry into the target container's `volumeMounts`
+  map. Give it a stable ID and explicit `name` and `mountPath`; there is no
+  implicit main-container mount or shared `containers` target list.
+- Move inline PVCs into `appResources.pvc`, with `metadata` and `spec`. Preserve
+  the old claim name and retention annotations. The optional `component` field
+  preserves component-scoped naming and labels; it does not create an implicit
+  connection to any Pod volume.
+- Replace `ref` and `certRef` with name helper calls in native source fields.
+- Move StatefulSet claim settings into `metadata` and `spec`; move its mounts to
+  the containers. Keep the existing claim-template keys to preserve claim names.
+- Update instance storage overrides to `appResources.pvc.<key>.spec`, regenerate
+  consumer schemas and rebuild dependencies when publishing the new version.
+
 ## Migrating from alpha.1
 
 - Replace component `service` with `services.main` and `httpRoute` with
@@ -506,7 +595,7 @@ and CI do not create policies, manage robot permissions, or call Harbor's admin 
 - Wrap raw resources in `manifest`, select Cluster scope where applicable, and
   enable `tpl` where previously relied upon.
 - Replace cross-file null deletions with disabled entries or component `remove`.
-- Regenerate consumer schemas and update the dependency and lockfile to alpha.2.
+- Regenerate consumer schemas and update the dependency and lockfile to alpha.3.
 - Main component selectors now include `app.kubernetes.io/component: main`.
   This is an immutable selector change for existing workloads and requires
   recreation. The legacy migration checker deliberately reports it as different.

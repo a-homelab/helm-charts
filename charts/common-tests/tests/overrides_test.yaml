@@ -70,7 +70,7 @@ tests:
       - equal:
           path: spec.sessionAffinity
           value: ClientIP
-        documentIndex: 2
+        documentIndex: 1
 
   - it: keeps overrides layered — container override beats first-class values
     set:

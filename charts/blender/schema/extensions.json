@@ -20,5 +20,97 @@
         "sha256"
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "components": {
+          "type": "object",
+          "required": [
+            "main"
+          ],
+          "properties": {
+            "main": {
+              "type": "object",
+              "required": [
+                "kind",
+                "deployment"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "Deployment"
+                },
+                "deployment": {
+                  "type": "object",
+                  "required": [
+                    "replicas",
+                    "strategy"
+                  ],
+                  "properties": {
+                    "replicas": {
+                      "const": 1
+                    },
+                    "strategy": {
+                      "type": "object",
+                      "required": [
+                        "type"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "Recreate"
+                        }
+                      }
+                    }
+                  }
+                },
+                "hpa": {
+                  "properties": {
+                    "enabled": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "components"
+      ]
+    },
+    {
+      "if": {
+        "properties": {
+          "mcp": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "mcp"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mcp": {
+            "properties": {
+              "revision": {
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "sha256": {
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

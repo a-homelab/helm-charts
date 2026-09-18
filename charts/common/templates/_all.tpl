@@ -71,8 +71,6 @@
   {{- include "common.build.controller" (dict "ctx" .ctx "name" .name "component" .component "box" $b) -}}
   {{- include "common.validate.controller" (dict "ctx" .ctx "name" .name "manifest" $b.result) -}}
   {{- include "common.emit" (dict "ctx" .ctx "manifest" $b.result) -}}
-  {{- include "common.build.componentPvcs" (dict "ctx" .ctx "name" .name "component" .component "pvcs" $b.pvcs "box" $b) -}}
-  {{- range $m := $b.result -}}{{- include "common.emit" (dict "ctx" $.ctx "componentName" $.name "manifest" $m) -}}{{- end -}}
   {{- range $builder := list "common.build.services" "common.build.routes" "common.build.policies" -}}
     {{- include $builder (dict "ctx" $.ctx "name" $.name "component" $.component "components" $.components "box" $b) -}}
     {{- range $m := $b.result -}}{{- include "common.emit" (dict "ctx" $.ctx "componentName" $.name "manifest" $m) -}}{{- end -}}

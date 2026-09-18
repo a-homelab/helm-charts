@@ -18,5 +18,11 @@ components:
         enabled: false
     pod:
       volumes:
-        config: ~
-    serviceAccount: ~
+        config:
+    serviceAccount:
+    container:
+      volumeMounts:
+        config:
+appResources:
+  pvc:
+    config:

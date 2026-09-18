@@ -2,4 +2,10 @@ components:
   main:
     pod:
       volumes:
-        config: ~
+        config:
+    container:
+      volumeMounts:
+        config:
+appResources:
+  pvc:
+    config:

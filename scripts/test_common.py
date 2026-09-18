@@ -235,10 +235,7 @@ def test_explicit_zero_values_survive(render):
             pod={
                 "volumes": {
                     "config": {
-                        "type": "configMap",
-                        "name": "external",
-                        "defaultMode": 0,
-                        "mounts": {"/config": {}},
+                        "configMap": {"name": "external", "defaultMode": 0},
                     }
                 }
             },
@@ -413,16 +410,12 @@ def test_long_names_and_duplicate_final_identities(render):
     [
         (
             {
-                "pod": {
-                    "volumes": {
-                        "tmp": {
-                            "type": "emptyDir",
-                            "mounts": {"/tmp": {"containers": ["typo"]}},
-                        }
-                    }
+                "container": {
+                    "image": {"repository": "nginx"},
+                    "volumeMounts": {"tmp": {"name": "typo", "mountPath": "/tmp"}},
                 }
             },
-            "unknown container",
+            "unknown volume",
         ),
         ({"sidecars": {"main": {}}}, "duplicates the main container"),
         ({"sidecars": {"other": {"name": "main"}}}, "duplicate container name"),
@@ -437,41 +430,66 @@ def test_invalid_resolved_combinations(render, component, error):
     render(app(**component), error=error)
 
 
-def test_pvc_overrides_and_renamed_config_reference(render):
+def test_native_pvc_and_renamed_config_reference(render):
     values = app(
         pod={
             "volumes": {
                 "data": {
-                    "type": "pvc",
-                    "size": "1Gi",
-                    "mounts": {"/data": {}},
-                    "overrides": {
-                        "spec": {
-                            "dataSource": {
-                                "apiGroup": "snapshot.storage.k8s.io",
-                                "kind": "VolumeSnapshot",
-                                "name": "restore",
-                            }
-                        }
-                    },
+                    "persistentVolumeClaim": {
+                        "claimName": '{{ include "common.ref" (list . "pvc" "data") }}'
+                    }
                 },
-                "cfg": {"type": "configMap", "ref": "config", "mounts": {"/cfg": {}}},
+                "cfg": {
+                    "configMap": {
+                        "name": '{{ include "common.ref" (list . "configMap" "config") }}'
+                    }
+                },
             }
         }
     )
     values["appResources"] = {
+        "pvc": {
+            "data": {
+                "metadata": {"name": "restored-data"},
+                "spec": {
+                    "accessModes": ["ReadWriteOnce"],
+                    "storageClassName": "",
+                    "resources": {"requests": {"storage": "1Gi"}},
+                    "dataSource": {
+                        "apiGroup": "snapshot.storage.k8s.io",
+                        "kind": "VolumeSnapshot",
+                        "name": "restore",
+                    },
+                },
+            }
+        },
         "configMap": {
             "config": {
                 "data": {"key": "value"},
                 "overrides": {"metadata": {"name": "renamed"}},
             }
-        }
+        },
     }
     docs = render(values)
-    assert one(docs, "PersistentVolumeClaim")["spec"]["dataSource"]["name"] == "restore"
+    pvc = one(docs, "PersistentVolumeClaim")
+    assert pvc["metadata"]["name"] == "restored-data"
+    assert pvc["spec"]["dataSource"]["name"] == "restore"
+    assert pvc["spec"]["storageClassName"] == ""
+    volumes = {v["name"]: v for v in pod(docs)["volumes"]}
+    assert volumes["data"]["persistentVolumeClaim"]["claimName"] == "restored-data"
+    assert volumes["cfg"]["configMap"]["name"] == "renamed"
+    without_metadata = render(
+        values, {"appResources": {"pvc": {"data": {"metadata": None}}}}
+    )
     assert (
-        next(v for v in pod(docs)["volumes"] if v["name"] == "cfg")["configMap"]["name"]
-        == "renamed"
+        one(without_metadata, "PersistentVolumeClaim")["metadata"]["name"]
+        == "test-check-data"
+    )
+    assert (
+        next(v for v in pod(without_metadata)["volumes"] if v["name"] == "data")[
+            "persistentVolumeClaim"
+        ]["claimName"]
+        == "test-check-data"
     )
 
 
@@ -592,23 +610,32 @@ def test_migration_comparison_preserves_empty_volume_sources():
     assert len(module.parse_docs(rendered)) == 2
 
 
-def test_claim_template_overrides_and_volume_collision(render):
+def test_native_claim_template_and_volume_collision(render):
     values = app(
         kind="StatefulSet",
         statefulset={
             "volumeClaimTemplates": {
                 "data": {
-                    "size": "1Gi",
-                    "mounts": {"/data": {}},
-                    "overrides": {"spec": {"volumeMode": "Filesystem"}},
+                    "metadata": {"annotations": {"example.com/retain": "true"}},
+                    "spec": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": "1Gi"}},
+                        "volumeMode": "Filesystem",
+                    },
                 }
             }
         },
     )
+    values["components"]["main"]["container"]["volumeMounts"] = {
+        "data": {"name": "data", "mountPath": "/data"}
+    }
     docs = render(values)
     claim = one(docs, "StatefulSet")["spec"]["volumeClaimTemplates"][0]
     assert claim["spec"]["volumeMode"] == "Filesystem"
-    values["components"]["main"]["pod"] = {"volumes": {"data": {"type": "emptyDir"}}}
+    assert claim["metadata"]["name"] == "data"
+    assert claim["metadata"]["annotations"]["example.com/retain"] == "true"
+    assert not any(d["kind"] == "PersistentVolumeClaim" for d in docs)
+    values["components"]["main"]["pod"] = {"volumes": {"data": {"emptyDir": {}}}}
     render(values, error="duplicates a pod volume")
 
 
@@ -999,3 +1026,216 @@ def test_managed_listener_parent_cannot_change_namespace(render):
         ),
         error="managed ListenerSet parentRef must use",
     )
+
+
+def test_independent_native_mount_maps_and_partial_overrides(render):
+    values = app(pod={"volumes": {"workspace": {"emptyDir": {}}}})
+    main = values["components"]["main"]
+    main["container"]["volumeMounts"] = {
+        "workspace": {"name": "workspace", "mountPath": "/workspace", "readOnly": True},
+        "exports": {
+            "name": "workspace",
+            "mountPath": "/exports",
+            "subPath": "exports",
+            "readOnly": True,
+        },
+    }
+    main["initContainers"] = {
+        "prepare": {
+            "volumeMounts": {
+                "workspace": {
+                    "name": "workspace",
+                    "mountPath": "/workspace",
+                    "readOnly": False,
+                },
+            }
+        }
+    }
+    main["sidecars"] = {
+        "exporter": {
+            "volumeMounts": {
+                "files": {
+                    "name": "workspace",
+                    "mountPath": "/workspace",
+                    "subPath": "exports",
+                    "readOnly": True,
+                },
+            }
+        }
+    }
+    overlay = {
+        "components": {
+            "main": {
+                "container": {
+                    "volumeMounts": {
+                        "workspace": {"readOnly": False},
+                    }
+                }
+            }
+        }
+    }
+    initial = pod(render(values))
+    initial_main = next(c for c in initial["containers"] if c["name"] == "main")
+    assert all(m["readOnly"] for m in initial_main["volumeMounts"])
+    assert initial["initContainers"][0]["volumeMounts"][0]["readOnly"] is False
+    result = pod(render(values, overlay))
+    containers = {c["name"]: c for c in result["containers"] + result["initContainers"]}
+    mounts = {m["mountPath"]: m for m in containers["main"]["volumeMounts"]}
+    assert mounts["/workspace"] == {
+        "name": "workspace",
+        "mountPath": "/workspace",
+        "readOnly": False,
+    }
+    assert mounts["/exports"]["subPath"] == "exports"
+    assert containers["prepare"]["volumeMounts"][0]["readOnly"] is False
+    assert containers["exporter"]["volumeMounts"][0]["readOnly"] is True
+    assert containers["exporter"]["volumeMounts"][0]["name"] == "workspace"
+    assert result["volumes"] == [{"name": "workspace", "emptyDir": {}}]
+    result = pod(
+        render(
+            values,
+            {
+                "components": {
+                    "main": {"container": {"volumeMounts": {"exports": None}}}
+                }
+            },
+        )
+    )
+    assert (
+        len(
+            next(c for c in result["containers"] if c["name"] == "main")["volumeMounts"]
+        )
+        == 1
+    )
+
+
+def test_native_volume_sources_preserve_fields_and_zero_values(render):
+    volumes = {
+        "config": {
+            "configMap": {"name": "settings", "optional": False, "defaultMode": 0}
+        },
+        "credentials": {"secret": {"secretName": "creds", "optional": True}},
+        "projection": {
+            "projected": {
+                "defaultMode": 0,
+                "sources": [{"secret": {"name": "creds", "optional": True}}],
+            }
+        },
+        "nfs": {
+            "nfs": {"server": "nas.example.com", "path": "/exports", "readOnly": True}
+        },
+        "csi": {
+            "csi": {
+                "driver": "example.com/csi",
+                "readOnly": True,
+                "volumeAttributes": {"mode": "test"},
+            }
+        },
+        "ephemeral": {
+            "ephemeral": {
+                "volumeClaimTemplate": {
+                    "spec": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": "1Gi"}},
+                    }
+                }
+            }
+        },
+    }
+    actual = pod(render(app(pod={"volumes": volumes})))["volumes"]
+    assert actual == [{"name": name, **volumes[name]} for name in sorted(volumes)]
+
+
+@pytest.mark.parametrize(
+    "mounts, error",
+    [
+        (
+            {
+                "first": {"name": "work", "mountPath": "/same"},
+                "second": {"name": "work", "mountPath": "/same"},
+            },
+            "mounts path /same more than once",
+        ),
+        ({"missing": {"name": "absent", "mountPath": "/work"}}, "unknown volume"),
+        ({"missing-name": {"mountPath": "/work"}}, "require name and mountPath"),
+        ({"missing-path": {"name": "work"}}, "require name and mountPath"),
+        (
+            {
+                "conflict": {
+                    "name": "work",
+                    "mountPath": "/work",
+                    "subPath": "a",
+                    "subPathExpr": "$(DIR)",
+                }
+            },
+            "mutually exclusive",
+        ),
+    ],
+)
+def test_invalid_native_mounts(render, mounts, error):
+    values = app(pod={"volumes": {"work": {"emptyDir": {}}}})
+    values["components"]["main"]["container"]["volumeMounts"] = mounts
+    render(values, error=error)
+
+
+@pytest.mark.parametrize(
+    "source, error",
+    [
+        ({}, "requires exactly one source"),
+        (
+            {"emptyDir": {}, "secret": {"secretName": "creds"}},
+            "requires exactly one source",
+        ),
+        ({"type": "emptyDir", "mounts": {"/work": {}}}, "schema"),
+        ({"name": "renamed", "emptyDir": {}}, "schema"),
+    ],
+)
+def test_invalid_native_volumes(render, source, error):
+    render(app(pod={"volumes": {"work": source}}), error=error)
+
+
+def test_volume_source_switch_and_duplicate_final_names(render):
+    values = app(pod={"volumes": {"work": {"emptyDir": {"medium": "Memory"}}}})
+    overlay = {
+        "components": {
+            "main": {
+                "pod": {
+                    "volumes": {
+                        "work": {
+                            "emptyDir": None,
+                            "persistentVolumeClaim": {"claimName": "existing"},
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert pod(render(values, overlay))["volumes"] == [
+        {"name": "work", "persistentVolumeClaim": {"claimName": "existing"}}
+    ]
+    values["components"]["main"]["pod"]["overrides"] = {
+        "volumes": [{"name": "same", "emptyDir": {}}, {"name": "same", "emptyDir": {}}]
+    }
+    render(values, error="duplicate volume name")
+
+
+def test_chart_level_pvc_exists_without_component_or_mount(render):
+    values = {
+        "appResources": {
+            "pvc": {
+                "archive": {
+                    "metadata": {"annotations": {"helm.sh/resource-policy": "keep"}},
+                    "spec": {
+                        "accessModes": ["ReadWriteMany"],
+                        "storageClassName": "nfs",
+                        "resources": {"requests": {"storage": "10Gi"}},
+                    },
+                }
+            }
+        }
+    }
+    values["components"] = {"main": {"enabled": False}}
+    docs = render(values)
+    assert len(docs) == 1
+    assert docs[0]["metadata"]["name"] == "test-check-archive"
+    assert docs[0]["metadata"]["annotations"]["helm.sh/resource-policy"] == "keep"

@@ -19,14 +19,26 @@ components:
       ports:
         http:
           port: 5580
+      volumeMounts:
+        data:
+          name: data
+          mountPath: /data
     pod:
       volumes:
         data:
-          type: pvc
-          size: 1Gi
-          storageClass: my-storage-class
-          mounts:
-            /data: {}
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "data") }}'
     deployment:
       strategy:
         type: Recreate
+appResources:
+  pvc:
+    data:
+      spec:
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: my-storage-class
+        accessModes:
+          - ReadWriteOnce
+      component: main

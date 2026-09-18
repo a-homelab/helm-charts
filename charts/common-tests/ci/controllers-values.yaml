@@ -3,7 +3,7 @@
 # volumeClaimTemplates + mounts), DaemonSet (hostNetwork), Job, and
 # pod/controller-level overrides.
 components:
-  main: ~
+  main:
   db:
     kind: StatefulSet
     container:
@@ -12,15 +12,22 @@ components:
       ports:
         db:
           port: 5432
+      volumeMounts:
+        data:
+          name: data
+          mountPath: /var/lib/db
     statefulset:
       replicas: 3
       podManagementPolicy: Parallel
       volumeClaimTemplates:
         data:
-          size: 10Gi
-          storageClass: fast
-          mounts:
-            /var/lib/db: {}
+          spec:
+            resources:
+              requests:
+                storage: 10Gi
+            storageClassName: fast
+            accessModes:
+              - ReadWriteOnce
     pod:
       overrides:
         hostUsers: false            # unmodeled pod field via pod overrides
@@ -62,3 +69,6 @@ components:
         enabled: false
     serviceAccount:
       enabled: false
+appResources:
+  pvc:
+    config:
