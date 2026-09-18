@@ -1239,3 +1239,158 @@ def test_chart_level_pvc_exists_without_component_or_mount(render):
     assert len(docs) == 1
     assert docs[0]["metadata"]["name"] == "test-check-archive"
     assert docs[0]["metadata"]["annotations"]["helm.sh/resource-policy"] == "keep"
+
+
+@pytest.mark.parametrize("enabled", [True, False, "{{ false }}", "{{ true }}"])
+def test_conditional_auxiliary_containers_and_service_ports(render, enabled):
+    active = enabled is True or enabled == "{{ true }}"
+    values = app(
+        sidecars={"proxy": {"enabled": enabled, "ports": {"proxy": {"port": 9000}}}},
+        initContainers={
+            "prepare": {"enabled": enabled},
+            "native-sidecar": {
+                "enabled": enabled,
+                "restartPolicy": "Always",
+                "ports": {"native": {"port": 9001}},
+            },
+        },
+    )
+    docs = render(values)
+    result = pod(docs)
+    assert [c["name"] for c in result["containers"]] == (
+        ["main", "proxy"] if active else ["main"]
+    )
+    assert [c["name"] for c in result.get("initContainers", [])] == (
+        ["native-sidecar", "prepare"] if active else []
+    )
+    ports = {p["port"] for p in one(docs, "Service")["spec"]["ports"]}
+    assert ports == ({8080, 9000, 9001} if active else {8080})
+    assert all(
+        "enabled" not in c
+        for c in result["containers"] + result.get("initContainers", [])
+    )
+
+
+def test_disabled_container_skips_templates_and_can_be_enabled_by_overlay(render):
+    values = app(
+        sidecars={
+            "proxy": {
+                "enabled": False,
+                "command": ['{{ fail "disabled command evaluated" }}'],
+            }
+        }
+    )
+    assert len(pod(render(values))["containers"]) == 1
+    render(
+        values,
+        {"components": {"main": {"sidecars": {"proxy": {"enabled": True}}}}},
+        error="disabled command evaluated",
+    )
+
+
+def test_disabled_container_ports_cannot_be_selected_by_service(render):
+    render(
+        app(
+            sidecars={"proxy": {"enabled": False, "ports": {"proxy": {"port": 9000}}}},
+            services={"main": {"ports": {"proxy": {}}}},
+        ),
+        error="unknown container port",
+    )
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_conditional_storage_preserves_native_shapes_and_skips_templates(
+    render, enabled
+):
+    values = app(
+        pod={
+            "volumes": {
+                "scratch": {
+                    "enabled": "{{ .Values.components.main.container.env.ACTIVE }}",
+                    "emptyDir": {},
+                }
+            }
+        }
+    )
+    container = values["components"]["main"]["container"]
+    container["env"] = {"ACTIVE": enabled}
+    container["volumeMounts"] = {
+        "scratch": {
+            "enabled": "{{ .Values.components.main.container.env.ACTIVE }}",
+            "name": "scratch",
+            "mountPath": "/tmp",
+        }
+    }
+    result = pod(render(values))
+    assert result.get("volumes", []) == (
+        [{"name": "scratch", "emptyDir": {}}] if enabled else []
+    )
+    assert result["containers"][0].get("volumeMounts", []) == (
+        [{"name": "scratch", "mountPath": "/tmp"}] if enabled else []
+    )
+    values["components"]["main"]["pod"]["volumes"]["skipped"] = {
+        "enabled": False,
+        "configMap": {"name": '{{ fail "disabled volume evaluated" }}'},
+    }
+    container["volumeMounts"]["skipped"] = {
+        "enabled": False,
+        "name": "missing",
+        "mountPath": '{{ fail "disabled mount evaluated" }}',
+    }
+    render(values)
+
+
+@pytest.mark.parametrize(
+    "location", ["sidecars", "initContainers", "volumes", "volumeMounts"]
+)
+def test_conditional_enabled_rejects_non_boolean_results(render, location):
+    entry = {"enabled": '{{ "not-a-boolean" }}'}
+    values = app()
+    component = values["components"]["main"]
+    if location == "volumes":
+        component["pod"] = {"volumes": {"scratch": {**entry, "emptyDir": {}}}}
+    elif location == "volumeMounts":
+        component["container"]["volumeMounts"] = {
+            "scratch": {**entry, "name": "scratch", "mountPath": "/tmp"}
+        }
+    else:
+        component[location] = {"optional": entry}
+    render(values, error="enabled must resolve to true or false")
+
+
+@pytest.mark.parametrize("uid", [0, 1234])
+def test_templated_security_ids_preserve_integer_types_and_inheritance(render, uid):
+    values = app(
+        containerDefaults={
+            "securityContext": {
+                "runAsUser": "{{ .Values.components.main.container.env.UID }}",
+                "runAsGroup": "{{ .Values.components.main.container.env.GID }}",
+                "allowPrivilegeEscalation": False,
+            }
+        },
+        sidecars={"proxy": {}},
+        initContainers={"prepare": {}},
+    )
+    values["components"]["main"]["container"]["env"] = {"UID": str(uid), "GID": "5678"}
+    result = pod(render(values))
+    for container in result["containers"] + result["initContainers"]:
+        assert container["securityContext"] == {
+            "runAsUser": uid,
+            "runAsGroup": 5678,
+            "allowPrivilegeEscalation": False,
+        }
+        assert type(container["securityContext"]["runAsUser"]) is int
+
+
+@pytest.mark.parametrize("value", ["bad", "1.5", "-1", "9223372036854775808"])
+def test_templated_security_ids_reject_invalid_integers(render, value):
+    values = app()
+    values["components"]["main"]["container"].update(
+        {
+            "env": {"UID": value},
+            "securityContext": {
+                "runAsUser": "{{ .Values.components.main.container.env.UID }}"
+            },
+        }
+    )
+    render(values, error="runAsUser must resolve to a non-negative integer")

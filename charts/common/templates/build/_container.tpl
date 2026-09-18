@@ -134,7 +134,8 @@ Input dict:
   {{- include "common.lib.setIf" (dict "target" $c "key" "readinessProbe" "value" $probes.readiness) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "startupProbe" "value" $probes.startup) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "resources" "value" $v.resources) -}}
-  {{- include "common.lib.setIf" (dict "target" $c "key" "securityContext" "value" $v.securityContext) -}}
+  {{- include "common.lib.securityContext" (dict "ctx" $ctx "value" $v.securityContext "box" $b) -}}
+  {{- include "common.lib.setIf" (dict "target" $c "key" "securityContext" "value" $b.result) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "lifecycle" "value" $v.lifecycle) -}}
   {{- include "common.lib.setIf" (dict "target" $c "key" "restartPolicy" "value" $v.restartPolicy) -}}
   {{- include "common.lib.nativeMap" (dict "ctx" $ctx "map" $v.volumeMounts "keyField" "" "box" $b) -}}

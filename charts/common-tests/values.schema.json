@@ -553,7 +553,7 @@
             "type": "null"
           },
           {
-            "$ref": "#/definitions/container"
+            "$ref": "#/definitions/auxiliaryContainer"
           }
         ]
       }
@@ -721,7 +721,7 @@
           "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
         },
         "securityContext": {
-          "$ref": "#/definitions/io.k8s.api.core.v1.SecurityContext"
+          "$ref": "#/definitions/containerSecurityContext"
         },
         "lifecycle": {
           "$ref": "#/definitions/io.k8s.api.core.v1.Lifecycle"
@@ -1298,6 +1298,9 @@
               "type": "null"
             }
           ]
+        },
+        "enabled": {
+          "$ref": "#/definitions/conditionalEnabled"
         }
       },
       "type": [
@@ -14597,12 +14600,371 @@
             "string",
             "null"
           ]
+        },
+        "enabled": {
+          "$ref": "#/definitions/conditionalEnabled"
         }
       },
       "type": [
         "object",
         "null"
       ],
+      "additionalProperties": false
+    },
+    "conditionalEnabled": {
+      "description": "Defaults to true. Templates must evaluate to true or false.",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "pattern": "\\{\\{[\\s\\S]*\\}\\}"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "auxiliaryContainer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Container name override (tpl-rendered); defaults to the component name"
+        },
+        "image": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tag": {
+              "type": [
+                "string",
+                "number",
+                "null"
+              ]
+            },
+            "pullPolicy": {
+              "enum": [
+                "Always",
+                "IfNotPresent",
+                "Never",
+                ""
+              ]
+            }
+          }
+        },
+        "command": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "args": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "workingDir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "env": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "value": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "valueFrom": {
+                    "$ref": "#/definitions/io.k8s.api.core.v1.EnvVarSource"
+                  },
+                  "weight": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 999999
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "envFrom": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/definitions/io.k8s.api.core.v1.EnvFromSource"
+              }
+            ]
+          }
+        },
+        "ports": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/definitions/port"
+              }
+            ]
+          }
+        },
+        "probes": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "liveness": {
+              "$ref": "#/definitions/probe"
+            },
+            "readiness": {
+              "$ref": "#/definitions/probe"
+            },
+            "startup": {
+              "$ref": "#/definitions/probe"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
+        },
+        "securityContext": {
+          "$ref": "#/definitions/containerSecurityContext"
+        },
+        "lifecycle": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Lifecycle"
+        },
+        "restartPolicy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "overrides": {
+          "$ref": "#/definitions/overrides"
+        },
+        "volumeMounts": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Map keyed by mount ID. Values use native VolumeMount fields, including explicit name and mountPath. IDs are not emitted.",
+          "additionalProperties": {
+            "$ref": "#/definitions/storage.io.k8s.api.core.v1.VolumeMount"
+          }
+        },
+        "enabled": {
+          "$ref": "#/definitions/conditionalEnabled"
+        }
+      }
+    },
+    "containerSecurityContext": {
+      "properties": {
+        "allowPrivilegeEscalation": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "appArmorProfile": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/io.k8s.api.core.v1.AppArmorProfile"
+            }
+          ]
+        },
+        "capabilities": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/io.k8s.api.core.v1.Capabilities"
+            }
+          ]
+        },
+        "privileged": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "procMount": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "readOnlyRootFilesystem": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "runAsGroup": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "format": "int64",
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{[\\s\\S]*\\}\\}"
+            }
+          ]
+        },
+        "runAsNonRoot": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "runAsUser": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "format": "int64",
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{[\\s\\S]*\\}\\}"
+            }
+          ]
+        },
+        "seLinuxOptions": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/io.k8s.api.core.v1.SELinuxOptions"
+            }
+          ]
+        },
+        "seccompProfile": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/io.k8s.api.core.v1.SeccompProfile"
+            }
+          ]
+        },
+        "windowsOptions": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/io.k8s.api.core.v1.WindowsSecurityContextOptions"
+            }
+          ]
+        }
+      },
+      "type": "object",
       "additionalProperties": false
     }
   },

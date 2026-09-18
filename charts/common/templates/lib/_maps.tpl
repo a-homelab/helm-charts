@@ -80,12 +80,41 @@ Input dict: { target: <dict>, key: <string>, value: <any> }
   {{- $entries := dict -}}
   {{- range $key, $value := (.map | default dict) -}}
     {{- if ne (kindOf $value) "invalid" -}}
-      {{- $entry := tpl (toYaml $value) $.ctx | fromYaml -}}
-      {{- if $entry.Error -}}{{- fail (printf "common: invalid native entry %q: %s" $key $entry.Error) -}}{{- end -}}
-      {{- include "common.lib.cleanNulls" $entry -}}
-      {{- if and $.keyField (hasKey $entry $.keyField) -}}{{- fail (printf "common: entry %q gets %s from its map key" $key $.keyField) -}}{{- end -}}
-      {{- $_ := set $entries $key $entry -}}
+      {{- $b := dict -}}
+      {{- include "common.lib.enabled" (dict "ctx" $.ctx "values" $value "box" $b) -}}
+      {{- if $b.result -}}
+        {{- $entry := tpl (toYaml (omit $value "enabled")) $.ctx | fromYaml -}}
+        {{- if $entry.Error -}}{{- fail (printf "common: invalid native entry %q: %s" $key $entry.Error) -}}{{- end -}}
+        {{- include "common.lib.cleanNulls" $entry -}}
+        {{- if and $.keyField (hasKey $entry $.keyField) -}}{{- fail (printf "common: entry %q gets %s from its map key" $key $.keyField) -}}{{- end -}}
+        {{- $_ := set $entries $key $entry -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
   {{- include "common.lib.mapToList" (dict "map" $entries "keyField" .keyField "box" .box) -}}
+{{- end -}}
+
+{{- define "common.lib.enabled" -}}
+  {{- $enabled := true -}}
+  {{- if and (hasKey .values "enabled") (ne (kindOf .values.enabled) "invalid") -}}
+    {{- $value := .values.enabled -}}
+    {{- if kindIs "string" $value -}}{{- $value = tpl $value .ctx | trim -}}{{- end -}}
+    {{- if not (has (toString $value) (list "true" "false")) -}}{{- fail "common: enabled must resolve to true or false" -}}{{- end -}}
+    {{- $enabled = eq (toString $value) "true" -}}
+  {{- end -}}
+  {{- $_ := set .box "result" $enabled -}}
+{{- end -}}
+
+{{- define "common.lib.securityContext" -}}
+  {{- $out := deepCopy (.value | default dict) -}}
+  {{- range $key := list "runAsUser" "runAsGroup" -}}
+    {{- $value := get $out $key -}}
+    {{- if and (hasKey $out $key) (kindIs "string" $value) -}}
+      {{- $rendered := tpl $value $.ctx | trim -}}
+      {{- $integer := int64 $rendered -}}
+      {{- if or (not (regexMatch "^(0|[1-9][0-9]*)$" $rendered)) (ne (toString $integer) $rendered) -}}{{- fail (printf "common: securityContext.%s must resolve to a non-negative integer" $key) -}}{{- end -}}
+      {{- $_ := set $out $key $integer -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $_ := set .box "result" $out -}}
 {{- end -}}

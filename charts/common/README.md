@@ -232,6 +232,31 @@ ordered identity maps, and is stripped from native output. Put referenced env
 variables before their dependents. Native route backend `weight` keeps its
 Gateway API meaning because backend references are already a list.
 
+### Conditional containers and typed user IDs
+
+Sidecars and init containers accept `enabled`, defaulting to `true`. It accepts a
+boolean or a template that evaluates to `true` or `false`. Disabled entries are
+removed after inheritance and explicit removal, before pod and Service derivation;
+their ports do not enter Services. The main container follows its component's
+existing `enabled` setting.
+
+Container `securityContext.runAsUser` and `runAsGroup` accept integer values or
+templates that resolve to non-negative integers. Rendered values are integers,
+including zero; other security-context fields retain their native types.
+
+```yaml
+components:
+  main:
+    sidecars:
+      worker:
+        enabled: '{{ .Values.worker.enabled }}'
+        securityContext:
+          runAsUser: '{{ .Values.worker.uid }}'
+          runAsGroup: '{{ .Values.worker.gid }}'
+```
+
+Define the referenced `worker` settings in the consumer's values and schema.
+
 ## Shared resources and storage
 
 `appResources` supports `configMap`, `secret`, `externalSecret`, `pvc`,
@@ -259,6 +284,10 @@ each `initContainers` entry. The map key is a logical mount ID used only for Hel
 overrides. Each value contains native VolumeMount fields, including explicit
 `name` and `mountPath`. The same volume can be mounted multiple times in one
 container and with different paths, permissions or subpaths in other containers.
+Volumes and mounts also accept `enabled` with the same boolean/template behavior
+as sidecars. This chart-only field is stripped from Kubernetes output. Coordinate
+the conditions: an enabled mount referencing a disabled volume fails validation.
+Disabled entries are skipped before evaluating their native field templates.
 
 ```yaml
 appResources:

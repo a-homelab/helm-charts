@@ -63,6 +63,17 @@ Input dict: { ctx: <root context>, box: <dict> }
     {{- end -}}
     {{- include "common.lib.remove" (dict "target" $eff "paths" $eff.remove) -}}
     {{- if $eff.enabled -}}
+      {{- range $group := list "sidecars" "initContainers" -}}
+        {{- $active := dict -}}
+        {{- range $key, $value := (get $eff $group | default dict) -}}
+          {{- if ne (kindOf $value) "invalid" -}}
+            {{- $b := dict -}}
+            {{- include "common.lib.enabled" (dict "ctx" $ctx "values" $value "box" $b) -}}
+            {{- if $b.result -}}{{- $_ := set $active $key (omit $value "enabled") -}}{{- end -}}
+          {{- end -}}
+        {{- end -}}
+        {{- $_ := set $eff $group $active -}}
+      {{- end -}}
       {{- if not ((($eff.container | default dict).image | default dict).repository) -}}
         {{- fail (printf "common: components.%s is enabled but container.image.repository is not set" $name) -}}
       {{- end -}}
