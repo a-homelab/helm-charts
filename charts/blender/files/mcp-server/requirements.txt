@@ -1,0 +1,1 @@
+blender-mcp @ git+https://projects.blender.org/lab/blender_mcp.git@2cea8d566dde07fbac28a61d698909d69724e853#subdirectory=mcp

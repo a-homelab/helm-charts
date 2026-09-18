@@ -8,9 +8,11 @@ appResources:
     bootstrap:
       tpl: true
       data:
-        prepare.py: '{{ .Files.Get "files/prepare.py" }}'
+        prepare.sh: '{{ .Files.Get "files/prepare.sh" }}'
         mcp_autostart.py: '{{ .Files.Get "files/mcp_autostart.py" }}'
         verify_gpu.py: '{{ .Files.Get "files/verify_gpu.py" }}'
+        start_server.py: '{{ .Files.Get "files/mcp-server/start_server.py" }}'
+        requirements.txt: '{{ .Files.Get "files/mcp-server/requirements.txt" }}'
 
   pvc:
     config:
@@ -89,12 +91,68 @@ components:
         shm:
           name: shm
           mountPath: /dev/shm
+    sidecars:
+      mcp:
+        enabled: '{{ .Values.mcp.enabled }}'
+        command: [/lsiopy/bin/python3, /opt/blender-bootstrap/start_server.py]
+        workingDir: /workspace
+        env:
+          HOME: /config
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONUNBUFFERED: "1"
+          BLENDER_MCP_HOST: 127.0.0.1
+          BLENDER_MCP_PORT: "9876"
+        ports:
+          mcp:
+            port: 8000
+            expose: 8000
+        probes:
+          startup:
+            tcpSocket:
+              port: mcp
+            periodSeconds: 5
+            failureThreshold: 180
+          readiness:
+            tcpSocket:
+              port: mcp
+            periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+          bootstrap:
+            name: bootstrap
+            mountPath: /opt/blender-bootstrap
+            readOnly: true
+          config:
+            name: config
+            mountPath: /config
+          workspace:
+            name: workspace
+            mountPath: /workspace
+          tmp:
+            name: mcp-tmp
+            mountPath: /tmp
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: '{{ .Values.components.main.container.env.PUID }}'
+          runAsGroup: '{{ .Values.components.main.container.env.PGID }}'
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+          seccompProfile:
+            type: RuntimeDefault
     initContainers:
       prepare:
-        command: [python3, /opt/blender-bootstrap/prepare.py]
+        command: [/bin/bash, /opt/blender-bootstrap/prepare.sh]
         env:
           PUID: '{{ .Values.components.main.container.env.PUID }}'
           PGID: '{{ .Values.components.main.container.env.PGID }}'
+          MCP_IMAGE: '{{ include "common.resolve.image" (dict "ctx" . "image" .Values.components.main.container.image) }}'
           MCP_ENABLED: '{{ .Values.mcp.enabled }}'
           MCP_VERSION: '{{ .Values.mcp.version }}'
           MCP_SHA256: '{{ .Values.mcp.sha256 }}'
@@ -103,7 +161,7 @@ components:
             cpu: 100m
             memory: 128Mi
           limits:
-            memory: 256Mi
+            memory: 1Gi
         volumeMounts:
           bootstrap:
             name: bootstrap
@@ -124,6 +182,9 @@ components:
       annotations:
         checksum/blender-bootstrap: '{{ include "common.checksum.configMap" (list . "bootstrap") }}'
       volumes:
+        mcp-tmp:
+          enabled: '{{ .Values.mcp.enabled }}'
+          emptyDir: {}
         bootstrap:
           configMap:
             name: '{{ include "common.ref" (list . "configMap" "bootstrap") }}'
@@ -145,3 +206,15 @@ components:
         rules:
           - backendRefs:
               - port: 3000
+      mcp:
+        enabled: false
+        rules:
+          - matches:
+              - path:
+                  type: Exact
+                  value: /
+            timeouts:
+              request: 360s
+              backendRequest: 350s
+            backendRefs:
+              - port: 8000

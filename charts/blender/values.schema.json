@@ -15080,6 +15080,63 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "components": {
+            "properties": {
+              "main": {
+                "properties": {
+                  "routes": {
+                    "properties": {
+                      "mcp": {
+                        "properties": {
+                          "enabled": {
+                            "const": true
+                          }
+                        },
+                        "required": [
+                          "enabled"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "mcp"
+                    ]
+                  }
+                },
+                "required": [
+                  "routes"
+                ]
+              }
+            },
+            "required": [
+              "main"
+            ]
+          }
+        },
+        "required": [
+          "components"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mcp": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          }
+        },
+        "required": [
+          "mcp"
+        ]
+      }
     }
   ]
 }
