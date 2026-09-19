@@ -9,7 +9,7 @@ description: |
   per-resource `overrides` escape hatches at container, pod, and resource
   altitude.
 type: library
-version: 1.0.0-alpha.3
+version: 1.0.0-alpha.4
 kubeVersion: ">=1.31.0-0"
 keywords:
   - common
