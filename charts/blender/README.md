@@ -11,6 +11,141 @@ Common's conditional entries bind the MCP sidecar and temporary volume to
 `mcp.enabled`. Its typed templates keep the sidecar UID/GID aligned with the
 desktop's `PUID`/`PGID`; no chart-specific template logic is needed.
 
+## RGW capture refresh
+
+`components.source-sync` is an optional CronJob, disabled by default. It runs
+`files/sync_sources.sh` directly in `rclone/rclone:1.75.1`, matching the twin repo's
+native rclone version. No Python, jq, package installation or init container is
+needed for source sync.
+
+```yaml
+components:
+  source-sync:
+    enabled: true
+    cronjob:
+      schedule: "0 */6 * * *"
+      timeZone: Etc/UTC
+    container:
+      envFrom:
+        bucket:
+          configMapRef:
+            name: mi-casa-twin-sources
+        credentials:
+          secretRef:
+            name: mi-casa-twin-sources
+```
+
+Rook's ConfigMap supplies `BUCKET_NAME`, `BUCKET_HOST`, `BUCKET_PORT` and
+`BUCKET_REGION` (empty defaults to `us-east-1`). Its Secret supplies
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The script maps these to native
+rclone environment settings for the in-cluster HTTP endpoint. These are
+bucket-owner credentials, but the script only lists and downloads RGW objects.
+
+### Shared checksum contract
+
+The twin Makefile's `hash-sources` target generates one sorted `rclone hashsum SHA-256`
+inventory for the entire `captures/` tree. `copy-sources` copies immutable payloads,
+verifies remote bytes, then replaces `captures/SHA256SUMS` last. Paths in the
+inventory are relative to `captures/`. See the twin repo's `Makefile`,
+`tools/sources/README.md` and ADR-0028. There is no delivery list or per-delivery
+completion marker. `session.json` is an ordinary checksummed payload.
+
+The Job mounts only the workspace PVC's `source` subPath at `/source`. Blender's
+existing prepare step creates `/workspace/source` and sets its ownership to the
+configured PUID/PGID. Staging, revisions and the shared lock live inside that mount;
+editable scenes elsewhere on the workspace PVC are outside the Job's mount.
+
+```text
+RGW inventory:     captures/SHA256SUMS
+Blender cache:     /workspace/source/captures -> .source-sync/revisions/<inventory-sha256>
+Job cache:         /source/captures          -> .source-sync/revisions/<inventory-sha256>
+Job staging:       /source/.source-sync/pending/captures/
+Job revisions:     /source/.source-sync/revisions/<inventory-sha256>/
+Job lock:          /source/.source-sync/lock
+```
+
+The script pins the root inventory, copies the whole prefix into private staging
+with `rclone copy --immutable --checksum --exclude /SHA256SUMS`, and verifies it
+with `rclone checksum SHA-256 <pinned-SHA256SUMS> <staging> --exclude /SHA256SUMS`.
+Missing, extra or changed files fail verification. After re-fetching the remote
+inventory and requiring identical bytes, it stores the verified revision and
+atomically replaces the relative `captures` symlink. Staging and publication stay
+on the same PVC. An unchanged inventory reuses the existing revision after local
+verification. The script only reads RGW; no remote objects are changed or deleted.
+
+A changed inventory is expected when captures are added. Existing local originals
+must still pass verification, and every previously published payload must retain
+its hash in the new tree. A failed refresh leaves the current cache available.
+New uploads arriving before their inventory can cause a temporary exact-file-set
+mismatch; retry after publication finishes. No ZIP extraction occurs.
+
+Previous verified revisions remain on disk, including a revision completed just
+before an interrupted pointer switch. Retries verify and reuse that revision.
+Only private `pending` staging is automatically removed. A new inventory needs
+space for another full tree plus `MIN_FREE_BYTES` (10 GiB by default). The preflight
+is not a reservation against Blender writes. Monitor the shared PVC and remove
+obsolete revisions during maintenance only when no reader uses them; never remove
+the current symlink target or the lock file. Long-running tasks needing a fixed
+snapshot should resolve `captures` once and use that revision path.
+
+Keep editable scenes outside `/workspace/source` and treat the source cache as
+read-only. Blender still mounts the full writable PVC; this remains an authoring
+convention. Other tools must not write to managed source revisions.
+
+If `/workspace/source/captures` already exists as a real directory from the earlier
+per-delivery design, the Job fails and preserves it. During a saved-work maintenance
+window, stop source readers and sync Jobs, move that legacy directory to an unused
+backup path outside `/workspace/source`, then run a refresh. Resume readers after
+verification. No directory cache is silently replaced or deleted.
+
+### Scheduling and manual runs
+
+Required pod affinity selects Blender's `main` component in the same release using
+`kubernetes.io/hostname`. The Job mounts the existing workspace claim, tolerates
+`nvidia.com/gpu:NoSchedule`, and requests no GPU. It runs as Blender's PUID/PGID
+with a read-only container root and no Kubernetes API token. Let Blender's prepare
+init finish before the first refresh so the subPath has writable ownership. The
+RBD claim is ReadWriteOnce, not ReadWriteOncePod. If Blender is absent, the Job
+stays Pending; a running Job can delay a cross-node Blender move until it releases
+the volume. Jobs have a two-hour deadline.
+
+`concurrencyPolicy: Forbid` covers scheduled Jobs. Native `flock` on the shared
+PVC also prevents manual runs from overlapping. A conflicting run fails clearly;
+the Job has one retry. Process exit releases the lock; never remove its file.
+
+```sh
+kubectl -n mi-casa create job \
+  --from=cronjob/mi-casa-blender-source-sync \
+  "mi-casa-blender-source-sync-manual-$(date +%s)"
+```
+
+Set `components.source-sync.cronjob.suspend: true` for manual-only operation.
+Manual Jobs use the same verification and lock. Suspension does not stop existing
+or manual Jobs. Completed Jobs expire after a day.
+
+The Blender chart owns this CronJob; Mi Casa GitOps values enable it and select
+the bucket references. Artifact publication remains separate.
+
+Tests use native rclone for checksum generation and verification, including
+whole-tree additions, corrupt/missing/extra files, inventory changes, existing edits,
+space checks, interrupted staging and shared locking. Install rclone 1.75.1 on
+PATH before running the chart's pytest suite. ShellCheck validates the script.
+
+See [rclone checksum](https://rclone.org/commands/rclone_checksum/) for exact-file-set
+verification and `--one-way`, used to require old originals in a new revision.
+
+
+Validation: all 48 Blender tests passed with Helm 3.22.0 and 4.3.0. ShellCheck,
+strict Helm lint, schema freshness and offline validation of all 10 rendered Mi
+Casa resources passed. Both Helm versions rendered identical resources. Kubernetes
+server-side dry runs accepted the CronJob and its manual Job equivalent. A non-root,
+read-only `rclone/rclone:1.75.1` container with networking disabled verified initial
+publication, whole-tree additions, repeat runs, retained revisions and preservation
+of the current cache after a corrupt refresh against a synthetic local remote.
+Live RGW access and RBD/subPath scheduling were not exercised. Nothing was deployed.
+Local validation files are under `/tmp/blender-source-sync/root-*`.
+
+
 ## Installation
 
 ```sh

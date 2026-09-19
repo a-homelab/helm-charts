@@ -103,7 +103,12 @@ def test_bootstrap_files_and_checksum_follow_values():
     resources = render()
     expected = {
         name: (CHART / "files" / name).read_text()
-        for name in ("prepare.sh", "mcp_autostart.py", "verify_gpu.py")
+        for name in (
+            "prepare.sh",
+            "mcp_autostart.py",
+            "verify_gpu.py",
+            "sync_sources.sh",
+        )
     }
     expected.update(
         {

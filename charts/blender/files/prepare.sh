@@ -80,8 +80,12 @@ prepare_environment() {
 prepare() {
     local bootstrap
     bootstrap=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-    mkdir -p -- "$blender_workspace"
-    chown -- "$PUID:$PGID" "$blender_workspace"
+    [[ ! -L "$blender_workspace/source" ]] || {
+        printf 'Workspace source directory cannot be a symlink\n' >&2
+        return 1
+    }
+    mkdir -p -- "$blender_workspace/source"
+    chown -- "$PUID:$PGID" "$blender_workspace" "$blender_workspace/source"
     if [[ "$MCP_ENABLED" != true ]]; then
         return
     fi

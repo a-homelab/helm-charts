@@ -149,6 +149,8 @@ def test_disabled_prepare_does_not_invoke_python(tmp_path):
         timeout=10,
     )
     assert workspace.is_dir()
+    assert (workspace / "source").is_dir()
+    assert (workspace / "source").stat().st_uid == os.getuid()
 
 
 def test_launcher_executes_prepared_server(monkeypatch):

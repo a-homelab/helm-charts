@@ -8,6 +8,7 @@ appResources:
     bootstrap:
       tpl: true
       data:
+        sync_sources.sh: '{{ .Files.Get "files/sync_sources.sh" }}'
         prepare.sh: '{{ .Files.Get "files/prepare.sh" }}'
         mcp_autostart.py: '{{ .Files.Get "files/mcp_autostart.py" }}'
         verify_gpu.py: '{{ .Files.Get "files/verify_gpu.py" }}'
@@ -218,3 +219,90 @@ components:
               backendRequest: 350s
             backendRefs:
               - port: 8000
+  source-sync:
+    enabled: false
+    kind: CronJob
+    cronjob:
+      schedule: "0 */6 * * *"
+      timeZone: Etc/UTC
+      concurrencyPolicy: Forbid
+      startingDeadlineSeconds: 300
+      successfulJobsHistoryLimit: 1
+      failedJobsHistoryLimit: 2
+    job:
+      restartPolicy: Never
+      backoffLimit: 1
+      activeDeadlineSeconds: 7200
+      ttlSecondsAfterFinished: 86400
+    container:
+      image:
+        repository: rclone/rclone
+        tag: 1.75.1
+      command: [/bin/sh, /opt/blender-bootstrap/sync_sources.sh]
+      env:
+        HOME: /tmp
+        MIN_FREE_BYTES: "10737418240"
+      envFrom:
+        bucket:
+          configMapRef:
+            name: blender-sources
+        credentials:
+          secretRef:
+            name: blender-sources
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          memory: 1Gi
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: '{{ .Values.components.main.container.env.PUID }}'
+        runAsGroup: '{{ .Values.components.main.container.env.PGID }}'
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+        seccompProfile:
+          type: RuntimeDefault
+      volumeMounts:
+        bootstrap:
+          name: bootstrap
+          mountPath: /opt/blender-bootstrap
+          readOnly: true
+        workspace:
+          name: workspace
+          mountPath: /source
+          subPath: source
+        tmp:
+          name: tmp
+          mountPath: /tmp
+    pod:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      labels:
+        sidecar.istio.io/inject: "false"
+      tolerations:
+        nvidia:
+          key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      overrides:
+        affinity:
+          podAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: '{{ include "common.name" . }}'
+                    app.kubernetes.io/instance: '{{ .Release.Name }}'
+                    app.kubernetes.io/component: main
+                topologyKey: kubernetes.io/hostname
+      volumes:
+        bootstrap:
+          configMap:
+            name: '{{ include "common.ref" (list . "configMap" "bootstrap") }}'
+        workspace:
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "workspace") }}'
+        tmp:
+          emptyDir: {}
