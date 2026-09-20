@@ -70,22 +70,22 @@ tests:
             value: to-be-deleted
         documentIndex: 6
 
-  - it: renders sidecars after the main container without inheriting its ports or resources
+  - it: renders native sidecars without inheriting main container ports or resources
     asserts:
       - equal:
           path: spec.template.spec.containers[0].name
           value: api
         documentIndex: 0
       - equal:
-          path: spec.template.spec.containers[1].name
+          path: spec.template.spec.initContainers[1].name
           value: oauth-proxy
         documentIndex: 0
       - equal:
-          path: spec.template.spec.containers[1].image
+          path: spec.template.spec.initContainers[1].image
           value: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
         documentIndex: 0
       - notExists:
-          path: spec.template.spec.containers[1].resources
+          path: spec.template.spec.initContainers[1].resources
         documentIndex: 0
 
   - it: inherits the main image into initContainers
@@ -108,7 +108,7 @@ tests:
             mountPath: /etc/app
         documentIndex: 0
       - contains:
-          path: spec.template.spec.containers[1].volumeMounts
+          path: spec.template.spec.initContainers[1].volumeMounts
           content:
             name: config
             mountPath: /etc/proxy

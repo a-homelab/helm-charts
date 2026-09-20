@@ -149,6 +149,7 @@ components:
             type: RuntimeDefault
     initContainers:
       prepare:
+        weight: 0
         command: [/bin/bash, /opt/blender-bootstrap/prepare.sh]
         env:
           PUID: '{{ .Values.components.main.container.env.PUID }}'

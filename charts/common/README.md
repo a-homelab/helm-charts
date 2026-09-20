@@ -99,7 +99,8 @@ components:
 - `main` uses the component's resource name; other keys append `-<key>`.
   `name` can override that name. Long generated names use a stable hash suffix.
 - Omitted `ports` derives all ports from the main container, sidecars, and native
-  sidecars (`initContainers` with `restartPolicy: Always`).
+  sidecars (`sidecars` native by default, or `initContainers` with
+  `restartPolicy: Always`).
 - Present `ports` selects only the listed entries. `{}` derives the matching
   container port. An empty ports map selects none.
 - `port` changes the Service-side port; `targetPort` accepts a declared port name
@@ -231,6 +232,58 @@ Identity maps cross into ordered lists using `weight` (integer 0-999999, default
 ordered identity maps, and is stripped from native output. Put referenced env
 variables before their dependents. Native route backend `weight` keeps its
 Gateway API meaning because backend references are already a list.
+
+### Native sidecars and startup ordering
+
+Entries in `components.<name>.sidecars` render under `spec.initContainers` with
+`restartPolicy: Always` by default. Set `native: false` on an entry to keep it
+in `spec.containers` instead. This changes the previous classic sidecar default. Native
+sidecars and regular init containers share one ordering: ascending `weight`
+(default 100), then map key. Their keys and rendered container names must be
+unique. The chart strips `native` and `weight` from the container output.
+
+When migrating, set lower weights on init containers that prepare files or tools
+needed by sidecars. A native sidecar's startup probe must not depend on the main
+application starting, because that probe gates the remaining init containers and
+the application. Use `native: false` for sidecars that need classic startup
+behavior.
+
+Native sidecars use the same image inheritance, probes, mounts, resources,
+security context and `enabled` handling as other sidecars. `native: true`
+sets `restartPolicy: Always` after container overrides. Existing native
+sidecars declared directly in `initContainers` remain supported.
+
+```yaml
+components:
+  main:
+    container:
+      image: {repository: example/app, tag: "1.0"}
+    initContainers:
+      tools:
+        weight: 0
+        command: [install-tools]
+      clone:
+        weight: 20
+        command: [clone-repositories]
+    sidecars:
+      token-renewal:
+        native: true
+        weight: 10
+        command: [renew-token]
+        probes:
+          startup:
+            exec:
+              command: [check-token]
+            periodSeconds: 5
+            failureThreshold: 60
+```
+
+With this sequence, tools completes, token renewal starts, its startup probe
+succeeds, cloning completes, and the main application starts. Token renewal
+continues running. A readiness probe alone does not gate the next init
+container; use `probes.startup` for that dependency. See the
+[Kubernetes sidecar lifecycle documentation](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/#sidecar-containers-and-pod-lifecycle).
+Kubernetes v1.31.14 supports this behavior with `SidecarContainers` enabled.
 
 ### Conditional containers and typed user IDs
 

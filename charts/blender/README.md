@@ -309,7 +309,10 @@ environment ready.
 Only prepare installs dependencies. After successful verification, it atomically
 points `/config/blender-mcp-server/current` at the ready environment.
 `start_server.py` only executes that environment's `blender-mcp` HTTP server.
-Kubernetes completes prepare before starting either the desktop or sidecar.
+The prepare init container has weight 0, so Kubernetes completes prepare before
+starting the native MCP sidecar. Common's default places that sidecar in
+`initContainers` with `restartPolicy: Always`. The desktop starts after the
+sidecar's existing TCP startup probe succeeds.
 The sidecar runs as the configured `PUID`/`PGID` with a read-only root filesystem;
 it needs read/execute access to the prepared environment, not package-install access.
 

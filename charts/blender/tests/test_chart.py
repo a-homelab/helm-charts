@@ -169,7 +169,7 @@ def test_http_sidecar_routing_workspace_and_gpu_isolation():
         "components.main.routes.mcp.hostnames[0]=blender.example.com",
     )
     pod = resources["Deployment"]["spec"]["template"]["spec"]
-    sidecar = next(c for c in pod["containers"] if c["name"] == "mcp")
+    sidecar = next(c for c in pod["initContainers"] if c["name"] == "mcp")
     assert sidecar["image"] == pod["containers"][0]["image"]
     assert "nvidia.com/gpu" not in sidecar["resources"]["limits"]
     mounts = {m["mountPath"]: m["name"] for m in sidecar["volumeMounts"]}
@@ -224,8 +224,9 @@ def test_rejects_removed_server_toggle_and_route_without_mcp(args):
 def test_single_toggle_controls_addon_and_http_server(enabled):
     resources = render("--set", f"mcp.enabled={str(enabled).lower()}")
     pod = resources["Deployment"]["spec"]["template"]["spec"]
-    assert [c["name"] for c in pod["containers"]] == (
-        ["main", "mcp"] if enabled else ["main"]
+    assert [c["name"] for c in pod["containers"]] == ["main"]
+    assert [c["name"] for c in pod["initContainers"]] == (
+        ["prepare", "mcp"] if enabled else ["prepare"]
     )
     assert (
         8000 in {p["port"] for p in resources["Service"]["spec"]["ports"]}
@@ -249,7 +250,11 @@ def test_sidecar_inherits_image_and_persistent_cache_identity(tag):
         "components.main.container.env.PGID=5678",
     )
     pod = resources["Deployment"]["spec"]["template"]["spec"]
-    main, sidecar = pod["containers"]
+    main = pod["containers"][0]
+    prepare, sidecar = pod["initContainers"]
+    assert prepare["name"] == "prepare"
+    assert sidecar["name"] == "mcp"
+    assert sidecar["restartPolicy"] == "Always"
     assert main["image"] == sidecar["image"] == pod["initContainers"][0]["image"]
     assert sidecar["securityContext"]["runAsUser"] == 1234
     assert sidecar["securityContext"]["runAsGroup"] == 5678

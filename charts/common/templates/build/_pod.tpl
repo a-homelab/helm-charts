@@ -7,8 +7,8 @@
   {{- include "common.lib.nativeMap" (dict "ctx" $ctx "map" $pod.volumes "keyField" "name" "box" $b) -}}
   {{- $volumes := $b.result -}}
 
-  {{/* main container, then sidecars sorted by key */}}
   {{- $containers := dict -}}
+  {{- $initContainers := dict -}}
   {{- include "common.build.container" (dict "ctx" $ctx "containerName" $name "values" $comp.container "box" $b) -}}
   {{- $_ := set $b.result "weight" (dig "weight" 100 $comp.container) -}}
   {{- $_ := set $containers $name $b.result -}}
@@ -17,16 +17,21 @@
       {{- if eq $scName $name -}}{{- fail (printf "common: container key %q duplicates the main container" $name) -}}{{- end -}}
       {{- include "common.build.container" (dict "ctx" $ctx "containerName" $scName "values" $sc "inheritImage" $comp.container.image "box" $b) -}}
       {{- $_ := set $b.result "weight" (dig "weight" 100 $sc) -}}
-      {{- $_ := set $containers $scName $b.result -}}
+      {{- if or (not (hasKey $sc "native")) $sc.native -}}
+        {{- $_ := set $b.result "restartPolicy" "Always" -}}
+        {{- $_ := set $initContainers $scName $b.result -}}
+      {{- else -}}
+        {{- $_ := set $containers $scName $b.result -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
 
   {{- include "common.lib.mapToList" (dict "map" $containers "box" $b) -}}
   {{- $containers = $b.result -}}
-  {{- $initContainers := dict -}}
   {{- range $icName, $ic := ($comp.initContainers | default dict) -}}
     {{- if ne (kindOf $ic) "invalid" -}}
       {{- if eq $icName $name -}}{{- fail (printf "common: container key %q duplicates the main container" $name) -}}{{- end -}}
+      {{- if hasKey $initContainers $icName -}}{{- fail (printf "common: init container key %q duplicates a native sidecar" $icName) -}}{{- end -}}
       {{- include "common.build.container" (dict "ctx" $ctx "containerName" $icName "values" $ic "inheritImage" $comp.container.image "box" $b) -}}
       {{- $_ := set $b.result "weight" (dig "weight" 100 $ic) -}}
       {{- $_ := set $initContainers $icName $b.result -}}

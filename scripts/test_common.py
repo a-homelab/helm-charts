@@ -308,8 +308,8 @@ def test_container_defaults_ordering_and_partial_image(render):
         },
     )
     p = pod(render(values))
-    assert [c["name"] for c in p["initContainers"]] == ["z-first", "a-last"]
-    assert p["containers"][1]["image"] == "nginx:2"
+    assert [c["name"] for c in p["initContainers"]] == ["z-first", "a-last", "proxy"]
+    assert p["initContainers"][2]["image"] == "nginx:2"
     assert all(
         c["securityContext"]["runAsNonRoot"]
         for c in p["containers"] + p["initContainers"]
@@ -1042,6 +1042,7 @@ def test_independent_native_mount_maps_and_partial_overrides(render):
     }
     main["initContainers"] = {
         "prepare": {
+            "weight": 0,
             "volumeMounts": {
                 "workspace": {
                     "name": "workspace",
@@ -1257,11 +1258,9 @@ def test_conditional_auxiliary_containers_and_service_ports(render, enabled):
     )
     docs = render(values)
     result = pod(docs)
-    assert [c["name"] for c in result["containers"]] == (
-        ["main", "proxy"] if active else ["main"]
-    )
+    assert [c["name"] for c in result["containers"]] == ["main"]
     assert [c["name"] for c in result.get("initContainers", [])] == (
-        ["native-sidecar", "prepare"] if active else []
+        ["native-sidecar", "prepare", "proxy"] if active else []
     )
     ports = {p["port"] for p in one(docs, "Service")["spec"]["ports"]}
     assert ports == ({8080, 9000, 9001} if active else {8080})
@@ -1394,3 +1393,131 @@ def test_templated_security_ids_reject_invalid_integers(render, value):
         }
     )
     render(values, error="runAsUser must resolve to a non-negative integer")
+
+
+@pytest.mark.parametrize(
+    "kind", ["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"]
+)
+def test_native_sidecars_preserve_container_fields_and_order(render, kind):
+    probe = {"exec": {"command": ["check-token"]}, "periodSeconds": 5}
+    mount = {"name": "token", "mountPath": "/token", "readOnly": True}
+    values = app(
+        kind=kind,
+        cronjob={"schedule": "0 * * * *"},
+        containerDefaults={"securityContext": {"runAsNonRoot": True}},
+        pod={"volumes": {"token": {"emptyDir": {}}}},
+        initContainers={
+            "tools": {"weight": 0, "command": ["install-tools"]},
+            "clone": {"weight": 20, "command": ["clone-repositories"]},
+            "a-tie": {"weight": 10},
+        },
+        sidecars={
+            "token-renewal": {
+                "native": True,
+                "weight": 10,
+                "image": {"tag": "2"},
+                "probes": {
+                    name: probe for name in ("startup", "readiness", "liveness")
+                },
+                "volumeMounts": {"token": mount},
+                "resources": {"requests": {"cpu": "10m"}},
+                "env": {"MODE": "renew"},
+                "command": ["renew-token"],
+                "ports": {"token": {"port": 9000}},
+                "overrides": {"workingDir": "/token", "restartPolicy": None},
+            },
+            "z-tie": {"weight": 10},
+            "classic": {"native": False},
+            "explicit-classic": {"native": False},
+            "disabled": {"native": True, "enabled": False},
+            "deleted": None,
+        },
+    )
+    docs = render(values)
+    manifest = one(docs, kind)
+    validate_manifest(manifest, "1.31.14")
+    spec = manifest["spec"]
+    if kind == "CronJob":
+        spec = spec["jobTemplate"]["spec"]
+    result = spec["template"]["spec"]
+    assert [c["name"] for c in result["containers"]] == [
+        "classic",
+        "explicit-classic",
+        "main",
+    ]
+    assert [c["name"] for c in result["initContainers"]] == [
+        "tools",
+        "a-tie",
+        "token-renewal",
+        "z-tie",
+        "clone",
+    ]
+    token = result["initContainers"][2]
+    assert token["restartPolicy"] == "Always"
+    assert token["image"] == "nginx:2"
+    assert result["initContainers"][3]["image"] == "nginx:1.0"
+    for name in ("startupProbe", "readinessProbe", "livenessProbe"):
+        assert token[name] == probe
+    assert token["volumeMounts"] == [mount]
+    assert token["securityContext"] == {"runAsNonRoot": True}
+    assert token["resources"] == {"requests": {"cpu": "10m"}}
+    assert token["env"] == [{"name": "MODE", "value": "renew"}]
+    assert token["command"] == ["renew-token"]
+    assert token["workingDir"] == "/token"
+    assert {p["name"] for p in one(docs, "Service")["spec"]["ports"]} == {
+        "http",
+        "token",
+    }
+    for container in result["containers"] + result["initContainers"]:
+        assert not {"native", "weight", "enabled"} & container.keys()
+        if container["name"] not in {"token-renewal", "z-tie"}:
+            assert "restartPolicy" not in container
+
+
+@pytest.mark.parametrize("native", ["true", 1, {}, []])
+def test_native_sidecar_requires_boolean(render, native):
+    render(app(sidecars={"token": {"native": native}}), error="native")
+
+
+@pytest.mark.parametrize(
+    "location", ["container", "containerDefaults", "initContainers"]
+)
+def test_native_opt_in_is_scoped_to_sidecars(render, location):
+    values = app()
+    if location == "initContainers":
+        values["components"]["main"][location] = {"prepare": {"native": True}}
+    else:
+        values["components"]["main"].setdefault(location, {})["native"] = True
+    render(values, error="native")
+
+
+@pytest.mark.parametrize(
+    "sidecars, init_containers, error",
+    [
+        ({"token": {"native": True}}, {"token": {}}, "duplicates a native sidecar"),
+        (
+            {"token": {"native": True, "name": "clone"}},
+            {"clone": {}},
+            "duplicate container name",
+        ),
+        ({"main": {"native": True}}, {}, "duplicates the main container"),
+        ({"token": {"native": True, "name": "main"}}, {}, "duplicate container name"),
+    ],
+)
+def test_native_sidecar_rejects_container_collisions(
+    render, sidecars, init_containers, error
+):
+    render(app(sidecars=sidecars, initContainers=init_containers), error=error)
+
+
+def test_native_sidecar_can_be_disabled_deleted_or_switched_by_overlay(render):
+    values = app(sidecars={"token": {"native": True}})
+    assert pod(render(values))["initContainers"][0]["restartPolicy"] == "Always"
+    for overlay in ({"enabled": False}, None, {"native": False}):
+        result = pod(
+            render(values, {"components": {"main": {"sidecars": {"token": overlay}}}})
+        )
+        assert not result.get("initContainers")
+        assert [c["name"] for c in result["containers"]] == (
+            ["main", "token"] if overlay == {"native": False} else ["main"]
+        )

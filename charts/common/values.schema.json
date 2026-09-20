@@ -289,7 +289,7 @@
           "$ref": "#/definitions/container"
         },
         "sidecars": {
-          "$ref": "#/definitions/containerMap"
+          "$ref": "#/definitions/sidecarMap"
         },
         "initContainers": {
           "$ref": "#/definitions/containerMap"
@@ -14966,6 +14966,221 @@
       },
       "type": "object",
       "additionalProperties": false
+    },
+    "sidecarMap": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "$ref": "#/definitions/sidecar"
+          }
+        ]
+      }
+    },
+    "sidecar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Container name override (tpl-rendered); defaults to the component name"
+        },
+        "image": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "repository": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tag": {
+              "type": [
+                "string",
+                "number",
+                "null"
+              ]
+            },
+            "pullPolicy": {
+              "enum": [
+                "Always",
+                "IfNotPresent",
+                "Never",
+                ""
+              ]
+            }
+          }
+        },
+        "command": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "args": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "workingDir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "env": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "value": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "valueFrom": {
+                    "$ref": "#/definitions/io.k8s.api.core.v1.EnvVarSource"
+                  },
+                  "weight": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 999999
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "envFrom": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/definitions/io.k8s.api.core.v1.EnvFromSource"
+              }
+            ]
+          }
+        },
+        "ports": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/definitions/port"
+              }
+            ]
+          }
+        },
+        "probes": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "liveness": {
+              "$ref": "#/definitions/probe"
+            },
+            "readiness": {
+              "$ref": "#/definitions/probe"
+            },
+            "startup": {
+              "$ref": "#/definitions/probe"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
+        },
+        "securityContext": {
+          "$ref": "#/definitions/containerSecurityContext"
+        },
+        "lifecycle": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.Lifecycle"
+        },
+        "restartPolicy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999
+        },
+        "overrides": {
+          "$ref": "#/definitions/overrides"
+        },
+        "volumeMounts": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Map keyed by mount ID. Values use native VolumeMount fields, including explicit name and mountPath. IDs are not emitted.",
+          "additionalProperties": {
+            "$ref": "#/definitions/storage.io.k8s.api.core.v1.VolumeMount"
+          }
+        },
+        "enabled": {
+          "$ref": "#/definitions/conditionalEnabled"
+        },
+        "native": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render under initContainers with restartPolicy Always, ordered with regular init containers by weight and map key. Requires the SidecarContainers feature gate."
+        }
+      }
     }
   },
   "additionalProperties": false
