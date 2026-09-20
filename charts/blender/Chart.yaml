@@ -2,7 +2,7 @@ apiVersion: v2
 name: blender
 description: Persistent Blender authoring desktop with optional NVIDIA and MCP support.
 type: application
-version: 0.5.0
+version: 0.6.0
 appVersion: "5.2.2"
 dependencies:
   - name: common
