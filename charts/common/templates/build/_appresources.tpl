@@ -52,14 +52,10 @@ Input dict: { ctx, components (resolved map), box }
     {{- if and (ne (kindOf $v) "invalid") (or (not (hasKey $v "enabled")) $v.enabled) -}}
       {{- include "common.appResources.meta" (dict "ctx" $ctx "components" $components "key" $name "entry" $v "box" $m) -}}
       {{- $manifest := dict "apiVersion" "v1" "kind" "ConfigMap" "metadata" $m.meta -}}
-      {{- $data := $v.data | default dict -}}
-      {{- if $v.tpl -}}
-        {{- include "common.lib.tplMap" (dict "ctx" $ctx "map" $data "box" $b) -}}
-        {{- $data = $b.result -}}
-      {{- end -}}
-      {{- include "common.lib.setIf" (dict "target" $manifest "key" "data" "value" $data) -}}
-      {{- include "common.lib.setIf" (dict "target" $manifest "key" "binaryData" "value" $v.binaryData) -}}
-      {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" $v.overrides) -}}
+      {{- include "common.configMap.resolve" (dict "ctx" $ctx "key" $name "entry" $v "box" $b) -}}
+      {{- include "common.lib.setIf" (dict "target" $manifest "key" "data" "value" $b.result.data) -}}
+      {{- include "common.lib.setIf" (dict "target" $manifest "key" "binaryData" "value" $b.result.binaryData) -}}
+      {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $manifest "overrides" (omit ($v.overrides | default dict) "data" "binaryData")) -}}
       {{- $out = append $out $manifest -}}
     {{- end -}}
   {{- end -}}

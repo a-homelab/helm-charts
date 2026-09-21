@@ -6,6 +6,12 @@
   {{- $b := dict -}}
   {{- include "common.lib.nativeMap" (dict "ctx" $ctx "map" $pod.volumes "keyField" "name" "box" $b) -}}
   {{- $volumes := $b.result -}}
+  {{- range $volume := $volumes -}}
+    {{- include "common.configMap.projection" (dict "ctx" $ctx "source" $volume.configMap) -}}
+    {{- range $source := (($volume.projected | default dict).sources | default list) -}}
+      {{- include "common.configMap.projection" (dict "ctx" $ctx "source" $source.configMap) -}}
+    {{- end -}}
+  {{- end -}}
 
   {{- $containers := dict -}}
   {{- $initContainers := dict -}}

@@ -24,12 +24,22 @@ def render(tmp_path):
     (chart / "values.schema.json").write_text(json.dumps(compose()))
 
     def run(
-        values, *overlays, error=None, template=None, validate=True, extension=None
+        values,
+        *overlays,
+        error=None,
+        template=None,
+        validate=True,
+        extension=None,
+        files=None,
     ):
         (chart / "values.schema.json").write_text(json.dumps(compose(extension)))
         (chart / "values.yaml").write_text(yaml.safe_dump(values))
         if template:
             (chart / "templates/all.yaml").write_text(template)
+        for name, content in (files or {}).items():
+            path = chart / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
         cmd = ["helm", "template", "test", str(chart), "--namespace", "apps"]
         for index, overlay in enumerate(overlays):
             file = tmp_path / f"overlay-{index}.yaml"
@@ -1049,7 +1059,7 @@ def test_independent_native_mount_maps_and_partial_overrides(render):
                     "mountPath": "/workspace",
                     "readOnly": False,
                 },
-            }
+            },
         }
     }
     main["sidecars"] = {
@@ -1521,3 +1531,201 @@ def test_native_sidecar_can_be_disabled_deleted_or_switched_by_overlay(render):
         assert [c["name"] for c in result["containers"]] == (
             ["main", "token"] if overlay == {"native": False} else ["main"]
         )
+
+
+def config_files_app(files, **config):
+    values = app(
+        pod={
+            "volumes": {"cfg": {"configMap": {"ref": "config"}}},
+            "annotations": {
+                "checksum/config": '{{ include "common.checksum.configMap" (list . "config") }}'
+            },
+        }
+    )
+    values["appResources"] = {"configMap": {"config": {"files": files, **config}}}
+    return values
+
+
+def mounted_config(docs, volume="cfg"):
+    config = one(docs, "ConfigMap")
+    source = next(v for v in pod(docs)["volumes"] if v["name"] == volume)["configMap"]
+    return {
+        item["path"]: config["data"][item["key"]]
+        for item in source["items"]
+        if item["key"] in config.get("data", {})
+    }
+
+
+def test_config_files_preserve_paths_contents_and_modes(render):
+    values = config_files_app(
+        {
+            "bin/start.sh": {"file": "files/start.sh", "mode": 365},
+            "empty.txt": {"file": "files/empty.txt", "mode": 0},
+            "nested/config.txt": {"content": "{{ not.a.helm.template }}"},
+            "rendered/config.txt": {"file": "files/templated.txt", "tpl": True},
+            "inline.txt": {"content": "{{ .Release.Name }}", "tpl": True},
+        },
+        tpl=True,
+        data={"plain": "{{ .Release.Name }}"},
+        binaryData={"blob": "AA=="},
+    )
+    docs = render(
+        values,
+        files={
+            "files/start.sh": "#!/bin/sh\nprintf 'hello\\n'\n",
+            "files/empty.txt": "",
+            "files/templated.txt": "release={{ .Release.Name }}\n",
+        },
+    )
+    mounted = mounted_config(docs)
+    assert mounted["bin/start.sh"] == "#!/bin/sh\nprintf 'hello\\n'\n"
+    assert mounted["empty.txt"] == ""
+    assert mounted["nested/config.txt"] == "{{ not.a.helm.template }}"
+    assert mounted["rendered/config.txt"] == "release=test\n"
+    assert mounted["inline.txt"] == mounted["plain"] == "test"
+    source = pod(docs)["volumes"][0]["configMap"]
+    assert source["name"] == one(docs, "ConfigMap")["metadata"]["name"]
+    assert "ref" not in source
+    assert {i["path"]: i.get("mode") for i in source["items"]}["bin/start.sh"] == 365
+    assert {i["path"]: i.get("mode") for i in source["items"]}["empty.txt"] == 0
+    assert {"key": "blob", "path": "blob"} in source["items"]
+
+
+def test_config_files_checksum_uses_effective_content(render):
+    values = config_files_app({"nested/file": {"file": "files/config"}})
+
+    def checksum(docs):
+        return one(docs, "Deployment")["spec"]["template"]["metadata"]["annotations"][
+            "checksum/config"
+        ]
+
+    first = render(values, files={"files/config": "one"})
+    second = render(values, files={"files/config": "two"})
+    assert checksum(first) != checksum(second)
+    values["appResources"]["configMap"]["config"]["overrides"] = {
+        "data": {"nested__file": "fixed"}
+    }
+    third = render(values, files={"files/config": "three"})
+    fourth = render(values, files={"files/config": "four"})
+    assert checksum(third) == checksum(fourth)
+    assert mounted_config(third) == {"nested/file": "fixed"}
+
+
+def test_config_files_overlay_deletion_and_custom_keys(render):
+    values = config_files_app(
+        {
+            "a/b": {"content": "nested"},
+            "a__b": {"content": "flat", "key": "flat"},
+            "removed": {"content": "remove"},
+        }
+    )
+    docs = render(
+        values,
+        {"appResources": {"configMap": {"config": {"files": {"removed": None}}}}},
+    )
+    assert mounted_config(docs) == {"a/b": "nested", "a__b": "flat"}
+
+
+def test_config_files_managed_projection_and_native_items(render):
+    values = config_files_app({"a/b": {"content": "value"}})
+    values["appResources"]["configMap"]["config"]["overrides"] = {
+        "metadata": {"name": "renamed"}
+    }
+    values["components"]["main"]["pod"]["volumes"] = {
+        "projected": {
+            "projected": {
+                "sources": [{"configMap": {"ref": "config", "optional": False}}]
+            }
+        },
+        "subset": {
+            "configMap": {"ref": "config", "items": [{"key": "a__b", "path": "custom"}]}
+        },
+        "external": {"configMap": {"name": "unmanaged"}},
+        "disabled": {"enabled": False, "configMap": {"ref": "absent"}},
+    }
+    docs = render(values)
+    volumes = {v["name"]: v for v in pod(docs)["volumes"]}
+    assert volumes["projected"]["projected"]["sources"] == [
+        {
+            "configMap": {
+                "name": "renamed",
+                "optional": False,
+                "items": [{"key": "a__b", "path": "a/b"}],
+            }
+        }
+    ]
+    assert volumes["subset"]["configMap"] == {
+        "name": "renamed",
+        "items": [{"key": "a__b", "path": "custom"}],
+    }
+    assert volumes["external"]["configMap"] == {"name": "unmanaged"}
+    assert "disabled" not in volumes
+
+
+@pytest.mark.parametrize(
+    "path", ["/absolute", "../escape", "a/../b", "a/./b", "a//b", "a/", ".", ".."]
+)
+def test_config_files_reject_invalid_paths(render, path):
+    render(config_files_app({path: {"content": "bad"}}), error="must be relative")
+
+
+@pytest.mark.parametrize(
+    "files, config, error",
+    [
+        ({"a": {"file": "files/missing"}}, {}, "missing or excluded"),
+        ({"a": {"file": "../outside"}}, {}, "must be relative"),
+        ({"a": {"file": "files/*"}}, {}, "must be relative"),
+        ({"a": {"file": "files/test", "content": "both"}}, {}, "schema"),
+        ({"a": {}}, {}, "schema"),
+        ({"a": {"content": "mode", "mode": 512}}, {}, "schema"),
+        ({"a/b": {"content": "a"}, "a__b": {"content": "b"}}, {}, "collides with key"),
+        ({"a": {"content": "a"}}, {"data": {"a": "b"}}, "collides with key"),
+        ({"a": {"content": "a"}}, {"binaryData": {"a": "AA=="}}, "collides with key"),
+        ({"a": {"content": "a"}, "a/b": {"content": "b"}}, {}, "mount paths"),
+        ({"a/b": {"content": "b"}}, {"data": {"a": "a"}}, "mount paths"),
+        (
+            {},
+            {"data": {"a": "a"}, "binaryData": {"a": "AA=="}},
+            "occurs in data and binaryData",
+        ),
+    ],
+)
+def test_config_files_reject_ambiguous_sources_and_destinations(
+    render, files, config, error
+):
+    render(config_files_app(files, **config), error=error)
+
+
+def test_config_files_reject_excluded_chart_files(render):
+    render(
+        config_files_app({"a": {"file": "files/excluded"}}),
+        files={"files/excluded": "secret", ".helmignore": "files/excluded\n"},
+        error="missing or excluded",
+    )
+
+
+def test_config_files_reject_unknown_and_disabled_references(render):
+    values = config_files_app({})
+    del values["components"]["main"]["pod"]["annotations"]
+    values["appResources"]["configMap"] = {}
+    render(values, error="not defined")
+    values["appResources"]["configMap"] = {"config": {"enabled": False}}
+    render(values, error="not defined")
+
+
+def test_config_files_preserve_native_data_keys_when_not_projected(render):
+    values = config_files_app({}, data={".": "valid config key"})
+    del values["components"]["main"]["pod"]["volumes"]
+    assert one(render(values), "ConfigMap")["data"] == {".": "valid config key"}
+    values["components"]["main"]["pod"]["volumes"] = {
+        "cfg": {"configMap": {"ref": "config"}}
+    }
+    render(values, error="must be relative")
+
+
+def test_config_files_ref_and_name_are_mutually_exclusive(render):
+    values = config_files_app({})
+    values["components"]["main"]["pod"]["volumes"]["cfg"]["configMap"]["name"] = (
+        "external"
+    )
+    render(values, error="schema")

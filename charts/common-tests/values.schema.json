@@ -2028,6 +2028,22 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "files": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "$ref": "#/definitions/configMapFile"
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -12594,13 +12610,24 @@
             "boolean",
             "null"
           ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "type": [
         "object",
         "null"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "not": {
+        "required": [
+          "ref",
+          "name"
+        ],
+        "type": "object"
+      }
     },
     "storage.io.k8s.api.core.v1.KeyToPath": {
       "properties": {
@@ -14063,13 +14090,24 @@
             "boolean",
             "null"
           ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "type": [
         "object",
         "null"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "not": {
+        "required": [
+          "ref",
+          "name"
+        ],
+        "type": "object"
+      }
     },
     "storage.io.k8s.api.core.v1.DownwardAPIProjection": {
       "properties": {
@@ -15181,6 +15219,45 @@
           "description": "Render under initContainers with restartPolicy Always, ordered with regular init containers by weight and map key. Requires the SidecarContainers feature gate."
         }
       }
+    },
+    "configMapFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "type": "string"
+        },
+        "tpl": {
+          "type": "boolean"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "mode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 511
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "file"
+          ]
+        },
+        {
+          "required": [
+            "content"
+          ]
+        }
+      ]
     }
   },
   "additionalProperties": false

@@ -174,12 +174,6 @@ Usage: {{ include "common.ref.tlsSecret" (list . "web") }}
 {{- define "common.checksum.configMap" -}}
   {{- $ctx := index . 0 -}}{{- $key := index . 1 -}}{{- $b := dict -}}
   {{- include "common.appResources.lookup" (dict "ctx" $ctx "type" "configMap" "key" $key "where" "checksum" "box" $b) -}}
-  {{- $v := $b.result -}}{{- $data := $v.data | default dict -}}
-  {{- if $v.tpl -}}
-    {{- include "common.lib.tplMap" (dict "ctx" $ctx "map" $data "box" $b) -}}{{- $data = $b.result -}}
-  {{- end -}}
-  {{- $m := dict "data" $data "binaryData" ($v.binaryData | default dict) -}}
-  {{- include "common.lib.applyOverrides" (dict "ctx" $ctx "target" $m "overrides" (pick ($v.overrides | default dict) "data" "binaryData")) -}}
-  {{- include "common.lib.cleanNulls" $m -}}
-  {{- toJson $m | sha256sum -}}
+  {{- include "common.configMap.resolve" (dict "ctx" $ctx "key" $key "entry" $b.result "box" $b) -}}
+  {{- toJson (pick $b.result "data" "binaryData") | sha256sum -}}
 {{- end -}}

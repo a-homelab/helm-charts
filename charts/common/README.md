@@ -327,6 +327,71 @@ native `metadata` and `spec` as described below.
   `spec.storageClassName: ""` to disable default storage-class selection. PVC entries
   also accept `enabled` and the optional `component` naming/label back-reference.
 
+### ConfigMap files
+
+Use `appResources.configMap.<name>.files` to package text files by their relative
+mount paths. Each entry selects exactly one source: `file` loads an exact path
+from the consumer chart, while `content` supplies inline text. Empty files are
+supported; missing or excluded chart files fail rendering.
+
+```yaml
+appResources:
+  configMap:
+    bootstrap:
+      files:
+        bin/start.sh:
+          file: files/start.sh
+          mode: 0555
+        settings/application.yaml:
+          content: |
+            hostname: {{ .Values.global.domain }}
+          tpl: true
+
+components:
+  main:
+    pod:
+      annotations:
+        checksum/bootstrap: '{{ include "common.checksum.configMap" (list . "bootstrap") }}'
+      volumes:
+        bootstrap:
+          configMap:
+            ref: bootstrap
+    container:
+      volumeMounts:
+        bootstrap:
+          name: bootstrap
+          mountPath: /opt/bootstrap
+          readOnly: true
+```
+
+`configMap.ref` selects an enabled managed ConfigMap and generates its `name`
+and `items`. This also works for ConfigMap sources inside projected volumes.
+Existing `data` and `binaryData` entries are included at the volume root. Use
+native `name` references for external ConfigMaps. Explicit `items` takes
+precedence over generated mappings when a volume needs a subset or custom paths.
+Mount locations remain explicit in each container's `volumeMounts`.
+
+File contents are literal by default, even when the ConfigMap has `tpl: true`.
+Set `tpl: true` on an individual file to evaluate its contents once. The
+ConfigMap-level `tpl` switch continues to apply only to `data`. This preserves
+scripts or configuration containing another application's template syntax.
+`file` paths are literal chart-relative paths; recursive discovery and globs
+are not supported. Helm's `.Files` restrictions and `.helmignore` apply.
+
+Keys default to the destination path with `/` replaced by `__`, for example
+`bin/start.sh` becomes `bin__start.sh`. Set `key` on a file to disambiguate a
+collision or shorten a key exceeding 253 characters. Duplicate keys and
+conflicting file/directory destinations fail rendering. Paths cannot contain
+absolute, empty, `.` or `..` components. File `mode` accepts an integer from
+0 to 511; omitted modes inherit the volume's `defaultMode`. Set a file entry
+to `null` in an overlay to remove it.
+
+Rendering, projections and `common.checksum.configMap` share the same resolver.
+Checksums cover the effective `data` and `binaryData`, including file contents,
+opt-in templating and resource overrides. Remove files through `files` overlays;
+Helm can strip nulls from `overrides` before the resolver sees them. Use
+`binaryData` for binary payloads and keep ConfigMaps within Kubernetes' size limit.
+
 Define `pod.volumes` as a map keyed by volume name. Each value contains native
 Kubernetes Volume source fields such as `emptyDir`, `persistentVolumeClaim`,
 `configMap`, `secret`, `projected`, `csi` or `ephemeral`. The chart supplies `name`
