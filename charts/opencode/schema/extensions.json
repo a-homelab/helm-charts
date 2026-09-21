@@ -1,0 +1,164 @@
+{
+  "properties": {
+    "opencode": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "type": "object"
+        },
+        "instructions": {
+          "type": "string"
+        }
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "existingSecret",
+        "owner",
+        "author",
+        "repositories"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string"
+        },
+        "author": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "email"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[^\\r\\n]*$"
+            },
+            "email": {
+              "type": "string",
+              "pattern": "^[^\\r\\n]*$"
+            }
+          }
+        },
+        "repositories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "path"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.-]+$"
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-][A-Za-z0-9_./-]*$"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "components": {
+          "type": "object",
+          "required": [
+            "main"
+          ],
+          "properties": {
+            "main": {
+              "type": "object",
+              "required": [
+                "kind",
+                "deployment"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "Deployment"
+                },
+                "deployment": {
+                  "type": "object",
+                  "required": [
+                    "replicas",
+                    "strategy"
+                  ],
+                  "properties": {
+                    "replicas": {
+                      "const": 1
+                    },
+                    "strategy": {
+                      "type": "object",
+                      "required": [
+                        "type"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "Recreate"
+                        }
+                      }
+                    }
+                  }
+                },
+                "hpa": {
+                  "properties": {
+                    "enabled": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "components"
+      ]
+    },
+    {
+      "if": {
+        "properties": {
+          "git": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "git": {
+            "properties": {
+              "owner": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$"
+              },
+              "repositories": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

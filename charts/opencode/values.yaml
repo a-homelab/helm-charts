@@ -1,0 +1,311 @@
+opencode:
+  config:
+    $schema: https://opencode.ai/config.json
+    share: disabled
+    update: disable
+    skills:
+    - /opt/opencode-config/skills
+    agents:
+      build:
+        system: '{file:/opt/opencode-config/purpose.md}'
+  instructions: |
+    Follow the user's requested task. Read the repository's AGENTS.md before making changes.
+git:
+  enabled: false
+  existingSecret: opencode-github-app
+  owner: ''
+  author:
+    name: ''
+    email: ''
+  repositories: []
+appResources:
+  configMap:
+    configuration:
+      tpl: true
+      data:
+        opencode.json: '{{ .Values.opencode.config | toJson }}'
+        purpose.md: '{{ .Values.opencode.instructions }}'
+      files: {}
+    bootstrap:
+      files:
+        bootstrap/workspace.sh:
+          file: files/bootstrap/workspace.sh
+        services/github/github_token.py:
+          file: files/services/github/github_token.py
+        services/github/git_credentials.py:
+          file: files/services/github/git_credentials.py
+      tpl: true
+      data:
+        git.json: '{{ .Values.git | toJson }}'
+        gitconfig: |
+          [user]
+              name = {{ .Values.git.author.name | quote }}
+              email = {{ .Values.git.author.email | quote }}
+          [credential]
+              helper =
+              helper = !python3 /opt/opencode/services/github/git_credentials.py
+              useHttpPath = true
+          [pull]
+              ff = only
+          [push]
+              default = simple
+  pvc:
+    state:
+      metadata:
+        annotations:
+          helm.sh/resource-policy: keep
+          argocd.argoproj.io/sync-options: Prune=false,Delete=false
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+    workspace:
+      metadata:
+        annotations:
+          helm.sh/resource-policy: keep
+          argocd.argoproj.io/sync-options: Prune=false,Delete=false
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+components:
+  main:
+    kind: Deployment
+    deployment:
+      replicas: 1
+      strategy:
+        type: Recreate
+    container:
+      image:
+        repository: ghcr.io/a-homelab/opencode-container
+        tag: 2.0.11-fb3f5aa
+      env:
+        OPENCODE_CONFIG: /opt/opencode-config/opencode.json
+        OPENCODE_CONFIG_PROJECT_DISABLE: 'true'
+        OPENCODE_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: opencode-server
+              key: password
+        GIT_CONFIG_SYSTEM: /opt/opencode/gitconfig
+        GIT_TERMINAL_PROMPT: '0'
+        GH_CONFIG_DIR: '{{ if .Values.git.enabled }}/run/github-token/gh{{ else }}/state/config/gh{{ end }}'
+        GH_PROMPT_DISABLED: '1'
+      ports:
+        http:
+          port: 4096
+          expose: 4096
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        seccompProfile:
+          type: RuntimeDefault
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          memory: 4Gi
+      probes:
+        startup:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - >-
+              exec curl --fail --silent --show-error --max-time 3 --noproxy '*'
+              --user "opencode:${OPENCODE_PASSWORD}" --output /dev/null
+              http://127.0.0.1:4096/api/info
+          timeoutSeconds: 5
+          periodSeconds: 5
+          failureThreshold: 60
+        readiness:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - >-
+              exec curl --fail --silent --show-error --max-time 3 --noproxy '*'
+              --user "opencode:${OPENCODE_PASSWORD}" --output /dev/null
+              http://127.0.0.1:4096/api/info
+          timeoutSeconds: 5
+          periodSeconds: 10
+      volumeMounts:
+        bootstrap:
+          name: bootstrap
+          mountPath: /opt/opencode
+          readOnly: true
+        state:
+          name: state
+          mountPath: /state
+        workspace:
+          name: workspace
+          mountPath: /workspace
+        tmp:
+          name: tmp
+          mountPath: /tmp
+        configuration:
+          name: configuration
+          mountPath: /opt/opencode-config
+          readOnly: true
+        github-token:
+          name: github-token
+          mountPath: /run/github-token
+          readOnly: true
+          enabled: '{{ .Values.git.enabled }}'
+    initContainers:
+      workspace:
+        weight: 20
+        command:
+        - /bin/sh
+        - /opt/opencode/bootstrap/workspace.sh
+        env:
+          GIT_CONFIG_SYSTEM: /opt/opencode/gitconfig
+          GIT_TERMINAL_PROMPT: '0'
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+        volumeMounts:
+          bootstrap:
+            name: bootstrap
+            mountPath: /opt/opencode
+            readOnly: true
+          state:
+            name: state
+            mountPath: /state
+          workspace:
+            name: workspace
+            mountPath: /workspace
+          tmp:
+            name: tmp
+            mountPath: /tmp
+          configuration:
+            name: configuration
+            mountPath: /opt/opencode-config
+            readOnly: true
+          github-token:
+            name: github-token
+            mountPath: /run/github-token
+            readOnly: true
+            enabled: '{{ .Values.git.enabled }}'
+    sidecars:
+      github-token:
+        enabled: '{{ .Values.git.enabled }}'
+        weight: 10
+        native: true
+        command:
+        - python3
+        - /opt/opencode/services/github/github_token.py
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        probes:
+          startup:
+            exec:
+              command:
+              - python3
+              - /opt/opencode/services/github/github_token.py
+              - check
+            periodSeconds: 5
+            failureThreshold: 60
+          readiness:
+            exec:
+              command:
+              - python3
+              - /opt/opencode/services/github/github_token.py
+              - check
+            periodSeconds: 30
+        volumeMounts:
+          bootstrap:
+            name: bootstrap
+            mountPath: /opt/opencode
+            readOnly: true
+          github-app:
+            name: github-app
+            mountPath: /run/github-app
+            readOnly: true
+          github-token:
+            name: github-token
+            mountPath: /run/github-token
+    pod:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
+      annotations:
+        checksum/opencode-bootstrap: '{{ include "common.checksum.configMap" (list . "bootstrap") }}'
+        checksum/opencode-configuration: '{{ include "common.checksum.configMap" (list . "configuration")
+          }}'
+      volumes:
+        bootstrap:
+          configMap:
+            ref: bootstrap
+        configuration:
+          configMap:
+            ref: configuration
+        state:
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "state") }}'
+        workspace:
+          persistentVolumeClaim:
+            claimName: '{{ include "common.ref" (list . "pvc" "workspace") }}'
+        tmp:
+          emptyDir: {}
+        github-app:
+          enabled: '{{ .Values.git.enabled }}'
+          secret:
+            secretName: '{{ .Values.git.existingSecret }}'
+            defaultMode: 288
+        github-token:
+          enabled: '{{ .Values.git.enabled }}'
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+    routes:
+      main:
+        enabled: false
+        rules:
+        - timeouts:
+            request: 0s
+            backendRequest: 0s
+          backendRefs:
+          - port: 4096

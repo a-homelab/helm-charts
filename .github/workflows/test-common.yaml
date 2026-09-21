@@ -19,16 +19,25 @@ jobs:
           python-version: "3.13"
       - name: Install validation dependencies
         run: python -m pip install pytest==9.1.1 PyYAML==6.0.3 jsonschema==4.26.0
+      - name: Install shell validation dependencies
+        run: |-
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends jq coreutils shellcheck
+      - name: Check OpenCode shell scripts
+        run: shellcheck charts/opencode/files/bootstrap/*.sh
       - name: Resolve local library dependency
         run: |-
           helm dependency update charts/common-tests --skip-refresh
           mkdir -p charts/blender/charts
           helm package charts/common --destination charts/blender/charts
+          mkdir -p charts/opencode/charts
+          helm package charts/common --destination charts/opencode/charts
       - name: Check generated schemas
         run: |-
           python scripts/common_schema.py charts/common --check
           python scripts/common_schema.py charts/common-tests --check
           python scripts/common_schema.py charts/blender --extensions charts/blender/schema/extensions.json --check
+          python scripts/common_schema.py charts/opencode --extensions charts/opencode/schema/extensions.json --check
       - name: Verify pinned output schema snapshots
         if: startsWith(matrix.helm, 'v3.')
         run: python scripts/update_common_schemas.py --cache '${{ runner.temp }}/common-schema-sources' --check
@@ -37,6 +46,7 @@ jobs:
           helm lint charts/common --strict
           helm lint charts/common-tests --strict
           helm lint charts/blender --strict
+          helm lint charts/opencode --strict
       - name: Install helm-unittest
         if: startsWith(matrix.helm, 'v3.')
         run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.5.2
@@ -44,7 +54,7 @@ jobs:
         if: startsWith(matrix.helm, 'v3.')
         run: helm unittest charts/common-tests
       - name: Validate overlays, references, native outputs and migration examples
-        run: python -m pytest scripts/test_common.py charts/blender/tests -q
+        run: python -m pytest scripts/test_common.py charts/blender/tests charts/opencode/tests -q
       - name: Render harness fixtures
         run: |-
           helm template t charts/common-tests > /dev/null

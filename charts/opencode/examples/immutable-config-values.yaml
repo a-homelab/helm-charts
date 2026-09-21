@@ -1,0 +1,19 @@
+opencode:
+  instructions: |
+    Read the repository's AGENTS.md before making changes.
+    Preserve unfinished edits and use a separate worktree for each concurrent task.
+    Keep credentials out of source files, prompts, logs and Git commits.
+appResources:
+  configMap:
+    configuration:
+      files:
+        skills/workspace-review/SKILL.md:
+          content: |
+            ---
+            name: workspace-review
+            description: Inspect the current Git checkout before starting or resuming authoring work.
+            ---
+
+            Read AGENTS.md, inspect git status and identify the current branch and base commit.
+            Preserve dirty and untracked files. Do not pull or reset an active worktree.
+            Create a separate task worktree when another task owns the checkout.
