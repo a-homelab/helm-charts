@@ -84,6 +84,8 @@ components:
         repository: ghcr.io/a-homelab/opencode-container
         tag: 2.0.11-fb3f5aa
       env:
+        # Mirror server logs to stderr for container log collection.
+        OPENCODE_PRINT_LOGS: "1"
         OPENCODE_CONFIG: /opt/opencode-config/opencode.json
         OPENCODE_CONFIG_PROJECT_DISABLE: 'true'
         OPENCODE_PASSWORD:

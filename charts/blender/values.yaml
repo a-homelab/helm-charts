@@ -202,6 +202,17 @@ components:
           emptyDir:
             medium: Memory
             sizeLimit: 1Gi
+    services:
+      main:
+        ports:
+          http: {}
+          https: {}
+          mcp:
+            enabled: '{{ .Values.mcp.enabled }}'
+            port: 8000
+            # Numeric targets avoid native-sidecar name resolution on Kubernetes 1.31.
+            # https://github.com/kubernetes/kubernetes/issues/127958
+            targetPort: 8000
     routes:
       main:
         enabled: false

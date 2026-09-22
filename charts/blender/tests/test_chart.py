@@ -196,6 +196,10 @@ def test_http_sidecar_routing_workspace_and_gpu_isolation():
         3001,
         8000,
     }
+    mcp_port = next(
+        p for p in resources["Service"]["spec"]["ports"] if p["name"] == "mcp"
+    )
+    assert mcp_port["targetPort"] == 8000
     rule = resources["HTTPRoute"]["spec"]["rules"][0]
     assert rule["backendRefs"][0]["port"] == 8000
     assert rule["matches"] == [{"path": {"type": "Exact", "value": "/"}}]

@@ -263,6 +263,10 @@ components:
             sectionName: https
 ```
 
+The chart declares MCP's Service port with numeric `targetPort: 8000`, so
+Kubernetes 1.31 can route to the native sidecar. The port's `enabled` expression
+follows `mcp.enabled`; instance values need no Service override.
+
 Without a route, the MCP server is available on Service port 8000. For local access:
 
 ```sh

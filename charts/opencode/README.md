@@ -77,6 +77,12 @@ using environment-based authentication. OpenCode v2 uses `OPENCODE_PASSWORD`
 and the `/api/info` readiness endpoint. Integrations must use the v2 API or
 `@opencode/client`, rather than v1 `/session` or `/global/health` contracts.
 
+Server logs are mirrored to stderr by default with `OPENCODE_PRINT_LOGS=1`,
+so they are available through `kubectl logs`. Override
+`components.main.container.env.OPENCODE_PRINT_LOGS` to `"0"` to disable console
+logging. For temporary debug output, set `OPENCODE_LOG_LEVEL: DEBUG` in the same
+environment map; the default level is INFO.
+
 ## Immutable configuration, skills and tools
 
 Deployment configuration is mounted read-only at `/opt/opencode-config`,
