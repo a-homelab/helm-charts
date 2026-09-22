@@ -348,6 +348,54 @@ def test_native_sidecar_ports_and_service_overrides(render):
     assert ref == {"name": "public", "port": 80}
 
 
+@pytest.mark.parametrize("location", ["container", "sidecars", "initContainers"])
+@pytest.mark.parametrize("target", ["proxy", 4180])
+def test_service_ports_accept_named_or_numeric_targets(render, location, target):
+    values = app(
+        services={"main": {"ports": {"public": {"port": 80, "targetPort": target}}}}
+    )
+    main = values["components"]["main"]
+    if location == "container":
+        main["container"]["ports"]["proxy"] = {"port": 4180}
+    else:
+        main[location] = {"proxy": {"ports": {"proxy": {"port": 4180}}}}
+        if location == "initContainers":
+            main[location]["proxy"]["restartPolicy"] = "Always"
+    assert one(render(values), "Service")["spec"]["ports"] == [
+        {"name": "public", "port": 80, "targetPort": target, "protocol": "TCP"}
+    ]
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+@pytest.mark.parametrize("templated", [False, True])
+def test_conditional_service_ports_follow_optional_container(
+    render, enabled, templated
+):
+    condition = (
+        "{{ .Values.components.main.sidecars.proxy.enabled }}" if templated else enabled
+    )
+    values = app(
+        sidecars={"proxy": {"enabled": enabled, "ports": {"proxy": {"port": 4180}}}},
+        services={"main": {"ports": {"http": {}, "proxy": {"enabled": condition}}}},
+    )
+    ports = {p["name"]: p for p in one(render(values), "Service")["spec"]["ports"]}
+    assert ports["http"]["targetPort"] == "http"
+    assert ("proxy" in ports) == enabled
+    if enabled:
+        assert ports["proxy"]["targetPort"] == "proxy"
+        assert "enabled" not in ports["proxy"]
+
+
+def test_all_service_ports_disabled_omits_service(render):
+    values = app(services={"main": {"ports": {"unused": {"enabled": False}}}})
+    assert not any(doc["kind"] == "Service" for doc in render(values))
+
+
+def test_service_port_condition_must_resolve_to_boolean(render):
+    values = app(services={"main": {"ports": {"http": {"enabled": "{{ 7 }}"}}}})
+    render(values, error="enabled must resolve to true or false")
+
+
 def test_ambiguous_route_port_fails(render):
     values = app(routes={"main": {}})
     values["components"]["main"]["container"]["ports"]["metrics"] = {"port": 9090}

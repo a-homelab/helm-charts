@@ -1680,6 +1680,9 @@
                         ]
                       }
                     ]
+                  },
+                  "enabled": {
+                    "$ref": "#/definitions/conditionalEnabled"
                   }
                 }
               }

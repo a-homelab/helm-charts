@@ -1606,6 +1606,9 @@
                         ]
                       }
                     ]
+                  },
+                  "enabled": {
+                    "$ref": "#/definitions/conditionalEnabled"
                   }
                 }
               }

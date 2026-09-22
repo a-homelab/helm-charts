@@ -103,10 +103,32 @@ components:
   `restartPolicy: Always`).
 - Present `ports` selects only the listed entries. `{}` derives the matching
   container port. An empty ports map selects none.
+- Each Service port accepts `enabled` as a boolean or a template that resolves
+  to `true` or `false`. Disabled ports are omitted before target resolution.
 - `port` changes the Service-side port; `targetPort` accepts a declared port name
   or a number. Numeric target ports do not require a declared ContainerPort.
 - `enabled: false` disables an entry. A portless ExternalName Service is supported
   with `type: ExternalName`, `externalName`, and `ports: {}`.
+
+Service ports can mix named and numeric targets independently of container type:
+
+```yaml
+components:
+  main:
+    services:
+      main:
+        ports:
+          web:
+            port: 80
+            targetPort: http
+          metrics:
+            enabled: false
+            port: 9090
+            targetPort: 9090
+```
+
+`http` references a declared container port. Numeric targets need no container
+port declaration. An omitted `targetPort` uses the Service port entry's name.
 
 A managed StatefulSet governing Service must be headless. Select its key through
 `statefulset.service` (default `main`), or use `statefulset.serviceName` for an

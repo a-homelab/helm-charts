@@ -24,19 +24,24 @@
   {{- $ports := dict -}}
   {{- range $name, $port := $selected -}}
     {{- if ne (kindOf $port) "invalid" -}}
-      {{- $target := $port.targetPort | default $name -}}
-      {{- $source := dict -}}
-      {{- if eq (kindOf $target) "string" -}}
-        {{- $source = get $available $target | default dict -}}
-        {{- if not $source -}}{{- fail (printf "common: components.%s.services.%s port %q targets unknown container port %q; set a numeric targetPort for undeclared ports" $.name $.serviceName $name $target) -}}{{- end -}}
+      {{- $b := dict -}}
+      {{- include "common.lib.enabled" (dict "ctx" $.ctx "values" $port "box" $b) -}}
+      {{- if $b.result -}}
+        {{- $port := omit $port "enabled" -}}
+        {{- $target := $port.targetPort | default $name -}}
+        {{- $source := dict -}}
+        {{- if eq (kindOf $target) "string" -}}
+          {{- $source = get $available $target | default dict -}}
+          {{- if not $source -}}{{- fail (printf "common: components.%s.services.%s port %q targets unknown container port %q; set a numeric targetPort for undeclared ports" $.name $.serviceName $name $target) -}}{{- end -}}
+        {{- end -}}
+        {{- $number := $source.expose | default $source.port -}}
+        {{- if hasKey $port "port" -}}{{- $number = $port.port -}}{{- end -}}
+        {{- if or (not $number) (lt (int $number) 1) (gt (int $number) 65535) -}}{{- fail (printf "common: components.%s.services.%s port %q must resolve a port from 1 to 65535" $.name $.serviceName $name) -}}{{- end -}}
+        {{- $entry := dict "port" (int $number) "targetPort" $target "protocol" ($source.protocol | default "TCP") -}}
+        {{- with $source.appProtocol -}}{{- $_ := set $entry "appProtocol" . -}}{{- end -}}
+        {{- include "common.lib.merge" (dict "base" $entry "overlay" $port) -}}
+        {{- $_ := set $ports $name $entry -}}
       {{- end -}}
-      {{- $number := $source.expose | default $source.port -}}
-      {{- if hasKey $port "port" -}}{{- $number = $port.port -}}{{- end -}}
-      {{- if or (not $number) (lt (int $number) 1) (gt (int $number) 65535) -}}{{- fail (printf "common: components.%s.services.%s port %q must resolve a port from 1 to 65535" $.name $.serviceName $name) -}}{{- end -}}
-      {{- $entry := dict "port" (int $number) "targetPort" $target "protocol" ($source.protocol | default "TCP") -}}
-      {{- with $source.appProtocol -}}{{- $_ := set $entry "appProtocol" . -}}{{- end -}}
-      {{- include "common.lib.merge" (dict "base" $entry "overlay" $port) -}}
-      {{- $_ := set $ports $name $entry -}}
     {{- end -}}
   {{- end -}}
   {{- include "common.lib.mapToList" (dict "map" $ports "keyField" "name" "box" .box) -}}
@@ -58,7 +63,7 @@
       {{- include "common.lib.merge" (dict "base" $svc "overlay" $values "keepNulls" true) -}}
       {{- if $svc.enabled -}}
         {{- $b := dict -}}
-        {{- include "common.build.servicePorts" (dict "component" $comp "service" $svc "name" $.name "serviceName" $key "box" $b) -}}
+        {{- include "common.build.servicePorts" (dict "ctx" $ctx "component" $comp "service" $svc "name" $.name "serviceName" $key "box" $b) -}}
         {{- $ports := $b.result -}}
         {{- if or $ports (eq $svc.type "ExternalName") (eq ($svc.clusterIP | default "") "None") -}}
           {{- $resourceName := include "common.resourceName" (dict "ctx" $ctx "component" $.name "key" $key "values" $svc) -}}
