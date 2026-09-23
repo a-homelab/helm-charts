@@ -82,7 +82,7 @@ components:
     container:
       image:
         repository: ghcr.io/a-homelab/opencode-container
-        tag: 2.0.11-799ddd5
+        tag: 2.0.11-1efcf21
       env:
         # Mirror server logs to stderr for container log collection.
         OPENCODE_PRINT_LOGS: "1"
