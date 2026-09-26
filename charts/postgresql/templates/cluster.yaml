@@ -3,6 +3,10 @@ kind: Cluster
 metadata:
   name: {{ include "postgresql.fullname" . }}
   namespace: {{ .Release.Namespace | quote }}
+  {{- with .Values.syncWave }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ . | quote }}
+  {{- end }}
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:

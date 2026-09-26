@@ -40,6 +40,12 @@ storageClass: rook-ceph-block-ssd
 backup:
   storageClassName: rook-ceph-bucket-ssd
 
+# Argo CD sync wave for every resource this chart renders (Cluster, its TLS
+# Certificates and the backup bucket claim). Set it below the consumers'
+# waves when an Application runs database jobs as Sync hooks, so the
+# database is healthy before they start. Empty keeps the chart's defaults.
+syncWave: ""
+
 certificateIssuerRef:
   name: apps-ca-issuer
   kind: ClusterIssuer

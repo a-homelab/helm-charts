@@ -3,6 +3,10 @@ kind: ObjectBucketClaim
 metadata:
   name: "{{ include "postgresql.fullname" . }}-backup-bucket"
   namespace: {{ .Release.Namespace | quote }}
+  {{- with .Values.syncWave }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ . | quote }}
+  {{- end }}
 spec:
   bucketName: "{{ include "postgresql.fullname" . }}-backup"
   storageClassName: {{ .Values.backup.storageClassName | quote }}
