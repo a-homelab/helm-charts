@@ -189,7 +189,7 @@ with urllib.request.urlopen(request, timeout=30) as response:
     assert any(item['id'] == session['id'] for item in json.load(response)['data'])
 request = urllib.request.Request(base + '/info', headers=headers)
 with urllib.request.urlopen(request, timeout=30) as response:
-    assert json.load(response)['version'] == '2.0.11'
+    assert json.load(response)['version'] == '2.0.18'
 query = urllib.parse.urlencode({'location[directory]': '/workspace'})
 request = urllib.request.Request(base + '/skill?' + query, headers=headers)
 for attempt in range(20):

@@ -34,7 +34,7 @@ bytecode caches are excluded from the chart.
 ## Image and server
 
 The server, workspace init and token sidecar use
-`ghcr.io/a-homelab/opencode-container:2.0.11-fb3f5aa`. The reusable
+`ghcr.io/a-homelab/opencode-container:2.0.18-8a29cdb`. The reusable
 [image repo](https://github.com/a-homelab/opencode-container) uses Debian slim
 for separate build and runtime stages. The build stage prepares the standalone
 OpenCode binary and Python environment; the runtime installs the agent's Debian
