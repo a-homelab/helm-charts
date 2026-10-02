@@ -1,0 +1,25 @@
+# Render as a NEW release. The source ObjectStore and its credentials must exist
+# in this namespace. The target archives under its own new cluster/bucket name.
+fullnameOverride: example-restored
+clientUsername: app
+databaseName: app
+credentials:
+  mode: copy
+  copy:
+    userSecretName: example-postgres-app
+bootstrap:
+  recovery:
+    source: source
+    database: app
+    owner: app
+    recoveryTarget:
+      targetTime: "2026-09-30T12:00:00+00:00"
+externalClusters:
+  - name: source
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: example-postgres
+        serverName: example-postgres
+backup:
+  provider: plugin

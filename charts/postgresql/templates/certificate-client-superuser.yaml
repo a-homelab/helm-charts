@@ -1,16 +1,13 @@
-{{- if (eq .Values.tls.mode "certManager") }}
+{{- if and (eq .Values.tls.mode "certManager") .Values.tls.superuserCertificate }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: "{{ include "postgresql.fullname" . }}-client-replica-tls"
+  name: "{{ include "postgresql.fullname" . }}-client-superuser-tls"
   namespace: {{ .Release.Namespace | quote }}
   annotations:
     {{- mustMergeOverwrite (dict "argocd.argoproj.io/sync-wave" "0") (include "postgresql.annotations" . | fromYaml) | toYaml | nindent 4 }}
 spec:
-  secretName: "{{ include "postgresql.fullname" . }}-client-replica-tls"
-  secretTemplate:
-    labels:
-      cnpg.io/reload: ""
+  secretName: "{{ include "postgresql.fullname" . }}-client-superuser-tls"
   duration: 2160h0m0s # 90d
   renewBefore: 360h0m0s # 15d
   revisionHistoryLimit: 10
@@ -25,9 +22,9 @@ spec:
     - digital signature
     - key encipherment
     - client auth
-  commonName: streaming_replica
+  commonName: postgres
   dnsNames:
-    - streaming_replica
+    - postgres
   issuerRef:
     {{- include "postgresql.issuerRef" . | nindent 4 }}
 {{- end }}

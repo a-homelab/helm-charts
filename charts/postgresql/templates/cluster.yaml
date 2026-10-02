@@ -1,118 +1,156 @@
+{{- include "postgresql.validate" . -}}
+{{- $name := include "postgresql.fullname" . -}}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: {{ include "postgresql.fullname" . }}
+  name: {{ $name }}
   namespace: {{ .Release.Namespace | quote }}
-  {{- with .Values.syncWave }}
   annotations:
-    argocd.argoproj.io/sync-wave: {{ . | quote }}
-  {{- end }}
+    {{- include "postgresql.annotations" . | nindent 4 }}
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
   inheritedMetadata:
     labels:
-      {{- include "postgresql.labels" . | nindent 6 }}
+      {{- mustMergeOverwrite (include "postgresql.podLabels" . | fromYaml) (deepCopy .Values.inheritedLabels) | toYaml | nindent 6 }}
     annotations:
-      sidecar.istio.io/inject: "false"
-
+      {{- toYaml .Values.inheritedAnnotations | nindent 6 }}
+  {{- if .Values.imageCatalogRef }}
+  imageCatalogRef:
+    {{- toYaml .Values.imageCatalogRef | nindent 4 }}
+  {{- else if .Values.image.digest }}
+  imageName: "{{ .Values.image.repository }}:{{ required "image.tag is required with image.digest so CNPG can infer the PostgreSQL major" .Values.image.tag }}@{{ .Values.image.digest }}"
+  {{- else }}
   imageName: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+  {{- end }}
   imagePullPolicy: {{ .Values.image.pullPolicy }}
   {{- with .Values.imagePullSecrets }}
   imagePullSecrets:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-
+  {{- if eq (kindOf .Values.instances) "invalid" }}
   instances: {{ .Values.replicaCount }}
-
+  {{- else }}
+  instances: {{ .Values.instances }}
+  {{- end }}
   enableSuperuserAccess: {{ .Values.enableSuperuserAccess }}
-
-  {{- with .Values.postgresqlConfig }}
+  {{- $postgresql := .Values.postgresqlConfig }}
+  {{- if ne (kindOf .Values.postgresql) "invalid" }}
+  {{- $postgresql = .Values.postgresql }}
+  {{- end }}
+  {{- with $postgresql }}
   postgresql:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  
+  {{- $managed := deepCopy .Values.managed }}
+  {{- $crRoles := dict }}
+  {{- range .Values.databaseRoles }}{{- $_ := set $crRoles .name true }}{{- end }}
+  {{- if hasKey $managed "roles" }}
+  {{- $roles := list }}
+  {{- range $managed.roles }}
+  {{- if not (hasKey $crRoles .name) }}{{- $roles = append $roles . }}{{- end }}
+  {{- end }}
+  {{- $_ := set $managed "roles" $roles }}
+  {{- end }}
+  {{- with $managed }}
+  managed:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   bootstrap:
+    {{- if .Values.bootstrap }}
+    {{- $bootstrap := deepCopy .Values.bootstrap }}
+    {{- if eq .Values.credentials.mode "copy" }}
+    {{- $_ := set $bootstrap "recovery" (mustMergeOverwrite $bootstrap.recovery (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .) "secret" (dict "name" (printf "%s-recovery-app" $name)))) }}
+    {{- end }}
+    {{- toYaml $bootstrap | nindent 4 }}
+    {{- else }}
     initdb:
-      database: {{ required ".Values.databaseName is required" .Values.databaseName | quote }}
-      owner: {{ required ".Values.clientUsername" .Values.clientUsername | quote }}
-      secret:
-        name: {{ required ".Values.userCredsSecretName" .Values.userCredsSecretName | quote }}
-      localeCType: {{ .Values.initdb.localeCType | quote }}
-      localeCollate: {{ .Values.initdb.localeCollate | quote }}
-      {{- with .Values.initdb.postInitSQL }}
-      postInitSQL:
-        {{- toYaml . | nindent 8 }}
+      {{- $initdb := mustMergeOverwrite (deepCopy .Values.initdb) (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .)) }}
+      {{- range $key := list "localeCType" "localeCollate" }}
+      {{- if hasKey $.Values.database $key }}{{- $_ := set $initdb $key (get $.Values.database $key) }}{{- end }}
       {{- end }}
-      {{- with .Values.initdb.postInitTemplateSQL }}
-      postInitTemplateSQL:
-        {{- toYaml . | nindent 8 }}
+      {{- if eq .Values.credentials.mode "existing" }}
+      {{- $_ := set $initdb "secret" (dict "name" (required "credentials.existing.userSecretName or userCredsSecretName is required" (include "postgresql.userSecretName" .))) }}
+      {{- else }}
+      {{- $_ := unset $initdb "secret" }}
       {{- end }}
-      {{- with .Values.initdb.postInitApplicationSQL }}
-      postInitApplicationSQL:
-        {{- toYaml . | nindent 8 }}
+      {{- range $key := list "postInitSQL" "postInitTemplateSQL" "postInitApplicationSQL" }}
+      {{- if not (get $initdb $key) }}{{- $_ := unset $initdb $key }}{{- end }}
       {{- end }}
-  
+      {{- toYaml $initdb | nindent 6 }}
+    {{- end }}
+  {{- with .Values.externalClusters }}
+  externalClusters:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if eq .Values.credentials.mode "existing" }}
+  {{- with (include "postgresql.superuserSecretName" .) }}
   superuserSecret:
-    name: {{ required ".Values.superuserCredsSecretName" .Values.superuserCredsSecretName | quote }}
-
+    name: {{ . | quote }}
+  {{- end }}
+  {{- else if and (eq .Values.credentials.mode "copy") .Values.enableSuperuserAccess }}
+  superuserSecret:
+    name: "{{ $name }}-recovery-superuser"
+  {{- end }}
+  {{- if eq .Values.tls.mode "certManager" }}
   certificates:
-    serverTLSSecret: "{{ include "postgresql.fullname" . }}-server-tls"
-    serverCASecret: "{{ include "postgresql.fullname" . }}-server-tls"
-    clientCASecret: "{{ include "postgresql.fullname" . }}-client-replica-tls"
-    replicationTLSSecret: "{{ include "postgresql.fullname" . }}-client-replica-tls"
-  
-  primaryUpdateStrategy: unsupervised 
-  primaryUpdateMethod: restart
-  
+    serverTLSSecret: "{{ $name }}-server-tls"
+    serverCASecret: "{{ $name }}-server-tls"
+    clientCASecret: "{{ $name }}-client-replica-tls"
+    replicationTLSSecret: "{{ $name }}-client-replica-tls"
+  {{- else if eq .Values.tls.mode "external" }}
+  certificates:
+    {{- toYaml .Values.tls.certificates | nindent 4 }}
+  {{- end }}
+  primaryUpdateStrategy: {{ .Values.primaryUpdateStrategy }}
+  primaryUpdateMethod: {{ .Values.primaryUpdateMethod }}
   storage:
-    storageClass: {{ .Values.storageClass | quote }}
-    size: {{ .Values.storageSize | quote }}
-  
+    {{- mustMergeOverwrite (dict "storageClass" .Values.storageClass "size" .Values.storageSize) (deepCopy .Values.storage) | toYaml | nindent 4 }}
+  {{- with .Values.affinity }}
   affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: node-role.benfu.me/storage
-                operator: In
-                values:
-                  - "true"
-    # enablePodAntiAffinity: true
-    # topologyKey: kubernetes.io/hostname
-    # podAntiAffinityType: required
-  
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if eq (kindOf .Values.topologySpreadConstraints) "invalid" }}
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
       whenUnsatisfiable: DoNotSchedule
       labelSelector:
         matchLabels:
-          {{- include "postgresql.labels" . | nindent 10 }}
-  
+          {{- if eq .Values.scheduling.topologySpreadSelector "legacy" }}
+          {{- include "postgresql.podLabels" . | nindent 10 }}
+          {{- else }}
+          cnpg.io/cluster: {{ $name | quote }}
+          {{- end }}
+  {{- else if .Values.topologySpreadConstraints }}
+  topologySpreadConstraints:
+    {{- toYaml .Values.topologySpreadConstraints | nindent 4 }}
+  {{- end }}
   resources:
     {{- toYaml .Values.resources | nindent 4 }}
-  
+  {{- if eq .Values.backup.provider "plugin" }}
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ include "postgresql.objectStoreName" . | quote }}
+  {{- end }}
   backup:
-    target: prefer-standby
+    target: {{ .Values.backup.target }}
+    {{- if eq .Values.backup.provider "inTree" }}
     barmanObjectStore:
-      destinationPath: "s3://{{ include "postgresql.fullname" . }}-backup/"
-      endpointURL: http://rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc
-      s3Credentials:
-        accessKeyId:
-          name: "{{ include "postgresql.fullname" . }}-backup-bucket"
-          key: AWS_ACCESS_KEY_ID
-        secretAccessKey:
-          name: "{{ include "postgresql.fullname" . }}-backup-bucket"
-          key: AWS_SECRET_ACCESS_KEY
-      wal:
-        compression: gzip
-        maxParallel: 8
-    retentionPolicy: 30d
-  
+      {{- include "postgresql.backupConfiguration" . | nindent 6 }}
+    retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
+    {{- end }}
+    {{- with .Values.backup.volumeSnapshot }}
+    volumeSnapshot:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   replicationSlots:
     highAvailability:
       enabled: true
-  
   monitoring:
-    enablePodMonitor: true
+    {{- mustMergeOverwrite (deepCopy .Values.monitoring.configuration) (dict "enablePodMonitor" (eq .Values.monitoring.mode "operator")) | toYaml | nindent 4 }}
+  {{- with .Values.clusterSpec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}

@@ -1,0 +1,19 @@
+{{- if and (eq .Values.backup.provider "plugin") (not .Values.backup.objectStore.existingName) }}
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ include "postgresql.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    {{- include "postgresql.annotations" . | nindent 4 }}
+spec:
+  configuration:
+    {{- include "postgresql.backupConfiguration" . | nindent 4 }}
+  retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
+  {{- with .Values.backup.objectStore.instanceSidecarConfiguration }}
+  instanceSidecarConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

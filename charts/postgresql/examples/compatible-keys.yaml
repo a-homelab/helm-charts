@@ -1,0 +1,25 @@
+# Schema migration only: renders the same resources as legacy.yaml.
+# Existing keys may remain alongside these if their effective values match.
+fullnameOverride: example-postgres
+instances: 3
+database:
+  name: app
+  owner: app
+  localeCType: C
+  localeCollate: C
+credentials:
+  mode: existing
+  existing:
+    userSecretName: example-app
+    superuserSecretName: example-superuser
+postgresql: {}
+storage:
+  size: 10Gi
+  storageClass: rook-ceph-block-ssd
+tls:
+  issuerRef:
+    name: apps-ca-issuer
+    kind: ClusterIssuer
+backup:
+  objectBucket:
+    storageClassName: rook-ceph-bucket-ssd

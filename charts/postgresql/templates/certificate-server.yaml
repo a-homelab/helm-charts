@@ -1,10 +1,11 @@
+{{- if (eq .Values.tls.mode "certManager") }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: "{{ include "postgresql.fullname" . }}-server-tls"
   namespace: {{ .Release.Namespace | quote }}
   annotations:
-    argocd.argoproj.io/sync-wave: {{ .Values.syncWave | default "0" | quote }}
+    {{- mustMergeOverwrite (dict "argocd.argoproj.io/sync-wave" "0") (include "postgresql.annotations" . | fromYaml) | toYaml | nindent 4 }}
 spec:
   secretName: "{{ include "postgresql.fullname" . }}-server-tls"
   secretTemplate:
@@ -35,5 +36,11 @@ spec:
     - "{{ include "postgresql.fullname" . }}-ro"
     - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}"
     - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}.svc"
+    {{- if eq .Values.tls.profile "cnpg" }}
+    - "{{ include "postgresql.fullname" . }}-rw.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+    - "{{ include "postgresql.fullname" . }}-r.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+    - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+    {{- end }}
   issuerRef:
-    {{- toYaml .Values.certificateIssuerRef | nindent 4 }}
+    {{- include "postgresql.issuerRef" . | nindent 4 }}
+{{- end }}

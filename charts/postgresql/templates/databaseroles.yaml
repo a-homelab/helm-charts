@@ -1,0 +1,31 @@
+{{- $root := . -}}
+{{- $names := dict -}}
+{{- range $key, $role := .Values.databaseRoles }}
+{{- $spec := mustMergeOverwrite (dict "databaseRoleReclaimPolicy" "retain") (deepCopy $role) -}}
+{{- $_ := required (printf "databaseRoles.%s.name is required" $key) $spec.name -}}
+{{- if hasKey $names $spec.name -}}{{- fail (printf "duplicate DatabaseRole name %s" $spec.name) -}}{{- end -}}
+{{- $_ := set $names $spec.name true -}}
+{{- if hasKey $spec "cluster" -}}{{- fail "DatabaseRole cluster is assigned by this chart" -}}{{- end -}}
+{{- if eq ($spec.ensure | default "present") "absent" -}}{{- fail "DatabaseRole removal uses databaseRoleReclaimPolicy, not ensure: absent" -}}{{- end -}}
+{{- $issueCertificate := false -}}
+{{- if hasKey $spec "clientCertificate" -}}
+{{- $issueCertificate = true -}}
+{{- if hasKey $spec.clientCertificate "enabled" -}}{{- $issueCertificate = $spec.clientCertificate.enabled -}}{{- end -}}
+{{- end -}}
+{{- if and $issueCertificate (ne $root.Values.tls.mode "operator") -}}
+{{- fail "DatabaseRole clientCertificate requires tls.mode=operator; cert-manager does not expose the CA private key" -}}
+{{- end -}}
+{{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: {{ include "postgresql.resourceName" (dict "root" $root "suffix" $key) }}
+  namespace: {{ $root.Release.Namespace | quote }}
+  labels:
+    {{- include "postgresql.labels" $root | nindent 4 }}
+  annotations:
+    {{- mustMergeOverwrite (include "postgresql.annotations" $root | fromYaml) (dict "argocd.argoproj.io/sync-wave" (include "postgresql.databaseWave" $root)) | toYaml | nindent 4 }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

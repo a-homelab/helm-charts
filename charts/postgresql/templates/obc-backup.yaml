@@ -1,12 +1,12 @@
+{{- if .Values.backup.objectBucket.enabled }}
 apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
 metadata:
   name: "{{ include "postgresql.fullname" . }}-backup-bucket"
   namespace: {{ .Release.Namespace | quote }}
-  {{- with .Values.syncWave }}
   annotations:
-    argocd.argoproj.io/sync-wave: {{ . | quote }}
-  {{- end }}
+    {{- include "postgresql.annotations" . | nindent 4 }}
 spec:
   bucketName: "{{ include "postgresql.fullname" . }}-backup"
-  storageClassName: {{ .Values.backup.storageClassName | quote }}
+  storageClassName: {{ include "postgresql.bucketStorageClassName" . | quote }}
+{{- end }}

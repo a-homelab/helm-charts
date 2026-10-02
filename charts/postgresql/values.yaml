@@ -1,29 +1,44 @@
-replicaCount: 3
-
+# Existing installations retain their image, credentials, TLS, and archive destination.
+# See examples/modern.yaml for explicit opt-ins and README.md for prerequisites.
+# Null inherits replicaCount; explicit instances uses CNPG naming.
+instances: null
+clusterDomain: cluster.local
 image:
   repository: ghcr.io/cloudnative-pg/postgresql
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
   tag: "15.3"
-
-# Postgres client username. Must match `username` key in `userCredsSecretName` secret
-clientUsername: null
-
-# Name of k8s secret containing `username` and `password` keys
-userCredsSecretName: null
-
-# Name of k8s secret containing `username` and `password` keys
-superuserCredsSecretName: null
-
-# Postgres database name
-databaseName: null
+  digest: ""
+imageCatalogRef: {}
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
 
 enableSuperuserAccess: false
 
-# PostgreSQL configuration
-# https://cloudnative-pg.io/documentation/1.21/cloudnative-pg.v1/#postgresql-cnpg-io-v1-PostgresConfiguration
-postgresqlConfig: {}
+# existing preserves SealedSecret references. generated overlays CNPG-owned Secrets.
+# copy retains credentials from a source cluster in this namespace during recovery.
+credentials:
+  mode: existing
+  # Explicit fields override the legacy credential names; absent fields inherit them.
+  # userSecretName: existing application Secret; superuserSecretName: admin Secret.
+  existing: {}
+  password:
+    length: 42
+    digits: 5
+    symbols: 5
+    symbolCharacters: "-_$@"
+    noUpper: false
+    allowRepeat: true
+  rotation:
+    enabled: false
+    interval: 24h
+  copy:
+    userSecretName: ""
+    superuserSecretName: ""
 
+# Native Cluster.spec.postgresql. Null inherits postgresqlConfig; {} clears it.
+# A non-null object replaces the legacy object rather than merging parameters.
+postgresql: null
 initdb:
   localeCType: C
   localeCollate: C
@@ -31,37 +46,127 @@ initdb:
   postInitTemplateSQL: []
   postInitApplicationSQL: []
 
-# Storage size
-storageSize: 10Gi
+# A complete native bootstrap replaces initdb (recovery or pg_basebackup).
+bootstrap: {}
+externalClusters: []
 
-# Storage class
-storageClass: rook-ceph-block-ssd
+# Native Cluster.spec.managed; roles are opt-in because adoption resets omitted attributes.
+managed: {}
+
+# Manage the bootstrap database after creation. Empty name/owner inherit legacy values.
+# Additional native Database.spec fields (schemas, fdws, servers, etc.) are supported.
+database:
+  enabled: false
+  name: ""
+  owner: ""
+  # Explicit locales override initdb locales and also reach the Database CR.
+  # localeCType: C
+  # localeCollate: C
+  syncWave: ""
+  extensions: []
+  schemas: []
+
+# Map Kubernetes resource suffixes to native Database.spec / DatabaseRole.spec.
+# The chart supplies cluster.name and defaults reclaim policies to retain.
+databases: {}
+databaseRoles: {}
+
+# Native storage settings override storageSize/storageClass.
+storage: {}
+resources: {}
+primaryUpdateStrategy: unsupervised
+primaryUpdateMethod: restart
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role.benfu.me/storage
+              operator: In
+              values: ["true"]
+# null uses the chart's hostname spread; [] disables it.
+topologySpreadConstraints: null
+scheduling:
+  # stable uses cnpg.io/cluster and can roll existing pods. legacy preserves
+  # the original selector and the 0.1.0 pod label across chart upgrades.
+  topologySpreadSelector: legacy
+
+# Native spec fields not otherwise managed by this chart, e.g. walStorage, probes,
+# tablespaces, serviceAccountTemplate, replica, podSelectorRefs, or primaryLease.
+# Collisions with chart-owned fields fail instead of silently overriding them.
+clusterSpec: {}
+labels: {}
+annotations: {}
+inheritedLabels: {}
+inheritedAnnotations:
+  sidecar.istio.io/inject: "false"
+syncWave: ""
+# Empty derives Cluster wave + 1; applies to Database and DatabaseRole resources.
+databaseSyncWave: ""
+
+tls:
+  # certManager preserves the existing certificates; operator uses CNPG's CA.
+  # external uses the native certificates object below.
+  mode: certManager
+  # cnpg selects the new in-cluster CA; legacy preserves certificateIssuerRef.
+  profile: legacy
+  # Explicit new syntax overrides both the profile and certificateIssuerRef.
+  issuerRef: {}
+  certificates: {}
+  clientCertificate: true
+  superuserCertificate: false
 
 backup:
+  # inTree preserves active archives; plugin requires the Barman Cloud plugin.
+  # none disables WAL archiving. Do not disable objectBucket when migrating to plugin.
+  provider: inTree
+  # Legacy alias for objectBucket.storageClassName.
   storageClassName: rook-ceph-bucket-ssd
+  objectBucket:
+    enabled: true
+    # Explicit storageClassName overrides backup.storageClassName.
+    # storageClassName: rook-ceph-bucket-ssd
+  target: prefer-standby
+  retentionPolicy: 30d
+  # Empty preserves the existing Ceph endpoint, path, Secret names, and WAL settings.
+  # Nonempty replaces the entire native Barman configuration, for any supported provider.
+  configuration: {}
+  objectStore:
+    # Use an existing ObjectStore instead of rendering one.
+    existingName: ""
+    instanceSidecarConfiguration: {}
+  volumeSnapshot: {}
+  scheduled:
+    enabled: false
+    schedule: "0 0 10 * * *"
+    immediate: true
+    suspend: false
+    backupOwnerReference: self
+    # Empty selects the provider's method; volumeSnapshot requires backup.volumeSnapshot.
+    method: ""
 
-# Argo CD sync wave for every resource this chart renders (Cluster, its TLS
-# Certificates and the backup bucket claim). Set it below the consumers'
-# waves when an Application runs database jobs as Sync hooks, so the
-# database is healthy before they start. Empty keeps the chart's defaults.
-syncWave: ""
+monitoring:
+  # podMonitor renders a chart-owned monitor with a distinct name; operator is legacy.
+  mode: operator
+  # Native Cluster.spec.monitoring, excluding enablePodMonitor.
+  configuration: {}
+  podMonitor:
+    labels: {}
+    annotations: {}
+    podMetricsEndpoints:
+      - port: metrics
 
+# Compatibility aliases. Prefer the grouped/native keys above for new values.
+# Keep these defaults until existing consumers explicitly select new settings.
+replicaCount: 3
+clientUsername: null
+databaseName: null
+userCredsSecretName: null
+superuserCredsSecretName: null
+postgresqlConfig: {}
+storageSize: 10Gi
+storageClass: rook-ceph-block-ssd
 certificateIssuerRef:
   name: apps-ca-issuer
   kind: ClusterIssuer
-
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi

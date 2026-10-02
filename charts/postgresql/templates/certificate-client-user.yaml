@@ -1,10 +1,11 @@
+{{- if and (eq .Values.tls.mode "certManager") .Values.tls.clientCertificate }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: "{{ include "postgresql.fullname" . }}-client-user-tls"
   namespace: {{ .Release.Namespace | quote }}
   annotations:
-    argocd.argoproj.io/sync-wave: {{ .Values.syncWave | default "0" | quote }}
+    {{- mustMergeOverwrite (dict "argocd.argoproj.io/sync-wave" "0") (include "postgresql.annotations" . | fromYaml) | toYaml | nindent 4 }}
 spec:
   secretName: "{{ include "postgresql.fullname" . }}-client-user-tls"
   duration: 2160h0m0s # 90d
@@ -21,8 +22,9 @@ spec:
     - digital signature
     - key encipherment
     - client auth
-  commonName: {{ required ".Values.clientUsername" .Values.clientUsername | quote }}
+  commonName: {{ include "postgresql.databaseOwner" . | quote }}
   dnsNames:
-    - {{ required ".Values.clientUsername" .Values.clientUsername | quote }}
+    - {{ include "postgresql.databaseOwner" . | quote }}
   issuerRef:
-    {{- toYaml .Values.certificateIssuerRef | nindent 4 }}
+    {{- include "postgresql.issuerRef" . | nindent 4 }}
+{{- end }}

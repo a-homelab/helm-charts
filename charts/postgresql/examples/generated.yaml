@@ -1,0 +1,12 @@
+# Requires ESO Password and ExternalSecret CRDs and the Ready cnpg-ca issuer.
+fullnameOverride: example-postgres
+database:
+  name: app
+  owner: app
+credentials:
+  mode: generated
+  rotation:
+    enabled: false
+tls:
+  profile: cnpg
+  superuserCertificate: true

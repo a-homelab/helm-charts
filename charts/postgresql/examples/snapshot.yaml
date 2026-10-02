@@ -1,0 +1,10 @@
+clientUsername: app
+databaseName: app
+userCredsSecretName: example-app
+backup:
+  volumeSnapshot:
+    className: database-snapshots
+    snapshotOwnerReference: backup
+  scheduled:
+    enabled: true
+    method: volumeSnapshot

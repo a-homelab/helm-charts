@@ -1,0 +1,43 @@
+fullnameOverride: example-postgres
+clientUsername: app
+databaseName: app
+userCredsSecretName: example-app
+syncWave: "-5"
+database:
+  enabled: true
+  extensions:
+    - name: pg_trgm
+      ensure: present
+  schemas:
+    - name: reporting
+      owner: app
+databases:
+  analytics:
+    name: app_analytics
+    owner: app
+    extensions:
+      - name: postgres_fdw
+    fdws:
+      - name: postgres_fdw
+        usage:
+          - name: app
+            type: grant
+    servers:
+      - name: source
+        fdw: postgres_fdw
+        options:
+          - name: host
+            value: source-postgres-rw
+managed:
+  roles:
+    - name: app
+      login: true
+      superuser: false
+      passwordSecret:
+        name: example-app
+    - name: reporting
+      login: false
+      inRoles: [pg_read_all_data]
+backup:
+  scheduled:
+    enabled: true

@@ -1,0 +1,17 @@
+{{- if eq .Values.monitoring.mode "podMonitor" }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: "{{ include "postgresql.fullname" . }}-metrics"
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- mustMergeOverwrite (include "postgresql.labels" . | fromYaml) (deepCopy .Values.monitoring.podMonitor.labels) | toYaml | nindent 4 }}
+  annotations:
+    {{- mustMergeOverwrite (include "postgresql.annotations" . | fromYaml) (deepCopy .Values.monitoring.podMonitor.annotations) | toYaml | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: {{ include "postgresql.fullname" . | quote }}
+  podMetricsEndpoints:
+    {{- toYaml .Values.monitoring.podMonitor.podMetricsEndpoints | nindent 4 }}
+{{- end }}

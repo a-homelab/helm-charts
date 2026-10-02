@@ -1,0 +1,35 @@
+{{- $root := . -}}
+{{- $databases := deepCopy .Values.databases -}}
+{{- if .Values.database.enabled -}}
+{{- if hasKey $databases "app" -}}{{- fail "databases.app conflicts with database.enabled" -}}{{- end -}}
+{{- $app := omit .Values.database "enabled" "syncWave" -}}
+{{- $_ := set $app "name" (include "postgresql.databaseName" .) -}}
+{{- $_ := set $app "owner" (include "postgresql.databaseOwner" .) -}}
+{{- $_ := set $databases "app" $app -}}
+{{- end -}}
+{{- $names := dict -}}
+{{- range $key, $database := $databases }}
+{{- $spec := mustMergeOverwrite (dict "databaseReclaimPolicy" "retain" "ensure" "present") (deepCopy $database) -}}
+{{- $_ := required (printf "databases.%s.name is required" $key) $spec.name -}}
+{{- $_ := required (printf "databases.%s.owner is required" $key) $spec.owner -}}
+{{- if hasKey $names $spec.name -}}{{- fail (printf "duplicate database name %s" $spec.name) -}}{{- end -}}
+{{- $_ := set $names $spec.name true -}}
+{{- if hasKey $spec "cluster" -}}{{- fail "Database cluster is assigned by this chart" -}}{{- end -}}
+{{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) -}}
+{{- $wave := include "postgresql.databaseWave" $root -}}
+{{- if and (eq $key "app") $root.Values.database.enabled (ne (toString $root.Values.database.syncWave) "") -}}
+{{- $wave = toString $root.Values.database.syncWave -}}
+{{- end }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: {{ include "postgresql.resourceName" (dict "root" $root "suffix" $key) }}
+  namespace: {{ $root.Release.Namespace | quote }}
+  labels:
+    {{- include "postgresql.labels" $root | nindent 4 }}
+  annotations:
+    {{- mustMergeOverwrite (include "postgresql.annotations" $root | fromYaml) (dict "argocd.argoproj.io/sync-wave" $wave) | toYaml | nindent 4 }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

@@ -1,0 +1,32 @@
+# Boots a local postgres from a CloudNativePG base backup.
+#
+# 1. Extract the Barman cloud data.tar.gz into ./pg_data:
+#      ./restore-cnpg-backup.sh /path/to/data.tar.gz
+# 2. docker compose up -d
+#
+# The `sanitize` init container rewrites CNPG-specific config (strips
+# /controller paths, disables SSL, rewrites pg_hba) and runs pg_resetwal
+# once, then exits. The `db` service waits for it to complete and then
+# runs as a stock postgres container.
+services:
+  sanitize:
+    image: ${POSTGRES_IMAGE:?Set a PostgreSQL image matching the backup major and extensions}
+    user: root
+    environment:
+      PGDATA: /var/lib/postgresql/restore
+    volumes:
+      - ./pg_data:/var/lib/postgresql/restore
+      - ./sanitize.sh:/sanitize.sh:ro
+    entrypoint: ["/sanitize.sh"]
+
+  db:
+    image: ${POSTGRES_IMAGE:?Set a PostgreSQL image matching the backup major and extensions}
+    environment:
+      PGDATA: /var/lib/postgresql/restore
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ./pg_data:/var/lib/postgresql/restore
+    depends_on:
+      sanitize:
+        condition: service_completed_successfully

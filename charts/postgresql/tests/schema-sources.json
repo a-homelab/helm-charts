@@ -1,0 +1,46 @@
+{
+  "cnpg-1.28.1-clusters.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.28.1/config/crd/bases/postgresql.cnpg.io_clusters.yaml",
+    "sha256": "cef9869d65873457388214210adb1ad3ed8998cc36fa8feb5e1260f5fe761590"
+  },
+  "cnpg-1.28.1-databases.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.28.1/config/crd/bases/postgresql.cnpg.io_databases.yaml",
+    "sha256": "1ec688536b42c781476f3825fd49af31d043613cccf4d80b3e2dfae5697e7cff"
+  },
+  "cnpg-1.28.1-scheduledbackups.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.28.1/config/crd/bases/postgresql.cnpg.io_scheduledbackups.yaml",
+    "sha256": "2921624c1e3546e264aa8c61cc413fea0dc7305b5c5cc3aaa6d0a5ee0696696b"
+  },
+  "cnpg-1.30.1-clusters.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_clusters.yaml",
+    "sha256": "d255176c368727b8ee84893bb2f37b5c5578a497e6ee7461a81fa6f3f80e552b"
+  },
+  "cnpg-1.30.1-databases.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_databases.yaml",
+    "sha256": "156b490ec59453a8a3f90ba7da0a6e76f736f54ad3fa8a3c97bbb6d0862327a9"
+  },
+  "cnpg-1.30.1-scheduledbackups.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_scheduledbackups.yaml",
+    "sha256": "fcd133df3056601c1a306a4bf0cd2fac6413c99b88b459e0296321299f7e5062"
+  },
+  "cnpg-1.30.1-databaseroles.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_databaseroles.yaml",
+    "sha256": "d12999000af48ac2f7725bfd45136232edc03ea39aad8476710ae51fa860280a"
+  },
+  "barman-0.15.1-objectstores.yaml": {
+    "url": "https://raw.githubusercontent.com/cloudnative-pg/plugin-barman-cloud/v0.15.1/config/crd/bases/barmancloud.cnpg.io_objectstores.yaml",
+    "sha256": "2d8be9265b99571a560e80f2a54dbbcc19cbfb2254575ff2e7bba9dc4429e99e"
+  },
+  "eso-2.11.0-externalsecrets.yaml": {
+    "url": "https://raw.githubusercontent.com/external-secrets/external-secrets/v2.11.0/config/crds/bases/external-secrets.io_externalsecrets.yaml",
+    "sha256": "5044be5a610ca90a075f34f03ed20b462695c43387ba9410db7f4250e47b1e2f"
+  },
+  "eso-2.11.0-secretstores.yaml": {
+    "url": "https://raw.githubusercontent.com/external-secrets/external-secrets/v2.11.0/config/crds/bases/external-secrets.io_secretstores.yaml",
+    "sha256": "76ade84a369b88fc2936cc53273e0e3357a696f012585293168a2a55dd48fe32"
+  },
+  "eso-2.11.0-passwords.yaml": {
+    "url": "https://raw.githubusercontent.com/external-secrets/external-secrets/v2.11.0/config/crds/bases/generators.external-secrets.io_passwords.yaml",
+    "sha256": "72ef666dcd0e24b71a2a8fe122ed01c86203f7a3a323ea90dc77a604b6a263da"
+  }
+}

@@ -1,0 +1,5 @@
+fullnameOverride: example-postgres
+clientUsername: app
+databaseName: app
+userCredsSecretName: example-app
+superuserCredsSecretName: example-superuser

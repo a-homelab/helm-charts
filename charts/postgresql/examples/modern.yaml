@@ -1,0 +1,50 @@
+# Requires CNPG 1.30+ and the Barman Cloud plugin, including their CRDs.
+# For a new cluster only; choose and pin an operand image for the required PG major.
+fullnameOverride: example-postgres
+database:
+  enabled: true
+  name: app
+  owner: app
+  extensions:
+    - name: pg_trgm
+credentials:
+  mode: generated
+tls:
+  profile: cnpg
+  superuserCertificate: true
+initdb:
+  dataChecksums: true
+databaseRoles:
+  app:
+    name: app
+    login: true
+    passwordSecret:
+      name: example-postgres-app
+  reporting:
+    name: reporting
+    login: false
+    inRoles: [pg_read_all_data]
+backup:
+  provider: plugin
+  scheduled:
+    enabled: true
+  objectStore:
+    instanceSidecarConfiguration:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+monitoring:
+  mode: podMonitor
+  podMonitor:
+    labels:
+      release: kube-prometheus-stack
+primaryUpdateMethod: switchover
+scheduling:
+  topologySpreadSelector: stable
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi

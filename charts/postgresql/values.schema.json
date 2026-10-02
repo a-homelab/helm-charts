@@ -1,0 +1,585 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        },
+        "tag": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^(sha256:[a-f0-9]{64})?$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "imageCatalogRef": {
+      "type": "object"
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "clientUsername": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "databaseName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "userCredsSecretName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "superuserCredsSecretName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "enableSuperuserAccess": {
+      "type": "boolean"
+    },
+    "postgresqlConfig": {
+      "type": "object"
+    },
+    "initdb": {
+      "type": "object"
+    },
+    "bootstrap": {
+      "type": "object",
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "initdb": {
+          "type": "object"
+        },
+        "recovery": {
+          "type": "object"
+        },
+        "pg_basebackup": {
+          "type": "object"
+        }
+      }
+    },
+    "externalClusters": {
+      "type": "array"
+    },
+    "managed": {
+      "type": "object"
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "syncWave": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string",
+              "pattern": "^(-?[0-9]+)?$"
+            }
+          ]
+        },
+        "cluster": false,
+        "extensions": {
+          "type": "array"
+        },
+        "schemas": {
+          "type": "array"
+        },
+        "databaseReclaimPolicy": {
+          "type": "string",
+          "enum": [
+            "retain",
+            "delete"
+          ]
+        },
+        "ensure": {
+          "type": "string",
+          "enum": [
+            "present",
+            "absent"
+          ]
+        },
+        "localeCType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "localeCollate": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "databases": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cluster": false,
+            "databaseReclaimPolicy": {
+              "type": "string",
+              "enum": [
+                "retain",
+                "delete"
+              ]
+            },
+            "ensure": {
+              "type": "string",
+              "enum": [
+                "present",
+                "absent"
+              ]
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "name",
+            "owner"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "databaseRoles": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cluster": false,
+            "ensure": {
+              "type": "string",
+              "enum": [
+                "present"
+              ]
+            },
+            "databaseRoleReclaimPolicy": {
+              "type": "string",
+              "enum": [
+                "retain",
+                "delete"
+              ]
+            }
+          },
+          "additionalProperties": true,
+          "required": [
+            "name"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "storageSize": {
+      "type": "string",
+      "minLength": 1
+    },
+    "storageClass": {
+      "type": "string"
+    },
+    "storage": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "primaryUpdateStrategy": {
+      "type": "string",
+      "enum": [
+        "unsupervised",
+        "supervised"
+      ]
+    },
+    "primaryUpdateMethod": {
+      "type": "string",
+      "enum": [
+        "restart",
+        "switchover"
+      ]
+    },
+    "affinity": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "topologySpreadConstraints": {
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "clusterSpec": {
+      "type": "object"
+    },
+    "labels": {
+      "type": "object"
+    },
+    "annotations": {
+      "type": "object"
+    },
+    "inheritedLabels": {
+      "type": "object"
+    },
+    "inheritedAnnotations": {
+      "type": "object"
+    },
+    "certificateIssuerRef": {
+      "type": "object"
+    },
+    "syncWave": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string",
+          "pattern": "^(-?[0-9]+)?$"
+        }
+      ]
+    },
+    "databaseSyncWave": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string",
+          "pattern": "^(-?[0-9]+)?$"
+        }
+      ]
+    },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "certManager",
+            "operator",
+            "external"
+          ]
+        },
+        "certificates": {
+          "type": "object"
+        },
+        "clientCertificate": {
+          "type": "boolean"
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "cnpg"
+          ]
+        },
+        "issuerRef": {
+          "type": "object"
+        },
+        "superuserCertificate": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "backup": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "inTree",
+            "plugin",
+            "none"
+          ]
+        },
+        "storageClassName": {
+          "type": "string"
+        },
+        "objectBucket": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "storageClassName": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "target": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "prefer-standby"
+          ]
+        },
+        "retentionPolicy": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[dwm]$"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "objectStore": {
+          "type": "object",
+          "properties": {
+            "existingName": {
+              "type": "string"
+            },
+            "instanceSidecarConfiguration": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        "volumeSnapshot": {
+          "type": "object"
+        },
+        "scheduled": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "schedule": {
+              "type": "string",
+              "pattern": "^\\S+(\\s+\\S+){5}$"
+            },
+            "immediate": {
+              "type": "boolean"
+            },
+            "suspend": {
+              "type": "boolean"
+            },
+            "backupOwnerReference": {
+              "type": "string",
+              "enum": [
+                "none",
+                "self",
+                "cluster"
+              ]
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "",
+                "plugin",
+                "barmanObjectStore",
+                "volumeSnapshot"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "operator",
+            "podMonitor",
+            "disabled"
+          ]
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "podMonitor": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object"
+            },
+            "annotations": {
+              "type": "object"
+            },
+            "podMetricsEndpoints": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "global": {
+      "type": "object"
+    },
+    "scheduling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "topologySpreadSelector": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "stable"
+          ]
+        }
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "existing",
+            "generated",
+            "copy"
+          ]
+        },
+        "password": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "length": {
+              "type": "integer",
+              "minimum": 16
+            },
+            "digits": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "symbols": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "symbolCharacters": {
+              "type": "string"
+            },
+            "noUpper": {
+              "type": "boolean"
+            },
+            "allowRepeat": {
+              "type": "boolean"
+            }
+          }
+        },
+        "rotation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*(s|m|h)$"
+            }
+          }
+        },
+        "copy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "userSecretName": {
+              "type": "string"
+            },
+            "superuserSecretName": {
+              "type": "string"
+            }
+          }
+        },
+        "existing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "userSecretName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "superuserSecretName": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "clusterDomain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "instances": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "postgresql": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

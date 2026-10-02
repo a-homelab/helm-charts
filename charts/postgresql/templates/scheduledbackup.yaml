@@ -1,0 +1,24 @@
+{{- if .Values.backup.scheduled.enabled }}
+{{- $method := .Values.backup.scheduled.method | default (ternary "plugin" "barmanObjectStore" (eq .Values.backup.provider "plugin")) }}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ include "postgresql.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    {{- include "postgresql.annotations" . | nindent 4 }}
+spec:
+  cluster:
+    name: {{ include "postgresql.fullname" . }}
+  schedule: {{ .Values.backup.scheduled.schedule | quote }}
+  immediate: {{ .Values.backup.scheduled.immediate }}
+  suspend: {{ .Values.backup.scheduled.suspend }}
+  backupOwnerReference: {{ .Values.backup.scheduled.backupOwnerReference }}
+  method: {{ $method }}
+  {{- if eq $method "plugin" }}
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  {{- end }}
+{{- end }}
