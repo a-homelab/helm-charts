@@ -60,7 +60,7 @@ spec:
     {{- if .Values.bootstrap }}
     {{- $bootstrap := deepCopy .Values.bootstrap }}
     {{- if eq .Values.credentials.mode "copy" }}
-    {{- $_ := set $bootstrap "recovery" (mustMergeOverwrite $bootstrap.recovery (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .) "secret" (dict "name" (printf "%s-recovery-app" $name)))) }}
+    {{- $_ := set $bootstrap "recovery" (mustMergeOverwrite $bootstrap.recovery (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .) "secret" (dict "name" (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app"))))) }}
     {{- end }}
     {{- toYaml $bootstrap | nindent 4 }}
     {{- else }}
@@ -72,7 +72,7 @@ spec:
       {{- if eq .Values.credentials.mode "existing" }}
       {{- $_ := set $initdb "secret" (dict "name" (required "credentials.existing.userSecretName or userCredsSecretName is required" (include "postgresql.userSecretName" .))) }}
       {{- else }}
-      {{- $_ := unset $initdb "secret" }}
+      {{- $_ := set $initdb "secret" (dict "name" (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app"))) }}
       {{- end }}
       {{- range $key := list "postInitSQL" "postInitTemplateSQL" "postInitApplicationSQL" }}
       {{- if not (get $initdb $key) }}{{- $_ := unset $initdb $key }}{{- end }}
@@ -88,9 +88,9 @@ spec:
   superuserSecret:
     name: {{ . | quote }}
   {{- end }}
-  {{- else if and (eq .Values.credentials.mode "copy") .Values.enableSuperuserAccess }}
+  {{- else if .Values.enableSuperuserAccess }}
   superuserSecret:
-    name: "{{ $name }}-recovery-superuser"
+    name: {{ include "postgresql.credentialResourceName" (dict "root" . "suffix" "superuser") | quote }}
   {{- end }}
   {{- if eq .Values.tls.mode "certManager" }}
   certificates:

@@ -111,17 +111,51 @@ wal:
 {{- define "postgresql.resourceName" -}}
 {{- $name := printf "%s-%s" (include "postgresql.fullname" .root) .suffix -}}
 {{- if or (gt (len $name) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $name)) -}}
-{{- fail (printf "resource name %q must be a DNS label of at most 63 characters; shorten fullnameOverride or the map key" $name) -}}
+{{- fail (printf "resource name %q must be a DNS label of at most 63 characters; shorten fullnameOverride or set resourceName explicitly" $name) -}}
 {{- end -}}
 {{- $name -}}
 {{- end -}}
 
+{{- define "postgresql.sqlResourceName" -}}
+{{- if .resourceName -}}
+{{- if or (gt (len .resourceName) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" .resourceName)) -}}
+{{- fail (printf "resourceName %q must be a DNS label of at most 63 characters" .resourceName) -}}
+{{- end -}}
+{{- .resourceName -}}
+{{- else -}}
+{{- $sqlName := trimAll "-" (regexReplaceAll "[^a-z0-9]+" (lower .sqlName) "-") -}}
+{{- if not $sqlName -}}{{- fail "SQL name cannot form a Kubernetes resource name; set resourceName explicitly" -}}{{- end -}}
+{{- include "postgresql.resourceName" (dict "root" .root "suffix" (printf "%s-%s" .prefix $sqlName)) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "postgresql.credentialResourceName" -}}
+{{- $admin := eq .suffix "superuser" -}}
+{{- $key := ternary "superuser" "user" $admin -}}
+{{- $username := "postgres" -}}
+{{- if not $admin -}}{{- $username = include "postgresql.databaseOwner" .root -}}{{- end -}}
+{{- $prefix := ternary "recovery-creds" "creds" (eq .root.Values.credentials.mode "copy") -}}
+{{- include "postgresql.sqlResourceName" (dict "root" .root "prefix" $prefix "sqlName" $username "resourceName" (get .root.Values.credentials.resourceNames $key)) -}}
+{{- end -}}
+
 {{- define "postgresql.validate" -}}
+{{- if and (ne .Values.credentials.mode "existing") .Values.enableSuperuserAccess -}}
+{{- if eq (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app")) (include "postgresql.credentialResourceName" (dict "root" . "suffix" "superuser")) -}}
+{{- fail "duplicate credential resource name; set distinct credentials.resourceNames.user and superuser" -}}
+{{- end -}}
+{{- end -}}
 {{- if and .Values.credentials.rotation.enabled (ne .Values.credentials.mode "generated") -}}
 {{- fail "credentials.rotation requires credentials.mode=generated" -}}
 {{- end -}}
 {{- if and (eq .Values.credentials.mode "generated") .Values.bootstrap -}}
 {{- fail "credentials.mode=generated requires the chart initdb settings; use copy or existing credentials for native bootstrap" -}}
+{{- end -}}
+{{- if eq .Values.credentials.mode "existing" -}}
+{{- range $method, $settings := .Values.bootstrap -}}
+{{- if not (dig "secret" "name" "" $settings) -}}
+{{- fail (printf "bootstrap.%s.secret.name is required; CNPG-generated credential Secrets are disabled" $method) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- if eq .Values.credentials.mode "copy" -}}
 {{- if not .Values.bootstrap.recovery -}}{{- fail "credentials.mode=copy requires bootstrap.recovery" -}}{{- end -}}
@@ -130,7 +164,7 @@ wal:
 {{- $_ := required "credentials.copy.superuserSecretName is required with superuser access" .Values.credentials.copy.superuserSecretName -}}
 {{- end -}}
 {{- range $source := list .Values.credentials.copy.userSecretName .Values.credentials.copy.superuserSecretName -}}
-{{- if has $source (list (printf "%s-recovery-app" (include "postgresql.fullname" $)) (printf "%s-recovery-superuser" (include "postgresql.fullname" $))) -}}
+{{- if has $source (list (include "postgresql.credentialResourceName" (dict "root" $ "suffix" "app")) (include "postgresql.credentialResourceName" (dict "root" $ "suffix" "superuser"))) -}}
 {{- fail "credential copy source must differ from its destination" -}}
 {{- end -}}
 {{- end -}}
@@ -204,19 +238,16 @@ kind: ClusterIssuer
 {{- $pgUser := $role.username | replace "\\" "\\\\" | replace ":" "\\:" -}}
 {{- $pgDB := (ternary "*" $role.database (eq $role.suffix "superuser")) | replace "\\" "\\\\" | replace ":" "\\:" -}}
 {{- $pgPassword := `{{ .password | replace "\\" "\\\\" | replace ":" "\\:" }}` -}}
-{{- if eq $root.Values.credentials.mode "copy" }}
 username: {{ $role.username | quote }}
+{{- if eq $root.Values.credentials.mode "copy" }}
 password: {{ printf `{{ if ne .username %q }}{{ fail "source credential username does not match the restored role" }}{{ end }}{{ .password }}` $role.username | quote }}
+{{- else }}
+password: '{{ "{{ .password }}" }}'
+{{- end }}
 host: {{ printf "%s-rw" $name | quote }}
 port: "5432"
 dbname: {{ $role.database | quote }}
 user: {{ $role.username | quote }}
-{{- else }}
-password: '{{ "{{ .password }}" }}'
-{{- if eq $role.suffix "superuser" }}
-dbname: postgres
-{{- end }}
-{{- end }}
 pgpass: {{ printf "%s-rw:5432:%s:%s:%s\n" $name $pgDB $pgUser $pgPassword | quote }}
 uri: {{ printf "postgresql://%s:%s@%s:5432/%s" $user $passwordURI $host $db | quote }}
 jdbc-uri: {{ printf "jdbc:postgresql://%s:5432/%s?password=%s&user=%s" $host $db $passwordQuery ($role.username | urlquery) | quote }}

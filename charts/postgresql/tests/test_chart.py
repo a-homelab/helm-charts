@@ -190,8 +190,14 @@ def test_declarative_databases_have_independent_kubernetes_names_and_retain_data
 ):
     resources = render(tmp_path, example="declarative")
     databases = {d["metadata"]["name"]: d for d in resources if d["kind"] == "Database"}
-    assert set(databases) == {"example-postgres-app", "example-postgres-analytics"}
-    assert databases["example-postgres-analytics"]["spec"]["name"] == "app_analytics"
+    assert set(databases) == {
+        "example-postgres-db-app",
+        "example-postgres-db-app-analytics",
+    }
+    assert (
+        databases["example-postgres-db-app-analytics"]["spec"]["name"]
+        == "app_analytics"
+    )
     for db in databases.values():
         assert db["spec"]["databaseReclaimPolicy"] == "retain"
         assert db["spec"]["cluster"] == {"name": "example-postgres"}
@@ -205,6 +211,10 @@ def test_role_crs_are_opt_in_and_retain_roles(tmp_path):
     resources = render(tmp_path, example="modern")
     roles = [d for d in resources if d["kind"] == "DatabaseRole"]
     assert len(roles) == 2
+    assert {r["metadata"]["name"] for r in roles} == {
+        "example-postgres-role-app",
+        "example-postgres-role-reporting",
+    }
     for role in roles:
         assert role["spec"]["databaseRoleReclaimPolicy"] == "retain"
         assert role["spec"]["cluster"] == {"name": "example-postgres"}
@@ -448,7 +458,7 @@ def test_new_keys_override_legacy_keys_without_duplicate_role_controllers(tmp_pa
 
 def test_legacy_pod_labels_and_topology_are_stable_across_chart_versions(tmp_path):
     cluster = one(render(tmp_path), "Cluster")
-    assert cluster["metadata"]["labels"]["helm.sh/chart"] == "postgresql-0.2.0"
+    assert cluster["metadata"]["labels"]["helm.sh/chart"] == "postgresql-0.2.1"
     pod_labels = cluster["spec"]["inheritedMetadata"]["labels"]
     assert pod_labels["helm.sh/chart"] == "postgresql-0.1.0"
     assert (
@@ -484,22 +494,30 @@ def test_digest_keeps_version_tag_for_cnpg_major_detection(tmp_path):
     )
 
 
-def test_generated_credentials_use_cnpg_ownership_and_disable_scheduled_rotation(
+def test_generated_credentials_create_named_secrets_and_disable_scheduled_rotation(
     tmp_path,
 ):
     resources = render(tmp_path, {"credentials": {"mode": "generated"}})
     spec = one(resources, "Cluster")["spec"]
-    assert "secret" not in spec["bootstrap"]["initdb"]
+    assert spec["bootstrap"]["initdb"]["secret"] == {
+        "name": "example-postgres-creds-app"
+    }
     assert "superuserSecret" not in spec
     secret = one(resources, "ExternalSecret")["spec"]
-    assert secret["target"]["name"] == "example-postgres-app"
-    assert secret["target"]["creationPolicy"] == "Merge"
+    assert secret["target"]["name"] == "example-postgres-creds-app"
+    assert secret["target"]["creationPolicy"] == "Orphan"
+    assert secret["target"]["template"]["data"]["username"] == "app"
     assert secret["refreshPolicy"] == "Periodic"
     assert secret["refreshInterval"] == "0s"
     assert secret["target"]["template"]["metadata"]["labels"] == {
         "cnpg.io/reload": "true"
     }
     assert set(secret["target"]["template"]["data"]) == {
+        "username",
+        "user",
+        "host",
+        "port",
+        "dbname",
         "password",
         "pgpass",
         "uri",
@@ -512,6 +530,213 @@ def test_generated_credentials_use_cnpg_ownership_and_disable_scheduled_rotation
         d["kind"] in {"Secret", "SecretStore", "PushSecret"} for d in resources
     )
     assert resources == render(tmp_path, {"credentials": {"mode": "generated"}})
+
+
+@pytest.mark.parametrize(
+    "example,mode", [("legacy", "generated"), ("recovery", "copy")]
+)
+@pytest.mark.parametrize("admin", [False, True])
+def test_eso_targets_are_explicit_cluster_credentials(tmp_path, example, mode, admin):
+    resources = render(
+        tmp_path,
+        {
+            "enableSuperuserAccess": admin,
+            "credentials": {
+                "mode": mode,
+                "resourceNames": {
+                    "user": "application-credentials",
+                    "superuser": "postgres-credentials",
+                },
+                "copy": {"superuserSecretName": "source-admin"},
+            },
+        },
+        example=example,
+    )
+    cluster = one(resources, "Cluster")["spec"]
+    bootstrap = cluster["bootstrap"]["initdb" if mode == "generated" else "recovery"]
+    assert bootstrap["secret"] == {"name": "application-credentials"}
+    secrets = [d for d in resources if d["kind"] == "ExternalSecret"]
+    expected = {"application-credentials"}
+    if admin:
+        expected.add("postgres-credentials")
+        assert cluster["superuserSecret"] == {"name": "postgres-credentials"}
+    else:
+        assert "superuserSecret" not in cluster
+    assert {d["spec"]["target"]["name"] for d in secrets} == expected
+    for secret in secrets:
+        assert secret["spec"]["target"]["creationPolicy"] == "Orphan"
+        fields = secret["spec"]["target"]["template"]["data"]
+        assert fields["username"] == (
+            "postgres"
+            if secret["metadata"]["name"] == "postgres-credentials"
+            else "app"
+        )
+        assert "password" in fields
+
+
+@pytest.mark.parametrize("method", ["initdb", "recovery", "pg_basebackup"])
+def test_native_bootstrap_cannot_request_cnpg_generated_credentials(tmp_path, method):
+    settings = {"database": "app", "owner": "app"}
+    if method != "initdb":
+        settings["source"] = "source"
+    assert "CNPG-generated credential Secrets are disabled" in render(
+        tmp_path,
+        {"bootstrap": {method: settings}},
+        success=False,
+    )
+    settings["secret"] = {"name": "explicit-credentials"}
+    resources = render(tmp_path, {"bootstrap": {method: settings}})
+    assert one(resources, "Cluster")["spec"]["bootstrap"][method]["secret"] == {
+        "name": "explicit-credentials"
+    }
+
+
+def test_sql_names_control_resource_names_without_changing_sql_identity(tmp_path):
+    resources = render(
+        tmp_path,
+        {
+            "database": {
+                "enabled": True,
+                "name": "Codecov_DB",
+                "owner": "Codecov_User",
+            },
+            "databaseRoles": {"reader": {"name": "Codecov_Reader", "login": False}},
+            "credentials": {"mode": "generated"},
+            "enableSuperuserAccess": True,
+        },
+    )
+    db = one(resources, "Database")
+    assert db["metadata"]["name"] == "example-postgres-db-codecov-db"
+    assert db["spec"]["name"] == "Codecov_DB"
+    assert db["spec"]["owner"] == "Codecov_User"
+    role = one(resources, "DatabaseRole")
+    assert role["metadata"]["name"] == "example-postgres-role-codecov-reader"
+    assert role["spec"]["name"] == "Codecov_Reader"
+    cluster = one(resources, "Cluster")["spec"]
+    assert cluster["bootstrap"]["initdb"]["secret"] == {
+        "name": "example-postgres-creds-codecov-user"
+    }
+    assert cluster["superuserSecret"] == {"name": "example-postgres-creds-postgres"}
+    generators = {d["metadata"]["name"] for d in resources if d["kind"] == "Password"}
+    assert generators == {
+        "example-postgres-creds-codecov-user",
+        "example-postgres-creds-postgres",
+    }
+    for secret in (d for d in resources if d["kind"] == "ExternalSecret"):
+        assert secret["spec"]["target"]["name"] == secret["metadata"]["name"]
+        assert secret["spec"]["target"]["creationPolicy"] == "Orphan"
+        fields = secret["spec"]["target"]["template"]["data"]
+        assert fields["username"] == (
+            "postgres"
+            if secret["metadata"]["name"].endswith("-postgres")
+            else "Codecov_User"
+        )
+        assert (
+            secret["spec"]["dataFrom"][0]["sourceRef"]["generatorRef"]["name"]
+            == secret["metadata"]["name"]
+        )
+
+
+def test_resource_name_overrides_preserve_previous_database_role_and_copy_identities(
+    tmp_path,
+):
+    resources = render(
+        tmp_path,
+        {
+            "database": {"enabled": True, "resourceName": "example-restored-app"},
+            "databaseRoles": {
+                "reader": {
+                    "name": "read_only",
+                    "resourceName": "example-restored-reader",
+                }
+            },
+            "credentials": {"resourceNames": {"user": "example-restored-recovery-app"}},
+        },
+        example="recovery",
+    )
+    db = one(resources, "Database")
+    role = one(resources, "DatabaseRole")
+    assert db["metadata"]["name"] == "example-restored-app"
+    assert role["metadata"]["name"] == "example-restored-reader"
+    assert "resourceName" not in db["spec"] and "resourceName" not in role["spec"]
+    secret = one(resources, "ExternalSecret")
+    assert secret["metadata"]["name"] == "example-restored-recovery-app"
+    assert secret["spec"]["target"]["name"] == "example-restored-recovery-app"
+    assert one(resources, "Cluster")["spec"]["bootstrap"]["recovery"]["secret"] == {
+        "name": "example-restored-recovery-app"
+    }
+
+
+def test_database_and_role_map_key_renames_do_not_rename_resources(tmp_path):
+    a = {
+        "databases": {"first": {"name": "reporting_db", "owner": "app"}},
+        "databaseRoles": {"first": {"name": "reporting_user", "login": False}},
+    }
+    b = {
+        "databases": {"second": a["databases"]["first"]},
+        "databaseRoles": {"second": a["databaseRoles"]["first"]},
+    }
+    assert render(tmp_path, a) == render(tmp_path, b)
+
+
+@pytest.mark.parametrize(
+    "values, message",
+    [
+        (
+            {
+                "databases": {
+                    "one": {"name": "sql_name", "owner": "app"},
+                    "two": {"name": "sql-name", "owner": "app"},
+                }
+            },
+            "duplicate Database resource name",
+        ),
+        (
+            {
+                "databaseRoles": {
+                    "one": {"name": "sql_name"},
+                    "two": {"name": "sql-name"},
+                }
+            },
+            "duplicate DatabaseRole resource name",
+        ),
+        ({"database": {"enabled": True, "name": "x" * 63}}, "resourceName"),
+        ({"database": {"enabled": True, "name": "_"}}, "set resourceName explicitly"),
+        ({"database": {"enabled": True, "resourceName": "BAD_NAME"}}, "resourceName"),
+        (
+            {
+                "enableSuperuserAccess": True,
+                "credentials": {
+                    "mode": "generated",
+                    "resourceNames": {"user": "same", "superuser": "same"},
+                },
+            },
+            "duplicate credential resource name",
+        ),
+    ],
+)
+def test_ambiguous_or_invalid_resource_names_fail_before_apply(
+    tmp_path, values, message
+):
+    assert message in render(tmp_path, values, success=False)
+
+
+def test_resource_name_override_resolves_sql_name_normalization_collision(tmp_path):
+    resources = render(
+        tmp_path,
+        {
+            "databases": {
+                "one": {"name": "sql_name", "owner": "app"},
+                "two": {
+                    "name": "sql-name",
+                    "owner": "app",
+                    "resourceName": "explicit-db-name",
+                },
+            }
+        },
+    )
+    names = {d["metadata"]["name"] for d in resources if d["kind"] == "Database"}
+    assert names == {"example-postgres-db-sql-name", "explicit-db-name"}
 
 
 def test_rotation_and_superuser_are_explicit_with_independent_password_generators(
@@ -530,8 +755,13 @@ def test_rotation_and_superuser_are_explicit_with_independent_password_generator
     secrets = [d for d in resources if d["kind"] == "ExternalSecret"]
     assert len(secrets) == 2
     generators = {d["metadata"]["name"] for d in resources if d["kind"] == "Password"}
-    assert generators == {"example-postgres-app", "example-postgres-superuser"}
-    admin = next(d for d in secrets if d["metadata"]["name"].endswith("-superuser"))
+    assert generators == {
+        "example-postgres-creds-app",
+        "example-postgres-creds-postgres",
+    }
+    admin = next(
+        d for d in secrets if d["spec"]["target"]["name"].endswith("-postgres")
+    )
     fields = admin["spec"]["target"]["template"]["data"]
     assert fields["dbname"] == "postgres"
     assert ":5432:*:postgres:" in fields["pgpass"]
@@ -554,9 +784,11 @@ def test_recovery_copy_restricts_reads_and_retains_secrets_after_removal(tmp_pat
     )
     cluster = one(resources, "Cluster")["spec"]
     assert cluster["bootstrap"]["recovery"]["secret"] == {
-        "name": "example-restored-recovery-app"
+        "name": "example-restored-recovery-creds-app"
     }
-    assert cluster["superuserSecret"] == {"name": "example-restored-recovery-superuser"}
+    assert cluster["superuserSecret"] == {
+        "name": "example-restored-recovery-creds-postgres"
+    }
     assert one(resources, "Role")["rules"] == [
         {
             "apiGroups": [""],
@@ -642,7 +874,7 @@ def test_copy_refuses_self_copy_and_mismatched_database_identity(tmp_path):
         tmp_path,
         {
             "credentials": {
-                "copy": {"userSecretName": "example-restored-recovery-app"}
+                "copy": {"userSecretName": "example-restored-recovery-creds-app"}
             },
         },
         example="recovery",
@@ -846,7 +1078,9 @@ def test_native_bootstrap_and_generated_credentials_keep_their_precedence(tmp_pa
         },
     )
     spec = one(resources, "Cluster")["spec"]
-    assert "secret" not in spec["bootstrap"]["initdb"]
+    assert spec["bootstrap"]["initdb"]["secret"] == {
+        "name": "example-postgres-creds-app"
+    }
     assert "superuserSecret" not in spec
 
 

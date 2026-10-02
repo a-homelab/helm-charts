@@ -7,7 +7,7 @@ superuser client certificates, and a chart-owned PodMonitor.
 
 ## Compatibility contract
 
-Version 0.2.0 preserves the resource identities and specs rendered by 0.1.0 for
+Version 0.2.x preserves the resource identities and specs rendered by 0.1.0 for
 existing homelab values. New behavior requires an explicit opt-in. The old keys
 remain supported, including `databaseName`, `clientUsername`, `storageSize`,
 `storageClass`, `initdb`, `certificateIssuerRef`, and `backup.storageClassName`.
@@ -48,7 +48,7 @@ rename: nested existing credentials still use the same SealedSecrets, and an
 explicit legacy issuer still issues the same certificates. Keep values valid in
 both syntaxes while they coexist; schema validation applies to both.
 
-For homelab consumers, put the preferred keys in a commented migration block in
+For homelab consumers, put the preferred keys in a migration block with comments in
 the existing values file. No additional values file or Application source change
 is needed. Keep legacy aliases during adoption, then consolidate the file after
 verification. Update the preferred keys in the block when both forms exist: editing
@@ -131,12 +131,28 @@ upgrade. See the [upstream support matrix](https://cloudnative-pg.io/docs/1.30/s
 
 [examples/declarative.yaml](examples/declarative.yaml) uses capabilities present
 on the installed CNPG version. `database.enabled` manages the bootstrap database
-as `<cluster>-app`. `databases` maps stable Kubernetes suffixes to native
+as `<cluster>-db-<database-name>`. `databases` maps values identifiers to native
 Database.spec objects. For example, `databases.visibility.name: temporal_visibility`
-creates a CR named `<cluster>-visibility`, allowing SQL names with underscores.
+creates a CR named `<cluster>-db-temporal-visibility`, while its SQL name remains
+`temporal_visibility`. DatabaseRole names use `<cluster>-role-<role-name>`.
 The chart supplies the Cluster reference and defaults `databaseReclaimPolicy`
 to `retain`. Native `extensions`, `schemas`, `fdws`, `servers`, and other database
 fields pass through. Extension binaries must be present in the operand image.
+
+Kubernetes names lowercase SQL names and replace runs of punctuation, underscores,
+or other non-alphanumeric characters with hyphens. SQL names remain exact. Names
+must fit the chart's 63-character DNS-label limit; the chart rejects empty or
+colliding normalized names instead of truncating or merging identities. Use
+`database.resourceName`, `databases.<key>.resourceName`, or
+`databaseRoles.<key>.resourceName` for an explicit full Kubernetes name. These
+chart fields do not reach the CNPG spec. Map-key changes alone do not rename CRs.
+See [Kubernetes naming constraints](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/).
+
+Version 0.2.0 used `<cluster>-app` and `<cluster>-<map-key>` for these CRs. If those
+resources were already deployed, set explicit `resourceName` overrides to their
+existing names before upgrading. Creating a second Database CR for the same SQL
+database is not an ownership transfer. No Database CRs were live in the homelab
+when this naming change was prepared on 2026-10-02.
 
 The default Database/DatabaseRole wave is one greater than the Cluster wave;
 `databaseSyncWave` overrides it, and `database.syncWave` can override the single
@@ -161,8 +177,8 @@ undo all manual SQL changes. Omitting an extension does not drop it. Explicit
 `ensure: absent` can delete objects, even when the database reclaim policy is
 `retain`. See [database management](https://cloudnative-pg.io/docs/1.30/declarative_database_management/).
 
-`managed` is the native Cluster.spec.managed object. `databaseRoles` maps stable
-suffixes to native DatabaseRole.spec objects and defaults
+`managed` is the native Cluster.spec.managed object. `databaseRoles` maps values
+identifiers to native DatabaseRole.spec objects and defaults
 `databaseRoleReclaimPolicy: retain`. If both forms name the same SQL role, the
 chart renders only the DatabaseRole definition for that role. Other inline roles
 and managed services remain intact.
@@ -189,26 +205,43 @@ renders no ESO resources. Do not point ESO at a Secret still reconciled by Seale
 Secrets: the controllers would compete over its data.
 
 [examples/generated.yaml](examples/generated.yaml) opts into
-`credentials.mode: generated`. CNPG creates `<cluster>-app`, and optionally
-`<cluster>-superuser` when `enableSuperuserAccess` is true. The chart omits custom
-bootstrap/superuser Secret references in this mode, even if legacy values remain.
-ESO Password generators provide independent passwords and ExternalSecrets use
-`creationPolicy: Merge` on those CNPG-owned Secrets. No Vault, SecretStore,
-PushSecret, plaintext Helm Secret, Helm randomness, or cluster lookup is involved.
+`credentials.mode: generated`. ESO Password generators and ExternalSecrets are
+named `<cluster>-creds-<role-name>` and create Secrets with those names. The
+application role is `database.owner`; the optional superuser role is `postgres`.
+The Cluster explicitly references those Secrets through `bootstrap.initdb.secret`
+and, when `enableSuperuserAccess` is true, `superuserSecret`. ESO supplies the
+matching username, password and connection fields; CNPG uses those credentials.
+ExternalSecrets use `creationPolicy: Orphan`, retaining Secrets when an
+ExternalSecret is removed. No Vault, SecretStore, PushSecret, plaintext Helm
+Secret, Helm randomness, or cluster lookup is involved.
 Use chart `initdb` settings in this mode; native `bootstrap` remains available
 with existing or recovery-copy credentials.
 
-This follows the [CNPG integration](https://cloudnative-pg.io/docs/1.30/cncf-projects/external-secrets/),
+This combines the [CNPG External Secrets integration](https://cloudnative-pg.io/docs/1.30/cncf-projects/external-secrets/)
+and [explicit bootstrap credentials](https://cloudnative-pg.io/docs/1.28/bootstrap/#bootstrap-an-empty-cluster-initdb),
 including `cnpg.io/reload: "true"`. The chart also updates both FQDN connection
 strings omitted from the upstream example, percent-encodes URI credentials, and
 escapes `.pgpass` separators. `clusterDomain` defaults to `cluster.local`; match
 CNPG's configured Kubernetes cluster domain. Superuser connection strings and
 `dbname` use `postgres`, while `.pgpass` retains a wildcard database match.
 
-Generated ExternalSecrets and Cluster share a sync wave: Merge needs CNPG to
-create its target first. An earlier health-gated ExternalSecret wave would block
-bootstrap. Wait for both Cluster readiness and ExternalSecret `Ready=True` before
-starting consumers. The first ESO reconciliation changes CNPG's initial password.
+Generated ExternalSecrets and Cluster share a sync wave. Wait for both Cluster
+readiness and ExternalSecret `Ready=True` before starting consumers. The Secret's
+username must match the application owner or `postgres`, as applicable.
+
+The chart always references explicitly controlled credential Secrets and never
+asks CNPG to generate them. Native `bootstrap.initdb`, `recovery`, and
+`pg_basebackup` objects in existing mode must also supply `secret.name`.
+When superuser access is enabled, an explicit superuser Secret is required.
+
+`credentials.resourceNames.user` and `.superuser` override the full names of
+Password generators, ExternalSecrets and their target Secrets. Changing a
+generator or ExternalSecret identity can generate a fresh password even with
+scheduled rotation disabled. Keep deployed identities stable until a deliberate
+credential migration. Version 0.2.0's generated mode used CNPG-owned targets with
+Merge; that implementation was never activated in the homelab and is removed.
+Any external deployment of that mode needs a deliberate Secret ownership and
+reference migration before adopting this version.
 
 Rotation is disabled by default (`Periodic`, `refreshInterval: 0s`). Zero prevents
 scheduled refresh, not all future changes: recreating the ExternalSecret or
@@ -230,7 +263,7 @@ substituting the actual Secret name:
 ```yaml
 metadata:
   annotations:
-    secret.reloader.stakater.com/reload: example-postgres-app
+    secret.reloader.stakater.com/reload: example-postgres-creds-app
 ```
 
 The annotation belongs to the application workload, not to the CNPG Cluster or
@@ -244,7 +277,7 @@ before enabling rotation. Reloader is absent from the live cluster as checked
 
 For an existing cluster, leave `existing` on the initial chart upgrade. Migrate
 credentials separately: back up the current credential Secrets, record all app
-references and managed-role passwordSecret references, adopt the new target
+references (including data keys) and managed-role passwordSecret references, adopt the new target
 names deliberately, wait for ESO/CNPG reconciliation, and verify authentication
 before switching consumers. Existing `bootstrap.initdb` fields do not reinitialize
 an existing database. Do not assume removing a custom bootstrap Secret adopts
@@ -261,7 +294,7 @@ do not track later ESO-generated passwords.
 
 `credentials.mode: copy` complements `bootstrap.recovery` for a new CNPG Cluster.
 It copies username/password from explicitly named Secrets in the same namespace
-into `<new-cluster>-recovery-app` and optionally `-recovery-superuser`, and rebuilds
+into `<new-cluster>-recovery-creds-<role-name>`, optionally including `postgres`, and rebuilds
 connection fields for the replacement hostname. It checks the copied username
 against the intended role. The new bootstrap Secret reference overrides the
 legacy name and any explicit `bootstrap.recovery.secret`.

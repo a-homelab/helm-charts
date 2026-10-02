@@ -19,7 +19,7 @@ databaseRoles:
     name: app
     login: true
     passwordSecret:
-      name: example-postgres-app
+      name: example-postgres-creds-app
   reporting:
     name: reporting
     login: false

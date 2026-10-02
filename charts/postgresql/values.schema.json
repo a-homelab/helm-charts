@@ -149,6 +149,11 @@
         "localeCollate": {
           "type": "string",
           "minLength": 1
+        },
+        "resourceName": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
         }
       },
       "additionalProperties": true
@@ -181,6 +186,11 @@
                 "present",
                 "absent"
               ]
+            },
+            "resourceName": {
+              "type": "string",
+              "maxLength": 63,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
             }
           },
           "additionalProperties": true,
@@ -215,6 +225,11 @@
                 "retain",
                 "delete"
               ]
+            },
+            "resourceName": {
+              "type": "string",
+              "maxLength": 63,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
             }
           },
           "additionalProperties": true,
@@ -558,6 +573,22 @@
             },
             "superuserSecretName": {
               "type": "string"
+            }
+          }
+        },
+        "resourceNames": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "user": {
+              "type": "string",
+              "maxLength": 63,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+            },
+            "superuser": {
+              "type": "string",
+              "maxLength": 63,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
             }
           }
         }

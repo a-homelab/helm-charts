@@ -8,12 +8,16 @@
 {{- $_ := set $databases "app" $app -}}
 {{- end -}}
 {{- $names := dict -}}
+{{- $resourceNames := dict -}}
 {{- range $key, $database := $databases }}
-{{- $spec := mustMergeOverwrite (dict "databaseReclaimPolicy" "retain" "ensure" "present") (deepCopy $database) -}}
+{{- $spec := mustMergeOverwrite (dict "databaseReclaimPolicy" "retain" "ensure" "present") (omit (deepCopy $database) "resourceName") -}}
 {{- $_ := required (printf "databases.%s.name is required" $key) $spec.name -}}
 {{- $_ := required (printf "databases.%s.owner is required" $key) $spec.owner -}}
 {{- if hasKey $names $spec.name -}}{{- fail (printf "duplicate database name %s" $spec.name) -}}{{- end -}}
 {{- $_ := set $names $spec.name true -}}
+{{- $resourceName := include "postgresql.sqlResourceName" (dict "root" $root "prefix" "db" "sqlName" $spec.name "resourceName" $database.resourceName) -}}
+{{- if hasKey $resourceNames $resourceName -}}{{- fail (printf "duplicate Database resource name %s; set distinct resourceName overrides" $resourceName) -}}{{- end -}}
+{{- $_ := set $resourceNames $resourceName true -}}
 {{- if hasKey $spec "cluster" -}}{{- fail "Database cluster is assigned by this chart" -}}{{- end -}}
 {{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) -}}
 {{- $wave := include "postgresql.databaseWave" $root -}}
@@ -24,7 +28,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: {{ include "postgresql.resourceName" (dict "root" $root "suffix" $key) }}
+  name: {{ $resourceName }}
   namespace: {{ $root.Release.Namespace | quote }}
   labels:
     {{- include "postgresql.labels" $root | nindent 4 }}
