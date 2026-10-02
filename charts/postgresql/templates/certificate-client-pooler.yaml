@@ -1,0 +1,38 @@
+{{- $needed := false }}
+{{- range .Values.poolers }}
+{{- if not (dig "pgbouncer" "authQuerySecret" "" .) }}{{- $needed = true }}{{- end }}
+{{- end }}
+{{- if and (eq .Values.tls.mode "certManager") $needed }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "postgresql.poolerAuthSecretName" . | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    {{- mustMergeOverwrite (dict "argocd.argoproj.io/sync-wave" "0") (include "postgresql.annotations" . | fromYaml) | toYaml | nindent 4 }}
+spec:
+  secretName: {{ include "postgresql.poolerAuthSecretName" . | quote }}
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  duration: 2160h0m0s # 90d
+  renewBefore: 360h0m0s # 15d
+  revisionHistoryLimit: 10
+  subject:
+    organizations:
+      - benfu-me
+  privateKey:
+    algorithm: Ed25519
+    encoding: PKCS8
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+  # CNPG's fixed pg_hba/pg_ident rules accept this certificate login.
+  commonName: cnpg_pooler_pgbouncer
+  dnsNames:
+    - cnpg_pooler_pgbouncer
+  issuerRef:
+    {{- include "postgresql.issuerRef" . | nindent 4 }}
+{{- end }}

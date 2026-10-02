@@ -1,3 +1,5 @@
+image:
+  tag: "18.6-system-trixie"
 fullnameOverride: example-postgres
 clientUsername: app
 databaseName: app
@@ -41,3 +43,10 @@ managed:
 backup:
   scheduled:
     enabled: true
+poolers:
+  rw:
+    instances: 2
+    pgbouncer:
+      poolMode: transaction
+      parameters:
+        max_client_conn: "500"

@@ -265,11 +265,253 @@ def test_chart_owned_monitor_has_distinct_identity_and_stable_selector(tmp_path)
     assert monitor["metadata"]["name"] != cluster["metadata"]["name"]
     assert cluster["spec"]["monitoring"]["enablePodMonitor"] is False
     assert monitor["spec"]["selector"]["matchLabels"] == {
-        "cnpg.io/cluster": "example-postgres"
+        "cnpg.io/cluster": "example-postgres",
+        "cnpg.io/podRole": "instance",
     }
     assert monitor["spec"]["podMetricsEndpoints"] == [{"port": "metrics"}]
     selector = cluster["spec"]["topologySpreadConstraints"][0]["labelSelector"]
     assert selector == {"matchLabels": {"cnpg.io/cluster": "example-postgres"}}
+
+
+@pytest.mark.parametrize(
+    ("tls_mode", "extra", "ca_secret"),
+    [
+        ("certManager", {}, "example-postgres-server-tls"),
+        ("operator", {}, "example-postgres-ca"),
+        (
+            "external",
+            {"certificates": {"serverTLSSecret": "srv", "serverCASecret": "srv-ca"}},
+            "srv-ca",
+        ),
+    ],
+)
+def test_metrics_tls_scrapes_https_with_the_server_ca(
+    tmp_path, tls_mode, extra, ca_secret
+):
+    resources = render(
+        tmp_path,
+        {
+            "tls": {"mode": tls_mode, **extra},
+            "monitoring": {
+                "mode": "podMonitor",
+                "configuration": {"tls": {"enabled": True}},
+                "podMonitor": {
+                    "podMetricsEndpoints": [{"port": "metrics", "interval": "30s"}]
+                },
+            },
+        },
+    )
+    assert one(resources, "PodMonitor")["spec"]["podMetricsEndpoints"] == [
+        {
+            "port": "metrics",
+            "interval": "30s",
+            "scheme": "https",
+            "tlsConfig": {
+                "ca": {"secret": {"name": ca_secret, "key": "ca.crt"}},
+                "serverName": "example-postgres-rw",
+            },
+        }
+    ]
+
+
+def test_replication_slots_merge_over_high_availability_default(tmp_path):
+    spec = one(render(tmp_path), "Cluster")["spec"]
+    assert spec["replicationSlots"] == {"highAvailability": {"enabled": True}}
+    spec = one(
+        render(
+            tmp_path,
+            {
+                "replicationSlots": {
+                    "highAvailability": {"synchronizeLogicalDecoding": True},
+                    "synchronizeReplicas": {"enabled": False},
+                }
+            },
+        ),
+        "Cluster",
+    )["spec"]
+    assert spec["replicationSlots"] == {
+        "highAvailability": {"enabled": True, "synchronizeLogicalDecoding": True},
+        "synchronizeReplicas": {"enabled": False},
+    }
+
+
+def test_plugin_server_name_separates_archives(tmp_path):
+    spec = one(
+        render(
+            tmp_path,
+            {"backup": {"provider": "plugin", "serverName": "example-postgres-pg18"}},
+        ),
+        "Cluster",
+    )["spec"]
+    assert spec["plugins"][0]["parameters"] == {
+        "barmanObjectName": "example-postgres",
+        "serverName": "example-postgres-pg18",
+    }
+    spec = one(render(tmp_path, {"backup": {"provider": "plugin"}}), "Cluster")["spec"]
+    assert "serverName" not in spec["plugins"][0]["parameters"]
+
+
+def test_server_alt_dns_names_reach_certificates(tmp_path):
+    names = ["example-postgres-pooler-rw", "db.example.internal"]
+    resources = render(tmp_path, {"tls": {"serverAltDNSNames": names}})
+    server = next(
+        d for d in resources if d["metadata"]["name"] == "example-postgres-server-tls"
+    )
+    assert server["spec"]["dnsNames"][-2:] == names
+    spec = one(
+        render(tmp_path, {"tls": {"mode": "operator", "serverAltDNSNames": names}}),
+        "Cluster",
+    )["spec"]
+    assert spec["certificates"] == {"serverAltDNSNames": names}
+
+
+def test_image_tag_is_required_without_a_catalog(tmp_path):
+    assert "image.tag or imageCatalogRef is required" in render(
+        tmp_path, {"image": {"tag": ""}}, success=False
+    )
+    spec = one(
+        render(
+            tmp_path,
+            {
+                "image": {"tag": ""},
+                "imageCatalogRef": {
+                    "apiGroup": "postgresql.cnpg.io",
+                    "kind": "ClusterImageCatalog",
+                    "name": "postgresql",
+                    "major": 18,
+                },
+            },
+        ),
+        "Cluster",
+    )["spec"]
+    assert "imageName" not in spec
+
+
+def test_cert_manager_poolers_use_chart_issued_auth_certificate(tmp_path):
+    resources = render(
+        tmp_path,
+        {
+            "poolers": {
+                "rw": {"instances": 2, "pgbouncer": {"poolMode": "transaction"}},
+                "ro": {"type": "ro", "resourceName": "reporting-pool"},
+            }
+        },
+    )
+    poolers = {d["metadata"]["name"]: d for d in resources if d["kind"] == "Pooler"}
+    assert sorted(poolers) == ["example-postgres-pooler-rw", "reporting-pool"]
+    rw = poolers["example-postgres-pooler-rw"]["spec"]
+    assert rw["cluster"] == {"name": "example-postgres"}
+    assert rw["pgbouncer"] == {
+        "poolMode": "transaction",
+        "authQuerySecret": {"name": "example-postgres-pooler-auth-tls"},
+        "authQuery": "SELECT usename, passwd FROM public.user_search($1)",
+    }
+    assert rw["template"] == {
+        "metadata": {"annotations": {"sidecar.istio.io/inject": "false"}}
+    }
+    certs = {d["metadata"]["name"]: d for d in resources if d["kind"] == "Certificate"}
+    auth = certs["example-postgres-pooler-auth-tls"]["spec"]
+    assert auth["commonName"] == "cnpg_pooler_pgbouncer"
+    assert auth["usages"][-1] == "client auth"
+    sans = certs["example-postgres-server-tls"]["spec"]["dnsNames"]
+    assert "reporting-pool.test.svc" in sans
+    assert "example-postgres-pooler-rw.test.svc.cluster.local" in sans
+
+
+def test_explicit_pooler_auth_and_template_are_preserved(tmp_path):
+    resources = render(
+        tmp_path,
+        {
+            "poolers": {
+                "rw": {
+                    "pgbouncer": {"authQuerySecret": {"name": "custom"}},
+                    "template": {
+                        "metadata": {"annotations": {"sidecar.istio.io/inject": "true"}}
+                    },
+                }
+            }
+        },
+    )
+    spec = one(resources, "Pooler")["spec"]
+    assert spec["pgbouncer"] == {"authQuerySecret": {"name": "custom"}}
+    assert spec["template"]["metadata"]["annotations"] == {
+        "sidecar.istio.io/inject": "true"
+    }
+    assert "example-postgres-pooler-auth-tls" not in [
+        d["metadata"]["name"] for d in resources if d["kind"] == "Certificate"
+    ]
+
+
+def test_operator_tls_poolers_keep_cnpg_integration_and_add_sans(tmp_path):
+    resources = render(
+        tmp_path,
+        {
+            "tls": {"mode": "operator", "serverAltDNSNames": ["db.example.internal"]},
+            "poolers": {"rw": {"pgbouncer": {}}},
+            "monitoring": {"mode": "podMonitor"},
+        },
+    )
+    assert one(resources, "Pooler")["spec"]["pgbouncer"] == {}
+    assert one(resources, "Cluster")["spec"]["certificates"] == {
+        "serverAltDNSNames": [
+            "example-postgres-pooler-rw",
+            "example-postgres-pooler-rw.test",
+            "example-postgres-pooler-rw.test.svc",
+            "example-postgres-pooler-rw.test.svc.cluster.local",
+            "db.example.internal",
+        ]
+    }
+    monitors = {
+        d["metadata"]["name"]: d["spec"]["selector"]["matchLabels"]
+        for d in resources
+        if d["kind"] == "PodMonitor"
+    }
+    assert monitors["example-postgres-pooler-metrics"] == {
+        "cnpg.io/cluster": "example-postgres",
+        "cnpg.io/podRole": "pooler",
+    }
+
+
+@pytest.mark.parametrize(
+    ("values", "message"),
+    [
+        (
+            {"poolers": {"rw": {"cluster": {"name": "other"}, "pgbouncer": {}}}},
+            "cluster",
+        ),
+        (
+            {
+                "poolers": {
+                    "a": {"resourceName": "pool", "pgbouncer": {}},
+                    "b": {"resourceName": "pool", "pgbouncer": {}},
+                }
+            },
+            "duplicate Pooler resource name",
+        ),
+    ],
+)
+def test_invalid_poolers_fail_before_apply(tmp_path, values, message):
+    assert message in render(tmp_path, values, success=False)
+
+
+@pytest.mark.parametrize(
+    ("example", "values", "immutable"),
+    [
+        ("generated", {}, True),
+        ("generated", {"credentials": {"rotation": {"enabled": True}}}, False),
+        ("recovery", {}, True),
+    ],
+)
+def test_credential_secrets_are_immutable_unless_rotating(
+    tmp_path, example, values, immutable
+):
+    secrets = [
+        d
+        for d in render(tmp_path, values, example=example)
+        if d["kind"] == "ExternalSecret"
+    ]
+    assert secrets
+    assert all(d["spec"]["target"]["immutable"] is immutable for d in secrets)
 
 
 def test_native_cluster_fields_and_image_catalog(tmp_path):
@@ -428,6 +670,17 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
             {"monitoring": {"configuration": {"enablePodMonitor": True}}},
             "use monitoring.mode",
         ),
+        ({"backup": {"serverName": "pg18"}}, "backup.serverName requires"),
+        (
+            {
+                "tls": {
+                    "mode": "external",
+                    "certificates": {"serverTLSSecret": "s"},
+                    "serverAltDNSNames": ["x"],
+                }
+            },
+            "tls.serverAltDNSNames is unused",
+        ),
     ],
 )
 def test_invalid_configuration_fails_before_apply(tmp_path, values, message):
@@ -458,7 +711,8 @@ def test_new_keys_override_legacy_keys_without_duplicate_role_controllers(tmp_pa
 
 def test_legacy_pod_labels_and_topology_are_stable_across_chart_versions(tmp_path):
     cluster = one(render(tmp_path), "Cluster")
-    assert cluster["metadata"]["labels"]["helm.sh/chart"] == "postgresql-0.2.1"
+    version = yaml.safe_load((CHART / "Chart.yaml").read_text())["version"]
+    assert cluster["metadata"]["labels"]["helm.sh/chart"] == f"postgresql-{version}"
     pod_labels = cluster["spec"]["inheritedMetadata"]["labels"]
     assert pod_labels["helm.sh/chart"] == "postgresql-0.1.0"
     assert (

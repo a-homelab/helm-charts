@@ -1,32 +1,89 @@
-# Existing installations retain their image, credentials, TLS, and archive destination.
-# See examples/modern.yaml for explicit opt-ins and README.md for prerequisites.
-# Null inherits replicaCount; explicit instances uses CNPG naming.
+# One CloudNativePG (CNPG) Cluster per release, plus optional Database,
+# DatabaseRole, cert-manager Certificate, ObjectStore, ScheduledBackup, PodMonitor
+# and External Secrets resources.
+#
+# Compatibility contract: these defaults reproduce what chart 0.1.0 rendered, so
+# existing installations keep their image, credentials, TLS and archive
+# destination. Every new behavior is an explicit opt-in. Start a new cluster from
+# examples/modern.yaml; README.md lists prerequisites and migration procedures.
+#
+# Keys named after CNPG fields take the native object unchanged. API reference:
+# https://cloudnative-pg.io/docs/1.30/cloudnative-pg.v1/
+# The cluster name (and prefix of every resource name) is the release name, or
+# fullnameOverride when set.
+
+# --- Image and instances ------------------------------------------------------
+
+# Number of PostgreSQL instances: one primary plus instances-1 streaming replicas.
+# Null inherits replicaCount; an explicit value uses CNPG naming.
 instances: null
+# Kubernetes cluster DNS domain. Used for FQDN connection strings in chart-managed
+# credential Secrets and for the full-FQDN server SANs of tls.profile=cnpg.
 clusterDomain: cluster.local
+# Renders Cluster.spec.imageName as repository:tag[@digest].
+# CNPG derives the PostgreSQL major version from the tag, so the tag must start
+# with the version (e.g. 18.6, 18.6-system-trixie) even when a digest is set.
+# Changing the major version in the tag (or imageCatalogRef.major) starts an
+# offline in-place major upgrade with pg_upgrade: the whole cluster is down
+# during the upgrade and replicas are re-cloned. Read README.md "Major upgrades" first.
+# Tag flavors from github.com/cloudnative-pg/postgres-containers:
+#   <ver>                 legacy image; bundles barman-cloud for in-tree backups
+#   <ver>-system-<distro> bundles barman-cloud; needed while backup.provider=inTree
+#   <ver>-standard-<distro>, <ver>-minimal-<distro>
+#                         no barman-cloud; use with backup.provider=plugin
+# There is no default tag: set image.tag or imageCatalogRef, so a release never
+# picks up a PostgreSQL version by accident.
 image:
   repository: ghcr.io/cloudnative-pg/postgresql
   pullPolicy: IfNotPresent
-  tag: "15.3"
+  tag: ""
+  # sha256:<64 hex>. Pins the exact image while keeping the tag for major detection.
   digest: ""
+# Use an ImageCatalog or ClusterImageCatalog instead of image.repository/tag.
+# Mutually exclusive with image.digest. Catalog extensions require CNPG 1.29+.
+# imageCatalogRef:
+#   apiGroup: postgresql.cnpg.io
+#   kind: ClusterImageCatalog
+#   name: postgresql
+#   major: 18
 imageCatalogRef: {}
+# Native list of {name: <Secret>} for private registries.
 imagePullSecrets: []
 nameOverride: ""
+# Sets the cluster name. Changing it on an existing release creates a new,
+# empty Cluster; it never renames one.
 fullnameOverride: ""
 
+# When true, CNPG sets the postgres password from the superuser Secret and allows
+# password login as postgres. False sets that password to NULL. Requires an
+# explicit superuser Secret (credentials.existing.superuserSecretName, or the
+# generated/copied superuser Secret).
 enableSuperuserAccess: false
 
-# existing preserves SealedSecret references. generated creates ESO-controlled Secrets.
-# copy retains credentials from a source cluster in this namespace during recovery.
+# --- Credentials --------------------------------------------------------------
+
+# Who controls the application (and optional superuser) password Secrets. The
+# chart never asks CNPG to generate credential Secrets.
+#   existing   reference Secrets managed elsewhere (SealedSecrets). No ESO resources.
+#   generated  ESO Password generator + ExternalSecret per role, named
+#              <cluster>-creds-<role>. New clusters only; see README before
+#              moving an existing cluster.
+#   copy       copy username/password from Secrets of a source cluster in this
+#              namespace during bootstrap.recovery, as <cluster>-recovery-creds-<role>.
 credentials:
   mode: existing
-  # Explicit fields override the legacy credential names; absent fields inherit them.
-  # userSecretName: existing application Secret; superuserSecretName: admin Secret.
+  # existing mode only. Present fields override the legacy userCredsSecretName and
+  # superuserCredsSecretName; absent fields inherit them.
+  # userSecretName: Secret with username/password keys for database.owner.
+  # superuserSecretName: Secret for postgres; "" clears the legacy reference.
   existing: {}
-  # Full resource-name overrides preserve deployed generator/ExternalSecret identities.
-  # These names also select the retained target Secrets.
+  # generated/copy modes: full-name overrides for the generator, ExternalSecret and
+  # target Secret. Changing a deployed name creates a new password.
   resourceNames:
     user: ""
     superuser: ""
+  # ESO Password generator spec (generated mode).
+  # https://external-secrets.io/latest/api/generator/password/
   password:
     length: 42
     digits: 5
@@ -34,57 +91,163 @@ credentials:
     symbolCharacters: "-_$@"
     noUpper: false
     allowRepeat: true
+  # Scheduled password rotation (generated mode). Disabled means
+  # refreshInterval 0s and an immutable target Secret: ESO generates once, never
+  # updates the Secret (not even for chart template changes), and a recreated
+  # ExternalSecret cannot overwrite the password.
+  # Enabling rotation makes new Secrets mutable. The first rotation requires
+  # deleting the existing immutable Secret; see README.md "Credentials and
+  # rotation". Deploy Reloader and wire every consumer first.
   rotation:
     enabled: false
     interval: 24h
+  # copy mode: source Secret names in this namespace. superuserSecretName is
+  # required when enableSuperuserAccess=true.
   copy:
     userSecretName: ""
     superuserSecretName: ""
 
-# Native Cluster.spec.postgresql. Null inherits postgresqlConfig; {} clears it.
-# A non-null object replaces the legacy object rather than merging parameters.
+# --- PostgreSQL configuration and bootstrap ------------------------------------
+
+# Native Cluster.spec.postgresql: parameters, pg_hba, pg_ident,
+# shared_preload_libraries, synchronous, extensions, ldap, and so on.
+# Null inherits postgresqlConfig; {} clears it. A non-null object replaces the
+# legacy object rather than merging parameters. CNPG 1.30 rejects unknown
+# parameter names and owns some parameters itself.
+# https://cloudnative-pg.io/docs/1.30/postgresql_conf/
+# postgresql:
+#   parameters:
+#     max_connections: "200"
+#   synchronous:
+#     method: any
+#     number: 1
+#     dataDurability: required
 postgresql: null
+# Extra Cluster.spec.bootstrap.initdb fields, merged with the chart-supplied
+# database, owner and secret. Applies only when the cluster is first created;
+# changing it later never reinitializes or alters an existing database.
+# Other useful native fields: dataChecksums (PG18 initdb enables checksums by
+# default), encoding, localeProvider, icuLocale, builtinLocale, walSegmentSize,
+# and postInit*SQLRefs.
 initdb:
   localeCType: C
   localeCollate: C
+  # SQL run as superuser in the postgres database after initdb.
   postInitSQL: []
+  # SQL run in template1, inherited by every database created later.
   postInitTemplateSQL: []
+  # SQL run in the application database. Prefer database.extensions/schemas.
   postInitApplicationSQL: []
 
-# A complete native bootstrap replaces initdb (recovery or pg_basebackup).
+# A complete native Cluster.spec.bootstrap (initdb, recovery or pg_basebackup).
+# Nonempty replaces the chart-built initdb, including its secret and locales, so
+# supply secret.name yourself (copy mode supplies it for recovery).
+# See examples/recovery.yaml.
 bootstrap: {}
+# Native Cluster.spec.externalClusters: recovery and replica sources. Use
+# plugin: {name: barman-cloud.cloudnative-pg.io, parameters: {...}} for archives.
 externalClusters: []
 
-# Native Cluster.spec.managed; roles are opt-in because adoption resets omitted attributes.
+# Native Cluster.spec.managed: inline roles and managed services.
+# Roles are opt-in because adopting an existing role resets every omitted
+# attribute and membership. Prefer databaseRoles on CNPG 1.30+. An entry with
+# the same name as a databaseRoles entry is dropped from the inline list.
+# Extra services from managed.services.additional need tls.serverAltDNSNames.
 managed: {}
 
-# Manage the bootstrap database after creation. Empty name/owner inherit legacy values.
-# Additional native Database.spec fields (schemas, fdws, servers, etc.) are supported.
+# --- Declarative databases and roles --------------------------------------------
+
+# Manage the bootstrap database with a Database CR, named
+# <cluster>-db-<normalized SQL name>. Empty name/owner inherit databaseName and
+# clientUsername. Other native Database.spec fields (extensions, schemas, fdws,
+# servers, connectionLimit, ...) pass through; the chart sets cluster.name,
+# ensure: present and databaseReclaimPolicy: retain. Omitting an extension or
+# schema never drops it; ensure: absent does.
+# https://cloudnative-pg.io/docs/1.30/declarative_database_management/
 database:
   enabled: false
   name: ""
   owner: ""
-  # Empty uses <cluster>-db-<normalized SQL name>; set an existing CR name to retain it.
+  # Full Kubernetes name override, e.g. to keep a previously deployed CR name.
   resourceName: ""
-  # Explicit locales override initdb locales and also reach the Database CR.
+  # Creation-time locales. Explicit values override initdb locales and also reach
+  # the Database CR; they never change an existing database's collation.
   # localeCType: C
   # localeCollate: C
+  # Overrides the Database/DatabaseRole wave for this CR only.
   syncWave: ""
+  # [{name, ensure, version, schema}]. Binaries must exist in the operand image.
   extensions: []
+  # [{name, owner, ensure}]
   schemas: []
 
-# Map values identifiers to native Database.spec / DatabaseRole.spec.
-# Resource names use SQL names; each entry accepts a full resourceName override.
-# The chart supplies cluster.name and defaults reclaim policies to retain.
+# Additional databases and roles, keyed by an arbitrary values identifier.
+# Values are native Database.spec / DatabaseRole.spec objects. Resource names
+# come from the SQL name (<cluster>-db-<name>, <cluster>-role-<name>); renaming a
+# map key does not rename the CR. Each entry accepts resourceName. The chart
+# sets cluster.name and defaults reclaim policies to retain.
+# databases:
+#   visibility:
+#     name: temporal_visibility
+#     owner: temporal
+#     extensions:
+#       - name: btree_gin
 databases: {}
+# DatabaseRole requires CNPG 1.30+. Use a kubernetes.io/basic-auth passwordSecret
+# labelled cnpg.io/reload: "true". clientCertificate requires tls.mode=operator.
+# https://cloudnative-pg.io/docs/1.30/declarative_role_management/
+# databaseRoles:
+#   reporting:
+#     name: reporting
+#     login: true
+#     inRoles: [pg_read_all_data]
+#     passwordSecret:
+#       name: example-reporting-creds
 databaseRoles: {}
 
-# Native storage settings override storageSize/storageClass.
+# PgBouncer Poolers, keyed by a values identifier. Values are native Pooler.spec
+# objects; the chart sets cluster.name. Each Pooler and its Service are named
+# <cluster>-pooler-<key> unless resourceName is set. Its DNS names are added to
+# the server certificate, which CNPG also uses for pooler client TLS.
+# Pooler pods inherit inheritedAnnotations (keeping them outside the mesh)
+# unless template.metadata.annotations overrides them.
+# With tls.mode=certManager, CNPG cannot create the auth_query login itself: the
+# chart issues <cluster>-pooler-auth-tls for cnpg_pooler_pgbouncer and sets
+# authQuerySecret/authQuery, and the role and lookup function must be created
+# once per cluster with the SQL in README.md "Connection pooling".
+# https://cloudnative-pg.io/docs/1.30/connection_pooling/
+# poolers:
+#   rw:
+#     type: rw
+#     instances: 2
+#     pgbouncer:
+#       poolMode: transaction
+#       parameters:
+#         max_client_conn: "500"
+#         default_pool_size: "20"
+poolers: {}
+
+# --- Storage, resources and updates --------------------------------------------
+
+# Native Cluster.spec.storage (size, storageClass, resizeInUseVolumes,
+# pvcTemplate). Present fields override storageSize/storageClass. Size can grow
+# but never shrink. A separate WAL volume goes in clusterSpec.walStorage.
 storage: {}
+# Container resources for each PostgreSQL instance. Set a memory limit at least
+# as large as the request; shared_buffers and max_connections drive usage.
 resources: {}
+# After replicas update, unsupervised updates the primary automatically;
+# supervised waits for a manual switchover or restart (kubectl cnpg promote/restart).
 primaryUpdateStrategy: unsupervised
+# restart restarts the primary pod in place; switchover promotes the most
+# aligned, already-updated replica. With switchover, CNPG rejects changing the
+# image and PostgreSQL parameters in the same update.
+# https://cloudnative-pg.io/docs/1.30/rolling_update/
 primaryUpdateMethod: restart
 
+# Native CNPG AffinityConfiguration, not a Pod affinity: also accepts
+# enablePodAntiAffinity, podAntiAffinityType, topologyKey, nodeSelector and
+# tolerations. null removes it. The default pins instances to storage nodes.
 affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
@@ -93,88 +256,167 @@ affinity:
             - key: node-role.benfu.me/storage
               operator: In
               values: ["true"]
-# null uses the chart's hostname spread; [] disables it.
+# null uses the chart's one-instance-per-hostname spread; [] disables it; a list
+# replaces it with native constraints.
 topologySpreadConstraints: null
 scheduling:
-  # stable uses cnpg.io/cluster and can roll existing pods. legacy preserves
-  # the original selector and the 0.1.0 pod label across chart upgrades.
+  # Label selector of the default spread constraint. CNPG rolls every pod when it
+  # changes, so switch only in a maintenance window.
+  #   legacy  original selector, which freezes the 0.1.0 pod chart label
+  #   stable  cnpg.io/cluster; later chart versions never change it
   topologySpreadSelector: legacy
 
-# Native spec fields not otherwise managed by this chart, e.g. walStorage, probes,
-# tablespaces, serviceAccountTemplate, replica, podSelectorRefs, or primaryLease.
-# Collisions with chart-owned fields fail instead of silently overriding them.
+# Native Cluster.spec.replicationSlots, merged over the chart default
+# highAvailability.enabled: true. For example, highAvailability.
+# synchronizeLogicalDecoding (PG17+, or pg_failover_slots) keeps logical
+# replication slots usable after failover.
+replicationSlots: {}
+
+# Native Cluster.spec fields without a dedicated chart key, for example
+# walStorage, probes, enablePDB, priorityClassName, podSecurityContext,
+# tablespaces, serviceAccountName, serviceAccountTemplate, podSelectorRefs,
+# primaryLease, replica, env, or projectedVolumeTemplate.
+# Fields the chart owns fail rendering instead of silently overriding it.
+# Adding walStorage to an existing cluster is supported; removing it is not.
 clusterSpec: {}
+# Metadata for chart resources. The Cluster passes inherited* to its pods,
+# PVCs and Services.
 labels: {}
 annotations: {}
 inheritedLabels: {}
 inheritedAnnotations:
+  # Database pods stay outside the mesh: CNPG terminates its own TLS, and
+  # sidecars can block network access during startup and keep CNPG Jobs running.
   sidecar.istio.io/inject: "false"
+# Argo CD sync wave for every rendered resource. Certificates default to wave 0.
 syncWave: ""
 # Empty derives Cluster wave + 1; applies to Database and DatabaseRole resources.
+# Wave order alone does not wait for SQL reconciliation; check the CRs'
+# status.applied before relying on them.
 databaseSyncWave: ""
 
+# --- TLS ------------------------------------------------------------------------
+
 tls:
-  # certManager preserves the existing certificates; operator uses CNPG's CA.
-  # external uses the native certificates object below.
+  # certManager  chart-issued server, replication and client Certificates
+  #              (preserves the existing certificates)
+  # operator     CNPG's self-signed CA; required for DatabaseRole client certificates
+  # external     the native certificates object below
   mode: certManager
-  # cnpg selects the new in-cluster CA; legacy preserves certificateIssuerRef.
+  # certManager issuer when issuerRef is empty:
+  #   legacy  certificateIssuerRef with the original SANs
+  #   cnpg    ClusterIssuer cnpg-ca plus full-FQDN SANs; clients must trust the
+  #           cluster-local root
   profile: legacy
-  # Explicit new syntax overrides both the profile and certificateIssuerRef.
+  # Explicit issuer; overrides both the profile and certificateIssuerRef.
   issuerRef: {}
+  # tls.mode=external: native Cluster.spec.certificates.
   certificates: {}
+  # Extra server certificate SANs, e.g. for managed.services.additional or a
+  # Pooler service. certManager adds them to the server Certificate; operator
+  # mode passes them to certificates.serverAltDNSNames.
+  serverAltDNSNames: []
+  # Issue <cluster>-client-user-tls for database.owner (certManager mode).
   clientCertificate: true
+  # Issue <cluster>-client-superuser-tls for postgres. Login still needs an
+  # explicit hostssl ... cert rule in postgresql.pg_hba.
   superuserCertificate: false
 
+# --- Backups --------------------------------------------------------------------
+
 backup:
-  # inTree preserves active archives; plugin requires the Barman Cloud plugin.
-  # none disables WAL archiving. Do not disable objectBucket when migrating to plugin.
+  # Where WAL archives and base backups go:
+  #   inTree  native .spec.backup.barmanObjectStore (deprecated; CNPG 1.31 is
+  #           planned to remove it). Needs barman-cloud in the image.
+  #   plugin  Barman Cloud plugin: an ObjectStore plus a WAL-archiver plugin entry
+  #   none    no WAL archiving
+  # WAL archiving alone is not a backup. Enable backup.scheduled as well.
   provider: inTree
   # Legacy alias for objectBucket.storageClassName.
   storageClassName: rook-ceph-bucket-ssd
+  # Rook ObjectBucketClaim for the <cluster>-backup bucket and its credentials.
+  # Disabling it removes the claim and can delete the bucket. Keep it enabled
+  # when switching providers.
   objectBucket:
     enabled: true
     # Explicit storageClassName overrides backup.storageClassName.
     # storageClassName: rook-ceph-bucket-ssd
+  # Default instance for base backups: prefer-standby or primary.
   target: prefer-standby
+  # Base backup and WAL retention, <n>d|w|m. In-tree: Cluster.spec.backup;
+  # plugin: ObjectStore.spec.
   retentionPolicy: 30d
   # Empty preserves the existing Ceph endpoint, path, Secret names, and WAL settings.
   # Nonempty replaces the entire native Barman configuration, for any supported provider.
+  # https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/
   configuration: {}
+  # plugin provider: archive server name (Cluster plugin parameter). Empty uses
+  # the cluster name. Change it together with the image for a major upgrade to
+  # keep pre-upgrade backups separate.
+  serverName: ""
   objectStore:
     # Use an existing ObjectStore instead of rendering one.
     existingName: ""
+    # Plugin sidecar settings: resources, env, logLevel,
+    # retentionPolicyIntervalSeconds, additionalContainerArgs.
     instanceSidecarConfiguration: {}
+  # Native Cluster.spec.backup.volumeSnapshot, e.g. className and
+  # snapshotOwnerReference. Requires a CSI snapshot class.
   volumeSnapshot: {}
   scheduled:
     enabled: false
+    # Six-field cron with seconds first: daily at 10:00:00 UTC.
     schedule: "0 0 10 * * *"
+    # Take one backup as soon as the ScheduledBackup is created.
     immediate: true
     suspend: false
+    # Owner of the Backup objects: self (the ScheduledBackup), cluster, or none.
     backupOwnerReference: self
     # Empty selects the provider's method; volumeSnapshot requires backup.volumeSnapshot.
     method: ""
 
+# --- Monitoring -----------------------------------------------------------------
+
 monitoring:
-  # podMonitor renders a chart-owned monitor with a distinct name; operator is legacy.
+  # operator    deprecated operator-created PodMonitor named <cluster> (legacy)
+  # podMonitor  chart-owned PodMonitor named <cluster>-metrics
+  # disabled    no PodMonitor
   mode: operator
-  # Native Cluster.spec.monitoring, excluding enablePodMonitor.
+  # Native Cluster.spec.monitoring, excluding enablePodMonitor: for example
+  # customQueriesConfigMap, disableDefaultQueries, metricsQueriesTTL, or
+  # tls.enabled. With tls.enabled, the chart PodMonitor scrapes over HTTPS and
+  # verifies the server CA.
   configuration: {}
   podMonitor:
+    # Add the labels your Prometheus podMonitorSelector requires.
     labels: {}
     annotations: {}
+    # Native PodMonitor endpoints. Explicit fields override the TLS defaults.
     podMetricsEndpoints:
       - port: metrics
 
-# Compatibility aliases. Prefer the grouped/native keys above for new values.
-# Keep these defaults until existing consumers explicitly select new settings.
+# --- Compatibility aliases --------------------------------------------------------
+# Prefer the grouped/native keys above for new values. When both forms exist,
+# the native key wins, so edit that one. Keep these defaults until existing
+# consumers explicitly select new settings.
+# Alias for instances.
 replicaCount: 3
+# Alias for database.owner: the application role, initdb owner and client
+# certificate CN.
 clientUsername: null
+# Alias for database.name: the database created by initdb.
 databaseName: null
+# Alias for credentials.existing.userSecretName.
 userCredsSecretName: null
+# Alias for credentials.existing.superuserSecretName.
 superuserCredsSecretName: null
+# Alias for postgresql.
 postgresqlConfig: {}
+# Alias for storage.size.
 storageSize: 10Gi
+# Alias for storage.storageClass.
 storageClass: rook-ceph-block-ssd
+# certManager issuer for tls.profile=legacy.
 certificateIssuerRef:
   name: apps-ca-issuer
   kind: ClusterIssuer

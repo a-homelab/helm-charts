@@ -41,6 +41,9 @@ spec:
     - "{{ include "postgresql.fullname" . }}-r.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
     - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
     {{- end }}
+    {{- range concat (include "postgresql.poolerDNSNames" . | fromJsonArray) .Values.tls.serverAltDNSNames }}
+    - {{ . | quote }}
+    {{- end }}
   issuerRef:
     {{- include "postgresql.issuerRef" . | nindent 4 }}
 {{- end }}

@@ -1,8 +1,38 @@
 {{- if eq .Values.monitoring.mode "podMonitor" }}
+{{- $name := include "postgresql.fullname" . }}
+{{- $endpoints := .Values.monitoring.podMonitor.podMetricsEndpoints }}
+{{- if dig "tls" "enabled" false .Values.monitoring.configuration }}
+{{- $tls := dict "ca" (dict "secret" (dict "name" (include "postgresql.serverCASecretName" .) "key" "ca.crt")) "serverName" (printf "%s-rw" $name) }}
+{{- $secured := list }}
+{{- range $endpoints }}
+{{- $secured = append $secured (mustMergeOverwrite (dict "scheme" "https" "tlsConfig" (deepCopy $tls)) (deepCopy .)) }}
+{{- end }}
+{{- $endpoints = $secured }}
+{{- end }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: "{{ include "postgresql.fullname" . }}-metrics"
+  name: "{{ $name }}-metrics"
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- mustMergeOverwrite (include "postgresql.labels" . | fromYaml) (deepCopy .Values.monitoring.podMonitor.labels) | toYaml | nindent 4 }}
+  annotations:
+    {{- mustMergeOverwrite (include "postgresql.annotations" . | fromYaml) (deepCopy .Values.monitoring.podMonitor.annotations) | toYaml | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: {{ $name | quote }}
+      # Pooler pods share cnpg.io/cluster and also expose a metrics port.
+      cnpg.io/podRole: instance
+  podMetricsEndpoints:
+    {{- toYaml $endpoints | nindent 4 }}
+{{- end }}
+{{- if and (eq .Values.monitoring.mode "podMonitor") .Values.poolers }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: "{{ include "postgresql.fullname" . }}-pooler-metrics"
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- mustMergeOverwrite (include "postgresql.labels" . | fromYaml) (deepCopy .Values.monitoring.podMonitor.labels) | toYaml | nindent 4 }}
@@ -12,6 +42,7 @@ spec:
   selector:
     matchLabels:
       cnpg.io/cluster: {{ include "postgresql.fullname" . | quote }}
+      cnpg.io/podRole: pooler
   podMetricsEndpoints:
-    {{- toYaml .Values.monitoring.podMonitor.podMetricsEndpoints | nindent 4 }}
+    - port: metrics
 {{- end }}

@@ -1,6 +1,8 @@
 # Requires CNPG 1.30+ and the Barman Cloud plugin, including their CRDs.
 # For a new cluster only; choose and pin an operand image for the required PG major.
 fullnameOverride: example-postgres
+image:
+  tag: "18.6-standard-trixie"
 database:
   enabled: true
   name: app
@@ -34,6 +36,11 @@ backup:
         requests:
           cpu: 100m
           memory: 128Mi
+poolers:
+  rw:
+    instances: 2
+    pgbouncer:
+      poolMode: transaction
 monitoring:
   mode: podMonitor
   podMonitor:

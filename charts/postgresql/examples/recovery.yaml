@@ -1,6 +1,8 @@
 # Render as a NEW release. The source ObjectStore and its credentials must exist
 # in this namespace. The target archives under its own new cluster/bucket name.
 fullnameOverride: example-restored
+image:
+  tag: "18.6-standard-trixie"
 clientUsername: app
 databaseName: app
 credentials:

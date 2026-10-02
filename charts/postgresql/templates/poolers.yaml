@@ -1,0 +1,34 @@
+{{- $root := . -}}
+{{- $resourceNames := dict -}}
+{{- range $key, $pooler := .Values.poolers }}
+{{- $spec := omit (deepCopy $pooler) "resourceName" -}}
+{{- if hasKey $spec "cluster" -}}{{- fail "Pooler cluster is assigned by this chart" -}}{{- end -}}
+{{- $resourceName := include "postgresql.poolerName" (dict "root" $root "key" $key "pooler" $pooler) -}}
+{{- if hasKey $resourceNames $resourceName -}}{{- fail (printf "duplicate Pooler resource name %s; set distinct resourceName overrides" $resourceName) -}}{{- end -}}
+{{- $_ := set $resourceNames $resourceName true -}}
+{{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) -}}
+{{- $pgbouncer := default (dict) $spec.pgbouncer -}}
+{{- if and (eq $root.Values.tls.mode "certManager") (not $pgbouncer.authQuerySecret) -}}
+{{- /* CNPG's automatic integration signs a client certificate with the client CA key, which cert-manager Secrets do not contain. */ -}}
+{{- $_ := set $pgbouncer "authQuerySecret" (dict "name" (include "postgresql.poolerAuthSecretName" $root)) -}}
+{{- $_ := set $pgbouncer "authQuery" ($pgbouncer.authQuery | default "SELECT usename, passwd FROM public.user_search($1)") -}}
+{{- end -}}
+{{- $_ := set $spec "pgbouncer" $pgbouncer -}}
+{{- $template := default (dict) $spec.template -}}
+{{- $templateMeta := default (dict) $template.metadata -}}
+{{- $_ := set $templateMeta "annotations" (mustMergeOverwrite (deepCopy $root.Values.inheritedAnnotations) (default (dict) $templateMeta.annotations)) -}}
+{{- $_ := set $template "metadata" $templateMeta -}}
+{{- $_ := set $spec "template" $template }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: {{ $resourceName }}
+  namespace: {{ $root.Release.Namespace | quote }}
+  labels:
+    {{- include "postgresql.labels" $root | nindent 4 }}
+  annotations:
+    {{- mustMergeOverwrite (include "postgresql.annotations" $root | fromYaml) (dict "argocd.argoproj.io/sync-wave" (include "postgresql.databaseWave" $root)) | toYaml | nindent 4 }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

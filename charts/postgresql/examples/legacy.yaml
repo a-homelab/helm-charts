@@ -1,4 +1,6 @@
 fullnameOverride: example-postgres
+image:
+  tag: "15.3"
 clientUsername: app
 databaseName: app
 userCredsSecretName: example-app

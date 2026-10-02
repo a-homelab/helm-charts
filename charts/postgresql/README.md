@@ -62,9 +62,11 @@ copy mode intentionally supplies its recovery credential reference. Locale field
 are creation-time settings, not a way to change an existing database's collation.
 
 Changing a value does not migrate database contents. In particular, new database
-names do not rename an existing database, bootstrap does not restore an existing
-Cluster, and changing a PostgreSQL major image is not an upgrade procedure.
-Keep identities unchanged when first adopting the new keys.
+names do not rename an existing database, and bootstrap does not restore an existing
+Cluster. Changing the PostgreSQL major version in the image tag, or
+`imageCatalogRef.major`, is not inert: CNPG starts an offline in-place major
+upgrade. See [Major upgrades](#major-upgrades). Keep identities unchanged when
+first adopting the new keys.
 
 `clusterSpec` accepts additional native Cluster.spec fields such as `walStorage`,
 `probes`, `tablespaces`, `serviceAccountTemplate`, `replica`, `podSelectorRefs`, or
@@ -113,6 +115,7 @@ depend on API discovery, so Argo CD and offline Helm render the same manifests.
 | `database.enabled`, `databases` | CNPG Database CRD; examples validated against 1.28.1 and 1.30.1 |
 | `managed.roles` | CNPG inline role management; available on the existing operator |
 | `databaseRoles` | CNPG 1.30+ DatabaseRole CRD |
+| `poolers` | CNPG Pooler CRD, validated against 1.28.1 and 1.30.1; with cert-manager TLS, the one-time SQL in [Connection pooling](#connection-pooling) |
 | `backup.provider: plugin` | Barman Cloud plugin and ObjectStore CRD; schemas validated against 0.15.1 |
 | `backup.scheduled.method: volumeSnapshot` | Snapshot controller, CRDs, and a compatible CSI snapshot class |
 | `monitoring.mode: podMonitor` | Prometheus Operator PodMonitor CRD and a matching Prometheus selector |
@@ -243,9 +246,26 @@ Merge; that implementation was never activated in the homelab and is removed.
 Any external deployment of that mode needs a deliberate Secret ownership and
 reference migration before adopting this version.
 
-Rotation is disabled by default (`Periodic`, `refreshInterval: 0s`). Zero prevents
-scheduled refresh, not all future changes: recreating the ExternalSecret or
-changing managed target data can cause a new password. Keep these objects stable.
+Rotation is disabled by default (`Periodic`, `refreshInterval: 0s`), and the
+target Secret is then created with `immutable: true`. After the first successful
+sync, ESO 2.11 does not refresh such an ExternalSecret again, even when its
+template changes. Consequences:
+
+- Recreating the ExternalSecret, for example by pruning it, a Replace sync, a Helm
+  reinstall or a restore without its status, runs the generator again. Because
+  the existing Secret is immutable, ESO keeps its data instead of writing the new
+  password. Without immutability, recreation would silently change the password.
+- Chart changes to the connection-field template do not reach an existing Secret.
+  To apply them, delete the Secret deliberately; that is a password change.
+- A deleted target Secret is not recreated, because `Orphan` targets are always
+  treated as valid.
+
+Copy mode also creates immutable Secrets.
+
+Manual edits to the Secret data are neither reverted nor regenerated. Do not switch
+to `refreshPolicy: OnChange`: it regenerates on any ExternalSecret label or
+annotation change. These statements come from the ESO v2.11.0 controller
+(`shouldRefresh` and `isSecretValid` in `externalsecret_controller.go`).
 To enable scheduled rotation later:
 
 ```yaml
@@ -256,8 +276,23 @@ credentials:
     interval: 24h
 ```
 
-Enabling rotation can immediately change the password. Deploy Reloader first,
-and put this annotation on each consuming Deployment/StatefulSet's metadata,
+Rotation needs a mutable Secret, so `rotation.enabled: true` also renders
+`immutable: false`. Kubernetes cannot make an immutable Secret mutable again, so
+the first rotation replaces the Secret:
+
+1. Deploy Reloader and annotate every consumer, as described below.
+2. Sync `rotation.enabled: true`. ESO cannot update the immutable Secret and
+   reports `SecretImmutable` on the ExternalSecret. The current password keeps
+   working.
+3. Delete the target Secret once. ESO creates a mutable replacement with a new
+   password, CNPG applies it through the `cnpg.io/reload` label, and Reloader
+   restarts consumers. Verify authentication before relying on the schedule.
+
+These steps follow the ESO v2.11.0 source and have not been exercised in the
+homelab yet; rehearse them on a disposable cluster first. Disabling rotation
+later stops refreshes but leaves that Secret mutable until it is recreated.
+
+Put this annotation on each consuming Deployment/StatefulSet's metadata,
 substituting the actual Secret name:
 
 ```yaml
@@ -419,6 +454,72 @@ are explicitly **untested against homelab backups**. Their sanitizer rewrites
 configuration and runs `pg_resetwal`; it does not anonymize data or perform a
 consistent WAL recovery. Prefer logical dumps or CNPG recovery.
 
+## Connection pooling
+
+`poolers` maps values identifiers to native Pooler.spec objects. The chart sets
+`cluster.name` and names each Pooler and its Service `<cluster>-pooler-<key>`, or
+`resourceName`. It adds every pooler Service name, including the FQDN, to the
+server certificate, because PgBouncer serves client TLS with the cluster's
+server certificate unless the Pooler sets `pgbouncer.clientTLSSecret`. Pooler pods
+inherit `inheritedAnnotations`, which keeps them outside the Istio mesh like the
+database pods. With `monitoring.mode: podMonitor`, the chart also renders
+`<cluster>-pooler-metrics`, selecting `cnpg.io/podRole: pooler`.
+
+CNPG 1.30 can only automate PgBouncer's `auth_query` login when it holds the
+client CA private key (`ca.key`). The operator signs a `cnpg_pooler_pgbouncer`
+client certificate with it
+([cluster_create.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/internal/controller/cluster_create.go),
+[certs.go](https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/pkg/certs/certs.go)).
+cert-manager Secrets contain no CA key, so with `tls.mode: certManager`:
+
+- The chart issues `<cluster>-pooler-auth-tls`, a client certificate with CN
+  `cnpg_pooler_pgbouncer`, and sets `pgbouncer.authQuerySecret` and the default
+  `authQuery` on each Pooler that does not set its own.
+- CNPG's fixed `pg_hba`/`pg_ident` rules already accept that certificate login.
+- The role and lookup function must exist. CNPG creates them only for automated
+  poolers, and both `managed.roles` and DatabaseRole reject the reserved
+  `cnpg_` prefix. Run this once per cluster as `postgres` in the `postgres`
+  database, before syncing the first Pooler:
+
+```sql
+CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;
+GRANT CONNECT ON DATABASE postgres TO cnpg_pooler_pgbouncer;
+CREATE OR REPLACE FUNCTION public.user_search(uname TEXT)
+  RETURNS TABLE (usename name, passwd text)
+  LANGUAGE sql SECURITY DEFINER
+  SET search_path = pg_catalog, pg_temp AS
+  'SELECT usename, passwd FROM pg_catalog.pg_shadow WHERE usename=$1;';
+REVOKE ALL ON FUNCTION public.user_search(text) FROM public;
+GRANT EXECUTE ON FUNCTION public.user_search(text) TO cnpg_pooler_pgbouncer;
+```
+
+For example: `kubectl cnpg psql <cluster> -n <namespace> -- -d postgres`.
+CNPG never drops this role or function for non-automated poolers. With
+`tls.mode: operator`, leave `authQuerySecret` unset and CNPG performs all of
+these steps itself. With `tls.mode: external`, supply the Pooler secrets
+yourself. See [connection pooling](https://cloudnative-pg.io/docs/1.30/connection_pooling/).
+
+## Major upgrades
+
+Since CNPG 1.26, changing the image to a newer PostgreSQL major runs an offline
+in-place upgrade with `pg_upgrade --link`. CNPG shuts down every instance, runs an
+upgrade Job, then destroys and re-clones the replicas. Applications have no
+database during the whole operation. If the Job fails, reverting the image
+restarts the old version; CNPG does not modify the original data on failure.
+
+1. Take and verify a fresh base backup. Confirm that every extension in the
+   operand image is available for the target major.
+2. With `backup.provider: plugin`, change `backup.serverName` in the same update
+   as the image, for example `<cluster>-pg18`. The Barman Cloud plugin does not
+   separate archives by major, and pre-upgrade backups cannot recover to a point
+   after the upgrade.
+3. After the upgrade, take a new base backup and run `ANALYZE`; `pg_upgrade`
+   does not transfer optimizer statistics.
+
+With `primaryUpdateMethod: switchover`, CNPG rejects changing the image and
+PostgreSQL parameters in one update. Change them in sequence. See
+[PostgreSQL upgrades](https://cloudnative-pg.io/docs/1.30/postgres_upgrades/).
+
 ## Further opt-ins
 
 [examples/modern.yaml](examples/modern.yaml) demonstrates DatabaseRole, plugin
@@ -427,11 +528,15 @@ initdb, stable scheduling labels, switchover updates, and an
 explicit PodMonitor. It is a starting point for a new cluster, not an overlay to
 apply wholesale to an existing database. Select a current operand image for the
 required PostgreSQL major, or use an existing ImageCatalog via `imageCatalogRef`.
-The example intentionally does not change the chart's legacy image default.
+The chart has no default image tag since 0.2.2: every release sets `image.tag`
+or `imageCatalogRef`. All homelab consumers already pinned a tag.
 
 `monitoring.mode: podMonitor` disables the deprecated operator-created monitor
 and creates `<cluster>-metrics`, avoiding ownership conflicts with the existing
-`<cluster>` monitor. Ensure Prometheus selects the new monitor's labels and
+`<cluster>` monitor. Like the operator's monitor, it selects
+`cnpg.io/podRole: instance`; Pooler pods share `cnpg.io/cluster` and also expose
+a `metrics` port. With `monitoring.configuration.tls.enabled`, every endpoint
+defaults to HTTPS, the server CA Secret and server name `<cluster>-rw`. Ensure Prometheus selects the new monitor's labels and
 scrapes it successfully; remove any old monitor left behind after checking
 ownership. See [CNPG monitoring](https://cloudnative-pg.io/docs/1.30/monitoring/).
 
@@ -440,6 +545,12 @@ and supported extension-image definitions. Extension image volumes additionally
 require PostgreSQL 18+, an appropriate Kubernetes ImageVolume feature gate/runtime,
 and matching extension images. The current homelab does not meet those prerequisites.
 See [image volume extensions](https://cloudnative-pg.io/docs/1.30/imagevolume_extensions/).
+`replicationSlots` merges native settings over the chart's
+`highAvailability.enabled: true`, for example `synchronizeLogicalDecoding` on
+PostgreSQL 17+. `tls.serverAltDNSNames` adds server certificate SANs for
+`managed.services.additional` or a Pooler service; it is passed to
+`certificates.serverAltDNSNames` in operator mode.
+
 Adding `clusterSpec.walStorage` to an existing Cluster is supported; removing it
 later is not. See [storage](https://cloudnative-pg.io/docs/1.30/storage/).
 

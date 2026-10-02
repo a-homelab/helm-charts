@@ -201,6 +201,12 @@ wal:
 {{- if ne .Values.backup.provider "plugin" -}}{{- fail "backup.objectStore.existingName requires backup.provider=plugin" -}}{{- end -}}
 {{- if .Values.backup.configuration -}}{{- fail "backup.configuration is unused with an existing ObjectStore" -}}{{- end -}}
 {{- end -}}
+{{- if and .Values.backup.serverName (ne .Values.backup.provider "plugin") -}}
+{{- fail "backup.serverName requires backup.provider=plugin; in-tree archives use backup.configuration.serverName" -}}
+{{- end -}}
+{{- if and .Values.tls.serverAltDNSNames (eq .Values.tls.mode "external") -}}
+{{- fail "tls.serverAltDNSNames is unused with tls.mode=external; put serverAltDNSNames in tls.certificates" -}}
+{{- end -}}
 {{- if and (eq .Values.backup.provider "plugin") .Values.backup.configuration.serverName -}}
 {{- fail "plugin ObjectStore configuration.serverName must be empty; set recovery serverName on externalClusters instead" -}}
 {{- end -}}
@@ -222,6 +228,17 @@ name: cnpg-ca
 kind: ClusterIssuer
 {{- else -}}
 {{- toYaml .Values.certificateIssuerRef -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "postgresql.serverCASecretName" -}}
+{{- $name := include "postgresql.fullname" . -}}
+{{- if eq .Values.tls.mode "certManager" -}}
+{{- printf "%s-server-tls" $name -}}
+{{- else if eq .Values.tls.mode "external" -}}
+{{- dig "serverCASecret" (printf "%s-ca" $name) .Values.tls.certificates -}}
+{{- else -}}
+{{- printf "%s-ca" $name -}}
 {{- end -}}
 {{- end -}}
 
@@ -277,4 +294,29 @@ fqdn-jdbc-uri: {{ printf "jdbc:postgresql://%s:5432/%s?password=%s&user=%s" $fqd
 {{- else -}}
 {{- .Values.backup.storageClassName -}}
 {{- end -}}
+{{- end -}}
+
+{{- define "postgresql.poolerName" -}}
+{{- if .pooler.resourceName -}}
+{{- include "postgresql.sqlResourceName" (dict "root" .root "resourceName" .pooler.resourceName) -}}
+{{- else -}}
+{{- include "postgresql.resourceName" (dict "root" .root "suffix" (printf "pooler-%s" .key)) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "postgresql.poolerAuthSecretName" -}}
+{{- printf "%s-pooler-auth-tls" (include "postgresql.fullname" .) -}}
+{{- end -}}
+
+{{/*
+Pooler Service DNS names. CNPG serves pooler client TLS with the cluster's server
+certificate unless a Pooler sets clientTLSSecret.
+*/}}
+{{- define "postgresql.poolerDNSNames" -}}
+{{- $names := list -}}
+{{- range $key, $pooler := .Values.poolers -}}
+{{- $name := include "postgresql.poolerName" (dict "root" $ "key" $key "pooler" $pooler) -}}
+{{- $names = concat $names (list $name (printf "%s.%s" $name $.Release.Namespace) (printf "%s.%s.svc" $name $.Release.Namespace) (printf "%s.%s.svc.%s" $name $.Release.Namespace $.Values.clusterDomain)) -}}
+{{- end -}}
+{{- toJson $names -}}
 {{- end -}}

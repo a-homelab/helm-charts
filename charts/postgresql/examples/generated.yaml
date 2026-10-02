@@ -1,5 +1,7 @@
 # Requires ESO Password and ExternalSecret CRDs and the Ready cnpg-ca issuer.
 fullnameOverride: example-postgres
+image:
+  tag: "18.6-system-trixie"
 database:
   name: app
   owner: app

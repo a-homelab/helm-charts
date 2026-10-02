@@ -240,6 +240,42 @@
       },
       "additionalProperties": false
     },
+    "poolers": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$": {
+          "type": "object",
+          "properties": {
+            "cluster": false,
+            "type": {
+              "type": "string",
+              "enum": [
+                "rw",
+                "ro",
+                "r"
+              ]
+            },
+            "instances": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pgbouncer": {
+              "type": "object"
+            },
+            "template": {
+              "type": "object"
+            },
+            "resourceName": {
+              "type": "string",
+              "maxLength": 63,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
     "storageSize": {
       "type": "string",
       "minLength": 1
@@ -348,6 +384,13 @@
         },
         "superuserCertificate": {
           "type": "boolean"
+        },
+        "serverAltDNSNames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "additionalProperties": false
@@ -443,6 +486,9 @@
             }
           },
           "additionalProperties": false
+        },
+        "serverName": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -482,6 +528,9 @@
         }
       },
       "additionalProperties": false
+    },
+    "replicationSlots": {
+      "type": "object"
     },
     "global": {
       "type": "object"

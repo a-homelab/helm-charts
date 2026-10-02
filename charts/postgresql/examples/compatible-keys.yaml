@@ -1,6 +1,8 @@
 # Schema migration only: renders the same resources as legacy.yaml.
 # Existing keys may remain alongside these if their effective values match.
 fullnameOverride: example-postgres
+image:
+  tag: "15.3"
 instances: 3
 database:
   name: app
