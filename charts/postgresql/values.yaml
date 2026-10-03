@@ -305,7 +305,7 @@ tls:
   mode: certManager
   # certManager issuer when issuerRef is empty:
   #   cnpg    ClusterIssuer cnpg-ca plus full-FQDN SANs; clients must trust the
-  #           cluster-local root (bundle homelab-cluster-local-ca)
+  #           estate root (bundle homelab-root-ca)
   #   legacy  certificateIssuerRef with the original SANs. Clusters created
   #           before chart 0.2.3 pin this until their certificate migration.
   profile: cnpg

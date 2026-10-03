@@ -124,7 +124,7 @@ depend on API discovery, so Argo CD and offline Helm render the same manifests.
 | `monitoring.mode: podMonitor` | Prometheus Operator PodMonitor CRD and a matching Prometheus selector |
 | `credentials.mode: generated` | ESO ExternalSecret v1 and Password v1alpha1 CRDs; validated against ESO 2.11.0 |
 | `credentials.mode: copy` | ESO SecretStore/ExternalSecret v1; source Secrets available in this namespace |
-| `tls.profile: cnpg` | Ready `cnpg-ca` ClusterIssuer from homelab cert-issuers; clients trust cluster-local root |
+| `tls.profile: cnpg` | Ready `cnpg-ca` ClusterIssuer from homelab cert-issuers; clients trust the estate root |
 | `tls.mode: certManager` | cert-manager and the configured issuer, whose Secrets contain `ca.crt` |
 
 The live homelab was CNPG 1.28.1 on Kubernetes 1.31.14 during the
@@ -364,7 +364,8 @@ CN `postgres` and client-auth usage. Password-based superuser access remains
 independent and disabled by default.
 
 `tls.profile` defaults to `cnpg` since 0.2.3: ClusterIssuer `cnpg-ca`, declared
-in homelab's cert-issuers chart under `cluster-local-ca`. This profile also
+in homelab's cert-issuers chart under the estate's `k8s-clusters-ca`, so replica
+clusters on other Kubernetes clusters share its root. This profile also
 includes full service FQDN SANs. Clusters created earlier set
 `tls.profile: legacy`, which keeps the `apps-ca-issuer` signer from
 `certificateIssuerRef` and their original SANs, until a planned certificate
@@ -374,14 +375,15 @@ Sync the new CA first and verify its Certificate and ClusterIssuer are Ready.
 Before migrating an existing cluster, distribute the new root trust to consumers,
 then change issuer/profile during a planned certificate migration. Verify the
 issued leaf chains and client connections before retiring old trust. Server
-clients can mount the existing `homelab-cluster-local-ca` bundle in namespaces
+clients can mount the existing `homelab-root-ca` bundle in namespaces
 labelled `bundle.benfu.me/inject: "true"`. No additional root bundle is needed.
 
 The CNPG intermediate provides a dedicated signer, **not an isolated client-auth
-trust domain**. cert-manager puts the shared cluster-local root in leaf `ca.crt`,
+trust domain**. cert-manager puts the shared estate root in leaf `ca.crt`,
 which the chart exposes to CNPG. Stock PostgreSQL does not enable partial-chain
 verification, so replacing that root with only an intermediate breaks validation;
-retaining it accepts valid sibling-CA client chains subject to HBA checks.
+retaining it accepts valid client chains from every estate CA on every cluster,
+subject to HBA checks.
 See [cert-manager CA chains](https://cert-manager.io/docs/configuration/ca/) and
 [PostgreSQL's TLS verification implementation](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/libpq/be-secure-openssl.c).
 A separately rooted CNPG domain would be a distinct PKI design change.
