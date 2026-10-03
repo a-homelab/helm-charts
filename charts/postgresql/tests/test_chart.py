@@ -529,6 +529,22 @@ def test_cnpg_ca_is_the_default_issuer_for_new_values(tmp_path):
     )
 
 
+def test_cnpg_specs_omit_empty_lists_the_operator_would_drop(tmp_path):
+    resources = render(
+        tmp_path,
+        {
+            "database": {"enabled": True},
+            "databaseRoles": {"r": {"name": "reporting", "inRoles": []}},
+            "poolers": {"rw": {"pgbouncer": {}}},
+        },
+    )
+    database = one(resources, "Database")["spec"]
+    assert "extensions" not in database and "schemas" not in database
+    assert "inRoles" not in one(resources, "DatabaseRole")["spec"]
+    # pgbouncer is required by the Pooler CRD even when empty.
+    assert "pgbouncer" in one(resources, "Pooler")["spec"]
+
+
 def test_native_cluster_fields_and_image_catalog(tmp_path):
     resources = render(
         tmp_path,

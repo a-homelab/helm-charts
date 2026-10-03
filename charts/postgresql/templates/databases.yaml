@@ -35,5 +35,5 @@ metadata:
   annotations:
     {{- mustMergeOverwrite (include "postgresql.annotations" $root | fromYaml) (dict "argocd.argoproj.io/sync-wave" $wave) | toYaml | nindent 4 }}
 spec:
-  {{- toYaml $spec | nindent 2 }}
+  {{- include "postgresql.pruneEmpty" $spec | nindent 2 }}
 {{- end }}

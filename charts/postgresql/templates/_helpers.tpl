@@ -320,3 +320,18 @@ certificate unless a Pooler sets clientTLSSecret.
 {{- end -}}
 {{- toJson $names -}}
 {{- end -}}
+
+{{/*
+CNPG serializes spec lists and maps with omitempty, so the operator's own writes
+(for example adding a finalizer) drop empty ones and Argo CD reports drift.
+Render Database and DatabaseRole specs without empty top-level lists and maps.
+*/}}
+{{- define "postgresql.pruneEmpty" -}}
+{{- $out := dict -}}
+{{- range $key, $value := . -}}
+{{- if not (and (has (kindOf $value) (list "slice" "map")) (empty $value)) -}}
+{{- $_ := set $out $key $value -}}
+{{- end -}}
+{{- end -}}
+{{- toYaml $out -}}
+{{- end -}}
