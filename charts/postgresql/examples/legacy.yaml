@@ -1,6 +1,9 @@
 fullnameOverride: example-postgres
 image:
   tag: "15.3"
+# Deployed clusters pin the pre-0.2.3 TLS profile.
+tls:
+  profile: legacy
 clientUsername: app
 databaseName: app
 userCredsSecretName: example-app

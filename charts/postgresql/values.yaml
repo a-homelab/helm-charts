@@ -304,10 +304,11 @@ tls:
   # external     the native certificates object below
   mode: certManager
   # certManager issuer when issuerRef is empty:
-  #   legacy  certificateIssuerRef with the original SANs
   #   cnpg    ClusterIssuer cnpg-ca plus full-FQDN SANs; clients must trust the
-  #           cluster-local root
-  profile: legacy
+  #           cluster-local root (bundle homelab-cluster-local-ca)
+  #   legacy  certificateIssuerRef with the original SANs. Clusters created
+  #           before chart 0.2.3 pin this until their certificate migration.
+  profile: cnpg
   # Explicit issuer; overrides both the profile and certificateIssuerRef.
   issuerRef: {}
   # tls.mode=external: native Cluster.spec.certificates.
@@ -416,7 +417,7 @@ postgresqlConfig: {}
 storageSize: 10Gi
 # Alias for storage.storageClass.
 storageClass: rook-ceph-block-ssd
-# certManager issuer for tls.profile=legacy.
+# certManager issuer for tls.profile=legacy only.
 certificateIssuerRef:
   name: apps-ca-issuer
   kind: ClusterIssuer

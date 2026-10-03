@@ -8,7 +8,10 @@ superuser client certificates, and a chart-owned PodMonitor.
 ## Compatibility contract
 
 Version 0.2.x preserves the resource identities and specs rendered by 0.1.0 for
-existing homelab values. New behavior requires an explicit opt-in. The old keys
+existing homelab values. New behavior requires an explicit opt-in, with two
+exceptions that every deployed consumer already overrides: since 0.2.2 there is
+no default image tag, and since 0.2.3 `tls.profile` defaults to `cnpg`. Values
+that relied on the old defaults must set `image.tag` and `tls.profile: legacy`. The old keys
 remain supported, including `databaseName`, `clientUsername`, `storageSize`,
 `storageClass`, `initdb`, `certificateIssuerRef`, and `backup.storageClassName`.
 Existing image pins, bootstrap SQL, credentials, certificates, storage,
@@ -32,7 +35,7 @@ Old and new settings can coexist. Explicit new settings take precedence:
 | `database.localeCType`, `database.localeCollate` | Corresponding `initdb` locales when present; also feed the Database CR |
 | `credentials.mode: generated` or `copy` | Legacy credential Secret references; explicit migration required |
 | `tls.issuerRef` | TLS profile issuer and `certificateIssuerRef` when nonempty |
-| `tls.profile: cnpg` | Legacy issuer fallback; defaults to `cnpg-ca` |
+| `tls.profile: cnpg` (default since 0.2.3) | `certificateIssuerRef`, which only `tls.profile: legacy` reads |
 | `database.name`, `database.owner` | `databaseName`, `clientUsername` when nonempty |
 | `storage` fields | Corresponding `storageSize` and `storageClass` fields |
 | `bootstrap` | The complete generated `bootstrap.initdb` when nonempty |
@@ -360,12 +363,12 @@ it did not issue a `postgres` superuser client certificate. Set
 CN `postgres` and client-auth usage. Password-based superuser access remains
 independent and disabled by default.
 
-New-cluster examples use `tls.profile: cnpg`, defaulting to ClusterIssuer
-`cnpg-ca`, declared in homelab's cert-issuers chart under `cluster-local-ca`.
-This profile also includes full service FQDN SANs. Legacy values retain the
-`apps-ca-issuer` signer and their original SANs. `tls.issuerRef` explicitly
-overrides either profile; Helm cannot infer whether a release is new, so there
-is no automatic change of existing issuers.
+`tls.profile` defaults to `cnpg` since 0.2.3: ClusterIssuer `cnpg-ca`, declared
+in homelab's cert-issuers chart under `cluster-local-ca`. This profile also
+includes full service FQDN SANs. Clusters created earlier set
+`tls.profile: legacy`, which keeps the `apps-ca-issuer` signer from
+`certificateIssuerRef` and their original SANs, until a planned certificate
+migration. `tls.issuerRef` explicitly overrides either profile.
 
 Sync the new CA first and verify its Certificate and ClusterIssuer are Ready.
 Before migrating an existing cluster, distribute the new root trust to consumers,

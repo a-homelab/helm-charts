@@ -19,6 +19,7 @@ storage:
   size: 10Gi
   storageClass: rook-ceph-block-ssd
 tls:
+  profile: legacy
   issuerRef:
     name: apps-ca-issuer
     kind: ClusterIssuer

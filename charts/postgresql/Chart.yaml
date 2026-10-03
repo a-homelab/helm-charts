@@ -2,4 +2,4 @@ apiVersion: v2
 name: postgresql
 description: CloudNativePG clusters with declarative databases, roles, TLS, and backups
 type: application
-version: 0.2.2
+version: 0.2.3

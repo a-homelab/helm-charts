@@ -514,6 +514,21 @@ def test_credential_secrets_are_immutable_unless_rotating(
     assert all(d["spec"]["target"]["immutable"] is immutable for d in secrets)
 
 
+def test_cnpg_ca_is_the_default_issuer_for_new_values(tmp_path):
+    certs = [
+        d for d in render(tmp_path, example="snapshot") if d["kind"] == "Certificate"
+    ]
+    assert certs
+    assert all(
+        d["spec"]["issuerRef"] == {"name": "cnpg-ca", "kind": "ClusterIssuer"}
+        for d in certs
+    )
+    server = next(d for d in certs if d["metadata"]["name"].endswith("-server-tls"))
+    assert any(
+        name.endswith(".svc.cluster.local") for name in server["spec"]["dnsNames"]
+    )
+
+
 def test_native_cluster_fields_and_image_catalog(tmp_path):
     resources = render(
         tmp_path,
