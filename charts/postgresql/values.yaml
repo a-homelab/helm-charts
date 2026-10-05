@@ -290,7 +290,8 @@ inheritedAnnotations:
   sidecar.istio.io/inject: "false"
 # Argo CD sync wave for every rendered resource. Certificates default to wave 0.
 syncWave: ""
-# Empty derives Cluster wave + 1; applies to Database and DatabaseRole resources.
+# Empty derives Cluster wave + 1; applies to Database, DatabaseRole, Pooler and
+# ScheduledBackup resources.
 # Wave order alone does not wait for SQL reconciliation; check the CRs'
 # status.applied before relying on them.
 databaseSyncWave: ""

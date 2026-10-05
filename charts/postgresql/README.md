@@ -160,7 +160,9 @@ existing names before upgrading. Creating a second Database CR for the same SQL
 database is not an ownership transfer. No Database CRs were live in the homelab
 when this naming change was prepared on 2026-10-02.
 
-The default Database/DatabaseRole wave is one greater than the Cluster wave;
+The default Database/DatabaseRole/Pooler/ScheduledBackup wave is one greater than
+the Cluster wave, so Argo CD waits for a healthy Cluster (including a plugin
+rollout) before an immediate backup starts;
 `databaseSyncWave` overrides it, and `database.syncWave` can override the single
 application Database. Role and database controllers retry dependencies within
 that wave. Application migration jobs must run later and verify the database is
@@ -440,6 +442,16 @@ credentials on that resource. Disabling `backup.objectBucket.enabled` removes
 the OBC from desired manifests and may cause GitOps pruning and bucket deletion.
 Do not disable it just to switch backup providers. `backup.provider: none` alone
 keeps the claim but stops archiving.
+
+The Barman Cloud plugin supports only a recovery-window retention, applied to every
+base backup in the archive, and it takes the ObjectStore and server name for a
+backup from the Cluster's plugin entry, ignoring per-backup parameters
+([plugin backup.go](https://github.com/cloudnative-pg/plugin-barman-cloud/blob/v0.15.1/internal/cnpgi/instance/backup.go)).
+Several ScheduledBackups therefore cannot keep weekly or monthly physical backups
+longer than daily ones. Homelab consumers run daily backups with a 7-day window.
+**TODO:** weekly (4-week) and monthly (3-month) tiers as logical `pg_dump` archives
+in a separate bucket expired by RGW lifecycle rules; dumps also survive major
+upgrades, which physical backups do not.
 
 [examples/recovery.yaml](examples/recovery.yaml) shows native plugin recovery and
 a PITR target. Create a new release with a distinct Cluster name and destination,

@@ -545,6 +545,20 @@ def test_cnpg_specs_omit_empty_lists_the_operator_would_drop(tmp_path):
     assert "pgbouncer" in one(resources, "Pooler")["spec"]
 
 
+def test_scheduled_backup_waits_for_the_cluster_wave(tmp_path):
+    resources = render(
+        tmp_path,
+        {
+            "syncWave": "-5",
+            "backup": {"provider": "plugin", "scheduled": {"enabled": True}},
+        },
+    )
+    wave = one(resources, "ScheduledBackup")["metadata"]["annotations"]
+    assert wave["argocd.argoproj.io/sync-wave"] == "-4"
+    cluster = one(resources, "Cluster")["metadata"]["annotations"]
+    assert cluster["argocd.argoproj.io/sync-wave"] == "-5"
+
+
 def test_native_cluster_fields_and_image_catalog(tmp_path):
     resources = render(
         tmp_path,
