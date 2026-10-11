@@ -21,7 +21,7 @@ databaseRoles:
     name: app
     login: true
     passwordSecret:
-      name: example-postgres-creds-app
+      name: example-postgres-app
   reporting:
     name: reporting
     login: false

@@ -125,7 +125,7 @@ wal:
 {{- else -}}
 {{- $sqlName := trimAll "-" (regexReplaceAll "[^a-z0-9]+" (lower .sqlName) "-") -}}
 {{- if not $sqlName -}}{{- fail "SQL name cannot form a Kubernetes resource name; set resourceName explicitly" -}}{{- end -}}
-{{- include "postgresql.resourceName" (dict "root" .root "suffix" (printf "%s-%s" .prefix $sqlName)) -}}
+{{- include "postgresql.resourceName" (dict "root" .root "suffix" (ternary $sqlName (printf "%s-%s" .prefix $sqlName) (empty .prefix))) -}}
 {{- end -}}
 {{- end -}}
 
@@ -134,8 +134,17 @@ wal:
 {{- $key := ternary "superuser" "user" $admin -}}
 {{- $username := "postgres" -}}
 {{- if not $admin -}}{{- $username = include "postgresql.databaseOwner" .root -}}{{- end -}}
-{{- $prefix := ternary "recovery-creds" "creds" (eq .root.Values.credentials.mode "copy") -}}
-{{- include "postgresql.sqlResourceName" (dict "root" .root "prefix" $prefix "sqlName" $username "resourceName" (get .root.Values.credentials.resourceNames $key)) -}}
+{{- $prefix := ternary "recovery" "" (eq .root.Values.credentials.mode "copy") -}}
+{{- $name := include "postgresql.sqlResourceName" (dict "root" .root "prefix" $prefix "sqlName" $username "resourceName" (get .root.Values.credentials.resourceNames $key)) -}}
+{{- /* <cluster>-<role> shares the namespace with Secrets CNPG and this chart name
+after the cluster; a role with one of these names would take one over. */ -}}
+{{- $fullname := include "postgresql.fullname" .root -}}
+{{- range list "ca" "server" "replication" "superuser" "backup-bucket" -}}
+{{- if eq $name (printf "%s-%s" $fullname .) -}}
+{{- fail (printf "credential Secret %q would collide with the cluster's %s Secret; set credentials.resourceNames.%s" $name . $key) -}}
+{{- end -}}
+{{- end -}}
+{{- $name -}}
 {{- end -}}
 
 {{- define "postgresql.validate" -}}

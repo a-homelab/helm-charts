@@ -66,10 +66,10 @@ enableSuperuserAccess: false
 # chart never asks CNPG to generate credential Secrets.
 #   existing   reference Secrets managed elsewhere (SealedSecrets). No ESO resources.
 #   generated  ESO Password generator + ExternalSecret per role, named
-#              <cluster>-creds-<role>. New clusters only; see README before
+#              <cluster>-<role>. New clusters only; see README before
 #              moving an existing cluster.
 #   copy       copy username/password from Secrets of a source cluster in this
-#              namespace during bootstrap.recovery, as <cluster>-recovery-creds-<role>.
+#              namespace during bootstrap.recovery, as <cluster>-recovery-<role>.
 credentials:
   mode: existing
   # existing mode only. Present fields override the legacy userCredsSecretName and

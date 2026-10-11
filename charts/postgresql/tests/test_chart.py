@@ -799,11 +799,11 @@ def test_generated_credentials_create_named_secrets_and_disable_scheduled_rotati
     resources = render(tmp_path, {"credentials": {"mode": "generated"}})
     spec = one(resources, "Cluster")["spec"]
     assert spec["bootstrap"]["initdb"]["secret"] == {
-        "name": "example-postgres-creds-app"
+        "name": "example-postgres-app"
     }
     assert "superuserSecret" not in spec
     secret = one(resources, "ExternalSecret")["spec"]
-    assert secret["target"]["name"] == "example-postgres-creds-app"
+    assert secret["target"]["name"] == "example-postgres-app"
     assert secret["target"]["creationPolicy"] == "Orphan"
     assert secret["target"]["template"]["data"]["username"] == "app"
     assert secret["refreshPolicy"] == "Periodic"
@@ -913,13 +913,13 @@ def test_sql_names_control_resource_names_without_changing_sql_identity(tmp_path
     assert role["spec"]["name"] == "Codecov_Reader"
     cluster = one(resources, "Cluster")["spec"]
     assert cluster["bootstrap"]["initdb"]["secret"] == {
-        "name": "example-postgres-creds-codecov-user"
+        "name": "example-postgres-codecov-user"
     }
-    assert cluster["superuserSecret"] == {"name": "example-postgres-creds-postgres"}
+    assert cluster["superuserSecret"] == {"name": "example-postgres-postgres"}
     generators = {d["metadata"]["name"] for d in resources if d["kind"] == "Password"}
     assert generators == {
-        "example-postgres-creds-codecov-user",
-        "example-postgres-creds-postgres",
+        "example-postgres-codecov-user",
+        "example-postgres-postgres",
     }
     for secret in (d for d in resources if d["kind"] == "ExternalSecret"):
         assert secret["spec"]["target"]["name"] == secret["metadata"]["name"]
@@ -1055,8 +1055,8 @@ def test_rotation_and_superuser_are_explicit_with_independent_password_generator
     assert len(secrets) == 2
     generators = {d["metadata"]["name"] for d in resources if d["kind"] == "Password"}
     assert generators == {
-        "example-postgres-creds-app",
-        "example-postgres-creds-postgres",
+        "example-postgres-app",
+        "example-postgres-postgres",
     }
     admin = next(
         d for d in secrets if d["spec"]["target"]["name"].endswith("-postgres")
@@ -1083,10 +1083,10 @@ def test_recovery_copy_restricts_reads_and_retains_secrets_after_removal(tmp_pat
     )
     cluster = one(resources, "Cluster")["spec"]
     assert cluster["bootstrap"]["recovery"]["secret"] == {
-        "name": "example-restored-recovery-creds-app"
+        "name": "example-restored-recovery-app"
     }
     assert cluster["superuserSecret"] == {
-        "name": "example-restored-recovery-creds-postgres"
+        "name": "example-restored-recovery-postgres"
     }
     assert one(resources, "Role")["rules"] == [
         {
@@ -1173,7 +1173,7 @@ def test_copy_refuses_self_copy_and_mismatched_database_identity(tmp_path):
         tmp_path,
         {
             "credentials": {
-                "copy": {"userSecretName": "example-restored-recovery-creds-app"}
+                "copy": {"userSecretName": "example-restored-recovery-app"}
             },
         },
         example="recovery",
@@ -1378,7 +1378,7 @@ def test_native_bootstrap_and_generated_credentials_keep_their_precedence(tmp_pa
     )
     spec = one(resources, "Cluster")["spec"]
     assert spec["bootstrap"]["initdb"]["secret"] == {
-        "name": "example-postgres-creds-app"
+        "name": "example-postgres-app"
     }
     assert "superuserSecret" not in spec
 
@@ -1394,3 +1394,13 @@ def test_native_bootstrap_and_generated_credentials_keep_their_precedence(tmp_pa
 )
 def test_invalid_canonical_values_fail_schema_validation(tmp_path, values, message):
     assert message in render(tmp_path, values, success=False)
+
+
+@pytest.mark.parametrize("owner", ["ca", "server", "replication", "superuser", "backup-bucket"])
+def test_generated_credentials_reject_a_role_named_like_a_cluster_secret(tmp_path, owner):
+    message = render(
+        tmp_path,
+        {"credentials": {"mode": "generated"}, "database": {"owner": owner}},
+        success=False,
+    )
+    assert f'credential Secret "example-postgres-{owner}" would collide' in message

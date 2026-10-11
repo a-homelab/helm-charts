@@ -214,7 +214,7 @@ Secrets: the controllers would compete over its data.
 
 [examples/generated.yaml](examples/generated.yaml) opts into
 `credentials.mode: generated`. ESO Password generators and ExternalSecrets are
-named `<cluster>-creds-<role-name>` and create Secrets with those names. The
+named `<cluster>-<role-name>` and create Secrets with those names. The
 application role is `database.owner`; the optional superuser role is `postgres`.
 The Cluster explicitly references those Secrets through `bootstrap.initdb.secret`
 and, when `enableSuperuserAccess` is true, `superuserSecret`. ESO supplies the
@@ -303,7 +303,7 @@ substituting the actual Secret name:
 ```yaml
 metadata:
   annotations:
-    secret.reloader.stakater.com/reload: example-postgres-creds-app
+    secret.reloader.stakater.com/reload: example-postgres-app
 ```
 
 The annotation belongs to the application workload, not to the CNPG Cluster or
@@ -334,7 +334,7 @@ do not track later ESO-generated passwords.
 
 `credentials.mode: copy` complements `bootstrap.recovery` for a new CNPG Cluster.
 It copies username/password from explicitly named Secrets in the same namespace
-into `<new-cluster>-recovery-creds-<role-name>`, optionally including `postgres`, and rebuilds
+into `<new-cluster>-recovery-<role-name>`, optionally including `postgres`, and rebuilds
 connection fields for the replacement hostname. It checks the copied username
 against the intended role. The new bootstrap Secret reference overrides the
 legacy name and any explicit `bootstrap.recovery.secret`.
