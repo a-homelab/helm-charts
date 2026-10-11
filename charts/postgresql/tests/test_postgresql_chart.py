@@ -750,7 +750,10 @@ def test_database_roles_replace_inline_roles_of_the_same_name(tmp_path):
 
 
 def test_legacy_pod_labels_and_topology_are_stable_across_chart_versions(tmp_path):
-    cluster = one(render(tmp_path), "Cluster")
+    cluster = one(
+        render(tmp_path, {"scheduling": {"topologySpreadSelector": "legacy"}}),
+        "Cluster",
+    )
     version = yaml.safe_load((CHART / "Chart.yaml").read_text())["version"]
     assert cluster["metadata"]["labels"]["helm.sh/chart"] == f"postgresql-{version}"
     pod_labels = cluster["spec"]["inheritedMetadata"]["labels"]
