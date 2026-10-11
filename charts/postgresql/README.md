@@ -19,8 +19,17 @@ the aliases `replicaCount`, `clientUsername`, `databaseName`,
 Chart resources carry the `helm.sh/chart` label with the chart version; pods
 do not, and the default spread constraint selects `cnpg.io/cluster`, so chart
 releases change neither pod metadata nor the selector. Chart 0.4.0 removed
-`scheduling.topologySpreadSelector`; values that still set it fail schema
-validation.
+`scheduling.topologySpreadSelector`.
+
+Chart 0.5.0 made what every homelab consumer set the default: switchover
+updates, a 30-second smart shutdown, daily plugin backups with a 7-day window,
+the chart-owned PodMonitor, and sync wave -5. It replaced `backup.provider` with
+`backup.enabled`, `monitoring.mode` with `monitoring.podMonitor.enabled`,
+`clusterSpec` with `extraClusterSpec`, and the `null` sentinels of `affinity`
+and `topologySpreadConstraints` with `storageNodesOnly` and `spreadAcrossNodes`.
+The main database's Database CR always renders (`database.enabled` is gone),
+locales live only in `database`, and `nameOverride` and every `resourceName`
+override are removed. Values that still set a removed key fail schema validation.
 
 `credentials.existing` only applies in existing mode. Generated/copy modes select
 their own target names. A nonempty native `bootstrap` still replaces the entire
@@ -34,7 +43,8 @@ Cluster. Changing the PostgreSQL major version in the image tag, or
 `imageCatalogRef.major`, is not inert: CNPG starts an offline in-place major
 upgrade. See [Major upgrades](#major-upgrades).
 
-`clusterSpec` accepts additional native Cluster.spec fields such as `walStorage`,
+`extraClusterSpec` is an escape hatch for outliers. It accepts native Cluster.spec
+fields the chart has no key for, such as `walStorage`,
 `probes`, `tablespaces`, `serviceAccountTemplate`, `replica`, `podSelectorRefs`, or
 `primaryLease`. It rejects fields already managed by the chart because overriding
 them independently could disconnect the certificates, backup resources, or
@@ -55,17 +65,17 @@ for resources that the chart coordinates.
 | `storageSize`, `storageClass` | `storage.size`, `storage.storageClass` | Native StorageConfiguration allows additional settings |
 | `certificateIssuerRef` | `tls.issuerRef` (default ClusterIssuer `cnpg-ca`) | Explicit override plus operator/external TLS modes |
 | `externalSecrets.passwordGenerator.excludeSymbols` | `credentials.password.symbols: 0` | Full Password generator settings, credential modes, and rotation controls |
-| `walArchiving.enabled` | `backup.provider: plugin` (default) | Explicit backend selection, or `none` |
+| `walArchiving.enabled` | `backup.enabled` (default true) | Barman Cloud plugin archiving |
 | `walArchiving.destinationPath`, `wal`, `data` | `backup.configuration.destinationPath`, `wal`, `data` | Complete native Barman configuration, including non-AWS credentials/endpoints |
 | `walArchiving.retentionPolicy`, `sidecar` | `backup.retentionPolicy`, `backup.objectStore.instanceSidecarConfiguration` | Plugin settings grouped with backups |
 | `backup.enabled`, `schedule`, `method`, `immediate` | Corresponding fields under `backup.scheduled` | Separate schedule from archive configuration; snapshots supported |
 | `mode: recovery`, `recovery.source`, `recoveryTarget` | `bootstrap.recovery` plus `externalClusters` | Native recovery supports more source/target forms; no wrapper mode |
 | Recovery credential copy inferred from source serverName | `credentials.mode: copy` plus explicit source Secret names | Archive identity and credential identity are independent |
-| `computeClass` | `affinity` and `topologySpreadConstraints` | No estate-specific Karpenter node/taint assumptions |
+| `computeClass` | `storageNodesOnly`, `spreadAcrossNodes`, `affinity` and `topologySpreadConstraints` | No estate-specific Karpenter node/taint assumptions |
 | PushSecret/KMS settings under `externalSecrets` | Not implemented by request | SealedSecret compatibility and generation do not imply external escrow |
 
 Homelab also exposes `databases`, `databaseRoles`, `managed`, `imageCatalogRef`,
-`clusterSpec`, and monitoring options.
+`extraClusterSpec`, and monitoring options.
 
 ## Feature prerequisites
 
@@ -75,13 +85,13 @@ depend on API discovery, so Argo CD and offline Helm render the same manifests.
 
 | Feature | Prerequisite |
 | --- | --- |
-| `database.enabled`, `databases` | CNPG Database CRD; examples validated against 1.28.1 and 1.30.1 |
+| `database`, `databases` | CNPG Database CRD; examples validated against 1.28.1 and 1.30.1 |
 | `managed.roles` | CNPG inline role management; available on the existing operator |
 | `databaseRoles` | CNPG 1.30+ DatabaseRole CRD |
 | `poolers` | CNPG Pooler CRD, validated against 1.28.1 and 1.30.1; with cert-manager TLS, the one-time SQL in [Connection pooling](#connection-pooling) |
-| `backup.provider: plugin` | Barman Cloud plugin and ObjectStore CRD; schemas validated against 0.15.1 |
+| `backup.enabled` | Barman Cloud plugin and ObjectStore CRD; schemas validated against 0.15.1 |
 | `backup.scheduled.method: volumeSnapshot` | Snapshot controller, CRDs, and a compatible CSI snapshot class |
-| `monitoring.mode: podMonitor` | Prometheus Operator PodMonitor CRD and a matching Prometheus selector |
+| `monitoring.podMonitor.enabled` | Prometheus Operator PodMonitor CRD and a matching Prometheus selector |
 | `credentials.mode: generated` | ESO ExternalSecret v1 and Password v1alpha1 CRDs; validated against ESO 2.11.0 |
 | `credentials.mode: copy` | ESO SecretStore/ExternalSecret v1; source Secrets available in this namespace |
 | Default `tls.issuerRef` | Ready `cnpg-ca` ClusterIssuer from homelab cert-issuers; clients trust the estate root |
@@ -96,7 +106,7 @@ upgrade. See the [upstream support matrix](https://cloudnative-pg.io/docs/1.30/s
 ## Declarative databases and roles
 
 [examples/declarative.yaml](examples/declarative.yaml) uses capabilities present
-on the installed CNPG version. `database.enabled` manages the bootstrap database
+on the installed CNPG version. The chart always manages the bootstrap database
 as `<cluster>-db-<database-name>`. `databases` maps values identifiers to native
 Database.spec objects. For example, `databases.visibility.name: temporal_visibility`
 creates a CR named `<cluster>-db-temporal-visibility`, while its SQL name remains
@@ -108,10 +118,9 @@ fields pass through. Extension binaries must be present in the operand image.
 Kubernetes names lowercase SQL names and replace runs of punctuation, underscores,
 or other non-alphanumeric characters with hyphens. SQL names remain exact. Names
 must fit the chart's 63-character DNS-label limit; the chart rejects empty or
-colliding normalized names instead of truncating or merging identities. Use
-`database.resourceName`, `databases.<key>.resourceName`, or
-`databaseRoles.<key>.resourceName` for an explicit full Kubernetes name. These
-chart fields do not reach the CNPG spec. Map-key changes alone do not rename CRs.
+colliding normalized names instead of truncating or merging identities; rename
+the SQL object or shorten `fullnameOverride` instead. Map-key changes alone do
+not rename CRs.
 See [Kubernetes naming constraints](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/).
 
 
@@ -130,7 +139,7 @@ To adopt an existing database:
 2. Check that another Database CR does not already manage that SQL database. Move
    ownership deliberately if one exists, including the Temporal visibility CR in
    the application resources chart. Do not emit a second controller for it.
-3. Enable `database.enabled` or add a `databases` entry, retaining the default
+3. Set `database` or add a `databases` entry, retaining the default
    reclaim policy. Verify `.status.applied` and `.status.observedGeneration`.
 4. Move extension/schema declarations out of bootstrap SQL when appropriate.
    SQL hooks remain supported for operations without a declarative equivalent.
@@ -198,11 +207,10 @@ asks CNPG to generate them. Native `bootstrap.initdb`, `recovery`, and
 `pg_basebackup` objects in existing mode must also supply `secret.name`.
 When superuser access is enabled, an explicit superuser Secret is required.
 
-`credentials.resourceNames.user` and `.superuser` override the full names of
-Password generators, ExternalSecrets and their target Secrets. Changing a
-generator or ExternalSecret identity can generate a fresh password even with
-scheduled rotation disabled. Keep deployed identities stable until a deliberate
-credential migration.
+Password generators, ExternalSecrets and their target Secrets are named
+`<cluster>-<owner>` and `<cluster>-superuser`. Changing a generator or
+ExternalSecret identity, for example by renaming `database.owner` or the cluster,
+can generate a fresh password even with scheduled rotation disabled.
 
 Rotation is disabled by default. The ExternalSecret then uses
 `refreshPolicy: CreatedOnce` (with `refreshInterval: 0s`, so the CRD default of
@@ -362,10 +370,10 @@ No broad HBA rule is injected automatically.
 
 ## Backups and recovery
 
-`backup.provider: plugin`, the default, archives WAL through the Barman Cloud
-plugin to the Ceph bucket of `backup.objectBucket`, with gzip WAL compression and
-the configured retention on the ObjectStore. Setting
-`backup.scheduled.enabled: true` adds a ScheduledBackup. Schedules have six
+`backup.enabled`, the default, archives WAL through the Barman Cloud plugin to
+the Ceph bucket of `backup.objectBucket`, with gzip WAL compression and the
+configured retention on the ObjectStore. `backup.scheduled.enabled`, also the
+default, adds a daily ScheduledBackup. Schedules have six
 fields, with seconds first. `immediate: true` triggers a backup on initial
 schedule creation. WAL archiving alone is not a base backup. See the plugin's
 [observability guidance](https://cloudnative-pg.io/plugin-barman-cloud/docs/observability/).
@@ -375,7 +383,7 @@ Ceph defaults rather than mixing credential providers. For an externally managed
 ObjectStore, use `backup.objectStore.existingName`; configure retention and
 credentials on that resource. Disabling `backup.objectBucket.enabled` removes
 the OBC from desired manifests and may cause GitOps pruning and bucket deletion.
-`backup.provider: none` alone keeps the claim but stops archiving.
+`backup.enabled: false` alone keeps the claim but stops archiving.
 
 The Barman Cloud plugin supports only a recovery-window retention, applied to every
 base backup in the archive, and it takes the ObjectStore and server name for a
@@ -408,12 +416,12 @@ consistent WAL recovery. Prefer logical dumps or CNPG recovery.
 ## Connection pooling
 
 `poolers` maps values identifiers to native Pooler.spec objects. The chart sets
-`cluster.name` and names each Pooler and its Service `<cluster>-pooler-<key>`, or
-`resourceName`. It adds every pooler Service name, including the FQDN, to the
+`cluster.name` and names each Pooler and its Service `<cluster>-pooler-<key>`.
+It adds every pooler Service name, including the FQDN, to the
 server certificate, because PgBouncer serves client TLS with the cluster's
 server certificate unless the Pooler sets `pgbouncer.clientTLSSecret`. Pooler pods
 inherit `inheritedAnnotations`, which keeps them outside the Istio mesh like the
-database pods. With `monitoring.mode: podMonitor`, the chart also renders
+database pods. With `monitoring.podMonitor.enabled`, the chart also renders
 `<cluster>-pooler-metrics`, selecting `cnpg.io/podRole: pooler`.
 
 CNPG 1.30 can only automate PgBouncer's `auth_query` login when it holds the
@@ -460,7 +468,7 @@ restarts the old version; CNPG does not modify the original data on failure.
 
 1. Take and verify a fresh base backup. Confirm that every extension in the
    operand image is available for the target major.
-2. With `backup.provider: plugin`, change `backup.serverName` in the same update
+2. With `backup.enabled`, change `backup.serverName` in the same update
    as the image, for example `<cluster>-pg18`. The Barman Cloud plugin does not
    separate archives by major, and pre-upgrade backups cannot recover to a point
    after the upgrade.
@@ -482,7 +490,7 @@ required PostgreSQL major, or use an existing ImageCatalog via `imageCatalogRef`
 The chart has no default image tag: every release sets `image.tag` or
 `imageCatalogRef`.
 
-`monitoring.mode: podMonitor`, the default, creates `<cluster>-metrics`. Like
+`monitoring.podMonitor.enabled`, the default, creates `<cluster>-metrics`. Like
 CNPG's deprecated operator-created monitor, it selects
 `cnpg.io/podRole: instance`; Pooler pods share `cnpg.io/cluster` and also expose
 a `metrics` port. With `monitoring.configuration.tls.enabled`, every endpoint
@@ -499,7 +507,7 @@ PostgreSQL 17+. `tls.serverAltDNSNames` adds server certificate SANs for
 `managed.services.additional` or a Pooler service; it is passed to
 `certificates.serverAltDNSNames` in operator mode.
 
-Adding `clusterSpec.walStorage` to an existing Cluster is supported; removing it
+Adding `extraClusterSpec.walStorage` to an existing Cluster is supported; removing it
 later is not. See [storage](https://cloudnative-pg.io/docs/1.30/storage/).
 
 ## Validation

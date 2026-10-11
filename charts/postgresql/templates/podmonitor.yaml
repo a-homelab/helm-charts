@@ -1,4 +1,4 @@
-{{- if eq .Values.monitoring.mode "podMonitor" }}
+{{- if .Values.monitoring.podMonitor.enabled }}
 {{- $name := include "postgresql.fullname" . }}
 {{- $endpoints := .Values.monitoring.podMonitor.podMetricsEndpoints }}
 {{- if dig "tls" "enabled" false .Values.monitoring.configuration }}
@@ -27,7 +27,7 @@ spec:
   podMetricsEndpoints:
     {{- toYaml $endpoints | nindent 4 }}
 {{- end }}
-{{- if and (eq .Values.monitoring.mode "podMonitor") .Values.poolers }}
+{{- if and .Values.monitoring.podMonitor.enabled .Values.poolers }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor

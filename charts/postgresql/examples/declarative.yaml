@@ -7,7 +7,6 @@ credentials:
     userSecretName: example-app
 syncWave: "-5"
 database:
-  enabled: true
   name: app
   owner: app
   extensions:

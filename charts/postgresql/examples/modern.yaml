@@ -4,7 +4,6 @@ fullnameOverride: example-postgres
 image:
   tag: "18.6-standard-trixie"
 database:
-  enabled: true
   name: app
   owner: app
   extensions:
@@ -26,9 +25,6 @@ databaseRoles:
     login: false
     inRoles: [pg_read_all_data]
 backup:
-  provider: plugin
-  scheduled:
-    enabled: true
   objectStore:
     instanceSidecarConfiguration:
       resources:
@@ -41,11 +37,9 @@ poolers:
     pgbouncer:
       poolMode: transaction
 monitoring:
-  mode: podMonitor
   podMonitor:
     labels:
       release: kube-prometheus-stack
-primaryUpdateMethod: switchover
 resources:
   requests:
     cpu: 100m

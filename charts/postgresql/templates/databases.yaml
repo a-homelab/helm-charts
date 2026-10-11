@@ -1,27 +1,25 @@
 {{- $root := . -}}
 {{- $databases := deepCopy .Values.databases -}}
-{{- if .Values.database.enabled -}}
-{{- if hasKey $databases "app" -}}{{- fail "databases.app conflicts with database.enabled" -}}{{- end -}}
-{{- $app := omit .Values.database "enabled" "syncWave" -}}
+{{- if hasKey $databases "app" -}}{{- fail "databases.app is reserved for the database key" -}}{{- end -}}
+{{- $app := omit .Values.database "syncWave" -}}
 {{- $_ := set $app "name" (include "postgresql.databaseName" .) -}}
 {{- $_ := set $app "owner" (include "postgresql.databaseOwner" .) -}}
 {{- $_ := set $databases "app" $app -}}
-{{- end -}}
 {{- $names := dict -}}
 {{- $resourceNames := dict -}}
 {{- range $key, $database := $databases }}
-{{- $spec := mustMergeOverwrite (dict "databaseReclaimPolicy" "retain" "ensure" "present") (omit (deepCopy $database) "resourceName") -}}
+{{- $spec := mustMergeOverwrite (dict "databaseReclaimPolicy" "retain" "ensure" "present") (deepCopy $database) -}}
 {{- $_ := required (printf "databases.%s.name is required" $key) $spec.name -}}
 {{- $_ := required (printf "databases.%s.owner is required" $key) $spec.owner -}}
 {{- if hasKey $names $spec.name -}}{{- fail (printf "duplicate database name %s" $spec.name) -}}{{- end -}}
 {{- $_ := set $names $spec.name true -}}
-{{- $resourceName := include "postgresql.sqlResourceName" (dict "root" $root "prefix" "db" "sqlName" $spec.name "resourceName" $database.resourceName) -}}
-{{- if hasKey $resourceNames $resourceName -}}{{- fail (printf "duplicate Database resource name %s; set distinct resourceName overrides" $resourceName) -}}{{- end -}}
+{{- $resourceName := include "postgresql.sqlResourceName" (dict "root" $root "prefix" "db" "sqlName" $spec.name) -}}
+{{- if hasKey $resourceNames $resourceName -}}{{- fail (printf "duplicate Database resource name %s; database names must differ after normalization" $resourceName) -}}{{- end -}}
 {{- $_ := set $resourceNames $resourceName true -}}
 {{- if hasKey $spec "cluster" -}}{{- fail "Database cluster is assigned by this chart" -}}{{- end -}}
 {{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) -}}
 {{- $wave := include "postgresql.databaseWave" $root -}}
-{{- if and (eq $key "app") $root.Values.database.enabled (ne (toString $root.Values.database.syncWave) "") -}}
+{{- if and (eq $key "app") (ne (toString $root.Values.database.syncWave) "") -}}
 {{- $wave = toString $root.Values.database.syncWave -}}
 {{- end }}
 ---

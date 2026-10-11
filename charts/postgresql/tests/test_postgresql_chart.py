@@ -64,9 +64,11 @@ def test_existing_credentials_identity_bootstrap_tls_and_archive(tmp_path):
         "Certificate",
         "Certificate",
         "Cluster",
+        "Database",
         "ObjectBucketClaim",
         "ObjectStore",
         "PodMonitor",
+        "ScheduledBackup",
     ]
     cluster = one(resources, "Cluster")
     assert cluster["metadata"]["name"] == "example-postgres"
@@ -84,7 +86,8 @@ def test_existing_credentials_identity_bootstrap_tls_and_archive(tmp_path):
     }
     assert spec["superuserSecret"] == {"name": "example-superuser"}
     assert spec["enableSuperuserAccess"] is False
-    assert spec["primaryUpdateMethod"] == "restart"
+    assert spec["primaryUpdateMethod"] == "switchover"
+    assert spec["smartShutdownTimeout"] == 30
     assert spec["storage"] == {"storageClass": "rook-ceph-block-ssd", "size": "10Gi"}
     assert spec["certificates"] == {
         "serverTLSSecret": "example-postgres-server-tls",
@@ -102,7 +105,7 @@ def test_existing_credentials_identity_bootstrap_tls_and_archive(tmp_path):
     ]
     store = one(resources, "ObjectStore")["spec"]
     assert store["configuration"] == DEFAULT_ARCHIVE
-    assert store["retentionPolicy"] == "30d"
+    assert store["retentionPolicy"] == "7d"
     assert one(resources, "ObjectBucketClaim")["spec"] == {
         "bucketName": "example-postgres-backup",
         "storageClassName": "rook-ceph-bucket-ssd",
@@ -120,9 +123,9 @@ def test_locale_sql_and_custom_image_survive(tmp_path):
                 "tag": "15.4-debian-timescaledb-2.12.2",
             },
             "postgresql": {"shared_preload_libraries": ["timescaledb"]},
+            "database": {"localeCType": "en_US.UTF-8", "localeCollate": "en_US.UTF-8"},
             "initdb": {
-                "localeCType": "en_US.UTF-8",
-                "localeCollate": "en_US.UTF-8",
+                "localeCType": "POSIX",
                 "postInitApplicationSQL": [
                     "CREATE EXTENSION IF NOT EXISTS timescaledb;"
                 ],
@@ -133,13 +136,15 @@ def test_locale_sql_and_custom_image_survive(tmp_path):
     assert spec["imageName"].endswith("15.4-debian-timescaledb-2.12.2")
     assert spec["postgresql"]["shared_preload_libraries"] == ["timescaledb"]
     assert spec["bootstrap"]["initdb"]["localeCType"] == "en_US.UTF-8"
+    assert spec["bootstrap"]["initdb"]["localeCollate"] == "en_US.UTF-8"
+    assert one(resources, "Database")["spec"]["localeCType"] == "en_US.UTF-8"
     assert spec["bootstrap"]["initdb"]["postInitApplicationSQL"] == [
         "CREATE EXTENSION IF NOT EXISTS timescaledb;"
     ]
 
 
-def test_scheduled_plugin_backup(tmp_path):
-    resources = render(tmp_path, {"backup": {"scheduled": {"enabled": True}}})
+def test_scheduled_plugin_backup_is_the_default(tmp_path):
+    resources = render(tmp_path)
     schedule = one(resources, "ScheduledBackup")["spec"]
     assert schedule["method"] == "plugin"
     assert schedule["pluginConfiguration"] == {"name": "barman-cloud.cloudnative-pg.io"}
@@ -151,7 +156,6 @@ def test_external_object_store_and_credentials_are_not_mixed_with_ceph(tmp_path)
         tmp_path,
         {
             "backup": {
-                "provider": "plugin",
                 "objectBucket": {"enabled": False},
                 "configuration": {
                     "destinationPath": "s3://offsite/app",
@@ -167,7 +171,7 @@ def test_external_object_store_and_credentials_are_not_mixed_with_ceph(tmp_path)
     }
     resources = render(
         tmp_path,
-        {"backup": {"provider": "plugin", "objectStore": {"existingName": "offsite"}}},
+        {"backup": {"objectStore": {"existingName": "offsite"}}},
     )
     assert not any(d["kind"] == "ObjectStore" for d in resources)
     assert (
@@ -246,12 +250,7 @@ def test_snapshot_schedule_keeps_wal_archiving(tmp_path):
 
 
 def test_chart_owned_monitor_has_distinct_identity_and_stable_selector(tmp_path):
-    resources = render(
-        tmp_path,
-        {
-            "monitoring": {"mode": "podMonitor"},
-        },
-    )
+    resources = render(tmp_path)
     cluster = one(resources, "Cluster")
     monitor = one(resources, "PodMonitor")
     assert monitor["metadata"]["name"] != cluster["metadata"]["name"]
@@ -263,6 +262,11 @@ def test_chart_owned_monitor_has_distinct_identity_and_stable_selector(tmp_path)
     assert monitor["spec"]["podMetricsEndpoints"] == [{"port": "metrics"}]
     selector = cluster["spec"]["topologySpreadConstraints"][0]["labelSelector"]
     assert selector == {"matchLabels": {"cnpg.io/cluster": "example-postgres"}}
+    resources = render(tmp_path, {"monitoring": {"podMonitor": {"enabled": False}}})
+    assert not any(d["kind"] == "PodMonitor" for d in resources)
+    assert one(resources, "Cluster")["spec"]["monitoring"] == {
+        "enablePodMonitor": False
+    }
 
 
 @pytest.mark.parametrize(
@@ -285,7 +289,6 @@ def test_metrics_tls_scrapes_https_with_the_server_ca(
         {
             "tls": {"mode": tls_mode, **extra},
             "monitoring": {
-                "mode": "podMonitor",
                 "configuration": {"tls": {"enabled": True}},
                 "podMonitor": {
                     "podMetricsEndpoints": [{"port": "metrics", "interval": "30s"}]
@@ -331,7 +334,7 @@ def test_plugin_server_name_separates_archives(tmp_path):
     spec = one(
         render(
             tmp_path,
-            {"backup": {"provider": "plugin", "serverName": "example-postgres-pg18"}},
+            {"backup": {"serverName": "example-postgres-pg18"}},
         ),
         "Cluster",
     )["spec"]
@@ -339,7 +342,7 @@ def test_plugin_server_name_separates_archives(tmp_path):
         "barmanObjectName": "example-postgres",
         "serverName": "example-postgres-pg18",
     }
-    spec = one(render(tmp_path, {"backup": {"provider": "plugin"}}), "Cluster")["spec"]
+    spec = one(render(tmp_path), "Cluster")["spec"]
     assert "serverName" not in spec["plugins"][0]["parameters"]
 
 
@@ -385,12 +388,15 @@ def test_cert_manager_poolers_use_chart_issued_auth_certificate(tmp_path):
         {
             "poolers": {
                 "rw": {"instances": 2, "pgbouncer": {"poolMode": "transaction"}},
-                "ro": {"type": "ro", "resourceName": "reporting-pool"},
+                "ro": {"type": "ro"},
             }
         },
     )
     poolers = {d["metadata"]["name"]: d for d in resources if d["kind"] == "Pooler"}
-    assert sorted(poolers) == ["example-postgres-pooler-rw", "reporting-pool"]
+    assert sorted(poolers) == [
+        "example-postgres-pooler-ro",
+        "example-postgres-pooler-rw",
+    ]
     rw = poolers["example-postgres-pooler-rw"]["spec"]
     assert rw["cluster"] == {"name": "example-postgres"}
     assert rw["pgbouncer"] == {
@@ -406,7 +412,7 @@ def test_cert_manager_poolers_use_chart_issued_auth_certificate(tmp_path):
     assert auth["commonName"] == "cnpg_pooler_pgbouncer"
     assert auth["usages"][-1] == "client auth"
     sans = certs["example-postgres-server-tls"]["spec"]["dnsNames"]
-    assert "reporting-pool.test.svc" in sans
+    assert "example-postgres-pooler-ro.test.svc" in sans
     assert "example-postgres-pooler-rw.test.svc.cluster.local" in sans
 
 
@@ -440,7 +446,6 @@ def test_operator_tls_poolers_keep_cnpg_integration_and_add_sans(tmp_path):
         {
             "tls": {"mode": "operator", "serverAltDNSNames": ["db.example.internal"]},
             "poolers": {"rw": {"pgbouncer": {}}},
-            "monitoring": {"mode": "podMonitor"},
         },
     )
     assert one(resources, "Pooler")["spec"]["pgbouncer"] == {}
@@ -470,15 +475,6 @@ def test_operator_tls_poolers_keep_cnpg_integration_and_add_sans(tmp_path):
         (
             {"poolers": {"rw": {"cluster": {"name": "other"}, "pgbouncer": {}}}},
             "cluster",
-        ),
-        (
-            {
-                "poolers": {
-                    "a": {"resourceName": "pool", "pgbouncer": {}},
-                    "b": {"resourceName": "pool", "pgbouncer": {}},
-                }
-            },
-            "duplicate Pooler resource name",
         ),
     ],
 )
@@ -525,7 +521,6 @@ def test_cnpg_specs_omit_empty_lists_the_operator_would_drop(tmp_path):
     resources = render(
         tmp_path,
         {
-            "database": {"enabled": True},
             "databaseRoles": {"r": {"name": "reporting", "inRoles": []}},
             "poolers": {"rw": {"pgbouncer": {}}},
         },
@@ -537,18 +532,14 @@ def test_cnpg_specs_omit_empty_lists_the_operator_would_drop(tmp_path):
     assert "pgbouncer" in one(resources, "Pooler")["spec"]
 
 
-def test_scheduled_backup_waits_for_the_cluster_wave(tmp_path):
-    resources = render(
-        tmp_path,
-        {
-            "syncWave": "-5",
-            "backup": {"provider": "plugin", "scheduled": {"enabled": True}},
-        },
-    )
-    wave = one(resources, "ScheduledBackup")["metadata"]["annotations"]
-    assert wave["argocd.argoproj.io/sync-wave"] == "-4"
-    cluster = one(resources, "Cluster")["metadata"]["annotations"]
-    assert cluster["argocd.argoproj.io/sync-wave"] == "-5"
+def test_default_waves_order_cluster_before_dependent_crs(tmp_path):
+    resources = render(tmp_path, {"poolers": {"rw": {"pgbouncer": {}}}})
+    for doc in resources:
+        wave = doc["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"]
+        if doc["kind"] in {"Database", "DatabaseRole", "Pooler", "ScheduledBackup"}:
+            assert wave == "-4", doc["metadata"]["name"]
+        else:
+            assert wave == "-5", doc["metadata"]["name"]
 
 
 def test_native_cluster_fields_and_image_catalog(tmp_path):
@@ -561,22 +552,72 @@ def test_native_cluster_fields_and_image_catalog(tmp_path):
                 "name": "postgres",
                 "major": 18,
             },
-            "clusterSpec": {
+            "extraClusterSpec": {
                 "walStorage": {"size": "5Gi"},
                 "priorityClassName": "database",
             },
             "storage": {"size": "30Gi"},
-            "affinity": None,
-            "topologySpreadConstraints": [],
+            "storageNodesOnly": False,
+            "spreadAcrossNodes": False,
         },
     )
     spec = one(resources, "Cluster")["spec"]
     assert "imageName" not in spec
     assert spec["imageCatalogRef"]["major"] == 18
     assert spec["walStorage"] == {"size": "5Gi"}
+    assert spec["priorityClassName"] == "database"
     assert spec["storage"]["size"] == "30Gi"
     assert "affinity" not in spec
     assert "topologySpreadConstraints" not in spec
+
+
+def test_affinity_merges_over_storage_nodes_and_extra_spread_follows_default(
+    tmp_path,
+):
+    storage_nodes = {
+        "requiredDuringSchedulingIgnoredDuringExecution": {
+            "nodeSelectorTerms": [
+                {
+                    "matchExpressions": [
+                        {
+                            "key": "node-role.benfu.me/storage",
+                            "operator": "In",
+                            "values": ["true"],
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    default_spread = {
+        "maxSkew": 1,
+        "topologyKey": "kubernetes.io/hostname",
+        "whenUnsatisfiable": "DoNotSchedule",
+        "labelSelector": {"matchLabels": {"cnpg.io/cluster": "example-postgres"}},
+    }
+    spec = one(render(tmp_path), "Cluster")["spec"]
+    assert spec["affinity"] == {"nodeAffinity": storage_nodes}
+    assert spec["topologySpreadConstraints"] == [default_spread]
+    zone = {
+        "maxSkew": 2,
+        "topologyKey": "topology.kubernetes.io/zone",
+        "whenUnsatisfiable": "ScheduleAnyway",
+    }
+    spec = one(
+        render(
+            tmp_path,
+            {
+                "affinity": {"enablePodAntiAffinity": True},
+                "topologySpreadConstraints": [zone],
+            },
+        ),
+        "Cluster",
+    )["spec"]
+    assert spec["affinity"] == {
+        "enablePodAntiAffinity": True,
+        "nodeAffinity": storage_nodes,
+    }
+    assert spec["topologySpreadConstraints"] == [default_spread, zone]
 
 
 @pytest.mark.parametrize("mode", ["operator", "external"])
@@ -600,10 +641,7 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
         {
             "syncWave": 0,
             "databaseSyncWave": 0,
-            "database": {"enabled": True},
-            "backup": {
-                "scheduled": {"enabled": True, "immediate": False, "suspend": True}
-            },
+            "backup": {"scheduled": {"immediate": False, "suspend": True}},
             "initdb": {"dataChecksums": False},
         },
     )
@@ -626,14 +664,17 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
     [
         ({"instances": 0}, "instances"),
         ({"backpu": {}}, "backpu"),
-        ({"backup": {"provider": "unknown"}}, "provider"),
+        ({"backup": {"enabled": "plugin"}}, "backup.enabled"),
+        ({"backup": {"provider": "plugin"}}, "provider"),
+        ({"monitoring": {"mode": "podMonitor"}}, "mode"),
+        ({"nameOverride": "other"}, "nameOverride"),
         (
             {"backup": {"scheduled": {"enabled": True, "schedule": "0 10 * * *"}}},
             "schedule",
         ),
         (
-            {"backup": {"provider": "none", "scheduled": {"enabled": True}}},
-            "requires backup.provider=plugin",
+            {"backup": {"enabled": False}},
+            "backup.scheduled.method plugin requires backup.enabled",
         ),
         (
             {"backup": {"scheduled": {"enabled": True, "method": "volumeSnapshot"}}},
@@ -646,7 +687,6 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
         (
             {
                 "backup": {
-                    "provider": "plugin",
                     "configuration": {
                         "destinationPath": "s3://test/",
                         "serverName": "other",
@@ -655,13 +695,19 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
             },
             "serverName must be empty",
         ),
-        ({"clusterSpec": {"imageName": "other"}}, "conflicts with a chart-owned field"),
         (
-            {
-                "database": {"enabled": True},
-                "databases": {"app": {"name": "app", "owner": "app"}},
-            },
-            "conflicts",
+            {"extraClusterSpec": {"imageName": "other"}},
+            "extraClusterSpec.imageName conflicts with a chart-owned field",
+        ),
+        (
+            {"extraClusterSpec": {"smartShutdownTimeout": 180}},
+            "extraClusterSpec.smartShutdownTimeout conflicts with a chart-owned field",
+        ),
+        ({"clusterSpec": {"walStorage": {"size": "5Gi"}}}, "clusterSpec"),
+        ({"database": {"enabled": True}}, "database.enabled"),
+        (
+            {"databases": {"app": {"name": "other", "owner": "app"}}},
+            "databases.app is reserved",
         ),
         (
             {
@@ -704,11 +750,20 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
         ({"tls": {"mode": "external"}}, "tls.certificates is required"),
         (
             {"monitoring": {"configuration": {"enablePodMonitor": True}}},
-            "use monitoring.mode",
+            (
+                "use monitoring.podMonitor.enabled instead of "
+                "monitoring.configuration.enablePodMonitor"
+            ),
         ),
         (
-            {"backup": {"provider": "none", "serverName": "pg18"}},
-            "backup.serverName requires",
+            {
+                "backup": {
+                    "enabled": False,
+                    "scheduled": {"enabled": False},
+                    "serverName": "pg18",
+                }
+            },
+            "backup.serverName requires backup.enabled",
         ),
         (
             {
@@ -730,7 +785,7 @@ def test_database_roles_replace_inline_roles_of_the_same_name(tmp_path):
     resources = render(
         tmp_path,
         {
-            "database": {"enabled": True, "name": "newdb", "owner": "newowner"},
+            "database": {"name": "newdb", "owner": "newowner"},
             "databaseRoles": {"app": {"name": "app", "login": False}},
             "managed": {
                 "roles": [
@@ -828,30 +883,29 @@ def test_generated_credentials_create_named_secrets_and_disable_scheduled_rotati
     "example,mode", [("existing", "generated"), ("recovery", "copy")]
 )
 @pytest.mark.parametrize("admin", [False, True])
-def test_eso_targets_are_explicit_cluster_credentials(tmp_path, example, mode, admin):
+def test_eso_targets_are_cluster_derived_credentials(tmp_path, example, mode, admin):
     resources = render(
         tmp_path,
         {
             "enableSuperuserAccess": admin,
             "credentials": {
                 "mode": mode,
-                "resourceNames": {
-                    "user": "application-credentials",
-                    "superuser": "postgres-credentials",
-                },
                 "copy": {"superuserSecretName": "source-admin"},
             },
         },
         example=example,
     )
+    prefix = "example-postgres" if mode == "generated" else "example-restored-recovery"
+    user_secret = f"{prefix}-app"
+    admin_secret = f"{prefix}-superuser"
     cluster = one(resources, "Cluster")["spec"]
     bootstrap = cluster["bootstrap"]["initdb" if mode == "generated" else "recovery"]
-    assert bootstrap["secret"] == {"name": "application-credentials"}
+    assert bootstrap["secret"] == {"name": user_secret}
     secrets = [d for d in resources if d["kind"] == "ExternalSecret"]
-    expected = {"application-credentials"}
+    expected = {user_secret}
     if admin:
-        expected.add("postgres-credentials")
-        assert cluster["superuserSecret"] == {"name": "postgres-credentials"}
+        expected.add(admin_secret)
+        assert cluster["superuserSecret"] == {"name": admin_secret}
     else:
         assert "superuserSecret" not in cluster
     assert {d["spec"]["target"]["name"] for d in secrets} == expected
@@ -859,9 +913,7 @@ def test_eso_targets_are_explicit_cluster_credentials(tmp_path, example, mode, a
         assert secret["spec"]["target"]["creationPolicy"] == "Orphan"
         fields = secret["spec"]["target"]["template"]["data"]
         assert fields["username"] == (
-            "postgres"
-            if secret["metadata"]["name"] == "postgres-credentials"
-            else "app"
+            "postgres" if secret["metadata"]["name"] == admin_secret else "app"
         )
         assert "password" in fields
 
@@ -888,7 +940,6 @@ def test_sql_names_control_resource_names_without_changing_sql_identity(tmp_path
         tmp_path,
         {
             "database": {
-                "enabled": True,
                 "name": "Codecov_DB",
                 "owner": "Codecov_User",
             },
@@ -929,36 +980,6 @@ def test_sql_names_control_resource_names_without_changing_sql_identity(tmp_path
         )
 
 
-def test_resource_name_overrides_preserve_previous_database_role_and_copy_identities(
-    tmp_path,
-):
-    resources = render(
-        tmp_path,
-        {
-            "database": {"enabled": True, "resourceName": "example-restored-app"},
-            "databaseRoles": {
-                "reader": {
-                    "name": "read_only",
-                    "resourceName": "example-restored-reader",
-                }
-            },
-            "credentials": {"resourceNames": {"user": "example-restored-recovery-app"}},
-        },
-        example="recovery",
-    )
-    db = one(resources, "Database")
-    role = one(resources, "DatabaseRole")
-    assert db["metadata"]["name"] == "example-restored-app"
-    assert role["metadata"]["name"] == "example-restored-reader"
-    assert "resourceName" not in db["spec"] and "resourceName" not in role["spec"]
-    secret = one(resources, "ExternalSecret")
-    assert secret["metadata"]["name"] == "example-restored-recovery-app"
-    assert secret["spec"]["target"]["name"] == "example-restored-recovery-app"
-    assert one(resources, "Cluster")["spec"]["bootstrap"]["recovery"]["secret"] == {
-        "name": "example-restored-recovery-app"
-    }
-
-
 def test_database_and_role_map_key_renames_do_not_rename_resources(tmp_path):
     a = {
         "databases": {"first": {"name": "reporting_db", "owner": "app"}},
@@ -992,19 +1013,15 @@ def test_database_and_role_map_key_renames_do_not_rename_resources(tmp_path):
             },
             "duplicate DatabaseRole resource name",
         ),
-        ({"database": {"enabled": True, "name": "x" * 63}}, "resourceName"),
-        ({"database": {"enabled": True, "name": "_"}}, "set resourceName explicitly"),
-        ({"database": {"enabled": True, "resourceName": "BAD_NAME"}}, "resourceName"),
         (
-            {
-                "enableSuperuserAccess": True,
-                "credentials": {
-                    "mode": "generated",
-                    "resourceNames": {"user": "same", "superuser": "same"},
-                },
-            },
-            "duplicate credential resource name",
+            {"database": {"name": "x" * 63}},
+            "must be a DNS label of at most 63 characters",
         ),
+        (
+            {"database": {"name": "_"}},
+            'SQL name "_" cannot form a Kubernetes resource name',
+        ),
+        ({"fullnameOverride": "Bad_Name"}, "must be a DNS label"),
     ],
 )
 def test_ambiguous_or_invalid_resource_names_fail_before_apply(
@@ -1013,22 +1030,22 @@ def test_ambiguous_or_invalid_resource_names_fail_before_apply(
     assert message in render(tmp_path, values, success=False)
 
 
-def test_resource_name_override_resolves_sql_name_normalization_collision(tmp_path):
-    resources = render(
+def test_copied_owner_named_superuser_collides_with_the_superuser_secret(tmp_path):
+    message = render(
         tmp_path,
         {
-            "databases": {
-                "one": {"name": "sql_name", "owner": "app"},
-                "two": {
-                    "name": "sql-name",
-                    "owner": "app",
-                    "resourceName": "explicit-db-name",
-                },
-            }
+            "enableSuperuserAccess": True,
+            "database": {"owner": "superuser"},
+            "bootstrap": {"recovery": {"owner": "superuser"}},
+            "credentials": {"copy": {"superuserSecretName": "source-admin"}},
         },
+        example="recovery",
+        success=False,
     )
-    names = {d["metadata"]["name"] for d in resources if d["kind"] == "Database"}
-    assert names == {"example-postgres-db-sql-name", "explicit-db-name"}
+    assert (
+        "database.owner superuser collides with the superuser credential Secret"
+        in message
+    )
 
 
 def test_rotation_and_superuser_are_explicit_with_independent_password_generators(
@@ -1260,7 +1277,6 @@ def test_explicit_settings_reach_cluster_database_and_bucket(tmp_path):
                 }
             },
             "database": {
-                "enabled": True,
                 "localeCType": "en_US.UTF-8",
                 "localeCollate": "en_US.UTF-8",
             },

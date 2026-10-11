@@ -24,5 +24,3 @@ externalClusters:
       parameters:
         barmanObjectName: example-postgres
         serverName: example-postgres
-backup:
-  provider: plugin

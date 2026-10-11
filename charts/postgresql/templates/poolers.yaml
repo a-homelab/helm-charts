@@ -1,11 +1,8 @@
 {{- $root := . -}}
-{{- $resourceNames := dict -}}
 {{- range $key, $pooler := .Values.poolers }}
-{{- $spec := omit (deepCopy $pooler) "resourceName" -}}
+{{- $spec := deepCopy $pooler -}}
 {{- if hasKey $spec "cluster" -}}{{- fail "Pooler cluster is assigned by this chart" -}}{{- end -}}
-{{- $resourceName := include "postgresql.poolerName" (dict "root" $root "key" $key "pooler" $pooler) -}}
-{{- if hasKey $resourceNames $resourceName -}}{{- fail (printf "duplicate Pooler resource name %s; set distinct resourceName overrides" $resourceName) -}}{{- end -}}
-{{- $_ := set $resourceNames $resourceName true -}}
+{{- $resourceName := include "postgresql.poolerName" (dict "root" $root "key" $key) -}}
 {{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) -}}
 {{- $pgbouncer := default (dict) $spec.pgbouncer -}}
 {{- if and (eq $root.Values.tls.mode "certManager") (not $pgbouncer.authQuerySecret) -}}

@@ -2,7 +2,7 @@
 Expand the name of the chart.
 */}}
 {{- define "postgresql.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- .Chart.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -14,7 +14,7 @@ If release name contains chart name it will be used as a full name.
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- $name := .Chart.Name }}
 {{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -111,39 +111,31 @@ wal:
 {{- define "postgresql.resourceName" -}}
 {{- $name := printf "%s-%s" (include "postgresql.fullname" .root) .suffix -}}
 {{- if or (gt (len $name) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $name)) -}}
-{{- fail (printf "resource name %q must be a DNS label of at most 63 characters; shorten fullnameOverride or set resourceName explicitly" $name) -}}
+{{- fail (printf "resource name %q must be a DNS label of at most 63 characters; shorten fullnameOverride or the SQL name" $name) -}}
 {{- end -}}
 {{- $name -}}
 {{- end -}}
 
 {{- define "postgresql.sqlResourceName" -}}
-{{- if .resourceName -}}
-{{- if or (gt (len .resourceName) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" .resourceName)) -}}
-{{- fail (printf "resourceName %q must be a DNS label of at most 63 characters" .resourceName) -}}
-{{- end -}}
-{{- .resourceName -}}
-{{- else -}}
 {{- $sqlName := trimAll "-" (regexReplaceAll "[^a-z0-9]+" (lower .sqlName) "-") -}}
-{{- if not $sqlName -}}{{- fail "SQL name cannot form a Kubernetes resource name; set resourceName explicitly" -}}{{- end -}}
+{{- if not $sqlName -}}{{- fail (printf "SQL name %q cannot form a Kubernetes resource name" .sqlName) -}}{{- end -}}
 {{- include "postgresql.resourceName" (dict "root" .root "suffix" (ternary $sqlName (printf "%s-%s" .prefix $sqlName) (empty .prefix))) -}}
-{{- end -}}
 {{- end -}}
 
 {{- define "postgresql.credentialResourceName" -}}
 {{- $admin := eq .suffix "superuser" -}}
-{{- $key := ternary "superuser" "user" $admin -}}
 {{- /* The superuser's Secret is <cluster>-superuser, CNPG's own name for it,
 rather than <cluster>-postgres; the application role's is <cluster>-<role>. */ -}}
 {{- $sqlName := "superuser" -}}
 {{- if not $admin -}}{{- $sqlName = include "postgresql.databaseOwner" .root -}}{{- end -}}
 {{- $prefix := ternary "recovery" "" (eq .root.Values.credentials.mode "copy") -}}
-{{- $name := include "postgresql.sqlResourceName" (dict "root" .root "prefix" $prefix "sqlName" $sqlName "resourceName" (get .root.Values.credentials.resourceNames $key)) -}}
+{{- $name := include "postgresql.sqlResourceName" (dict "root" .root "prefix" $prefix "sqlName" $sqlName) -}}
 {{- /* <cluster>-<role> shares the namespace with Secrets CNPG and this chart name
 after the cluster; a role with one of these names would take one over. */ -}}
 {{- $fullname := include "postgresql.fullname" .root -}}
 {{- range list "ca" "server" "replication" "superuser" "backup-bucket" -}}
 {{- if and (not $admin) (eq $name (printf "%s-%s" $fullname .)) -}}
-{{- fail (printf "credential Secret %q would collide with the cluster's %s Secret; set credentials.resourceNames.%s" $name . $key) -}}
+{{- fail (printf "credential Secret %q would collide with the cluster's %s Secret; rename database.owner" $name .) -}}
 {{- end -}}
 {{- end -}}
 {{- $name -}}
@@ -152,7 +144,7 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- define "postgresql.validate" -}}
 {{- if and (ne .Values.credentials.mode "existing") .Values.enableSuperuserAccess -}}
 {{- if eq (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app")) (include "postgresql.credentialResourceName" (dict "root" . "suffix" "superuser")) -}}
-{{- fail "duplicate credential resource name; set distinct credentials.resourceNames.user and superuser" -}}
+{{- fail "database.owner superuser collides with the superuser credential Secret; rename database.owner" -}}
 {{- end -}}
 {{- end -}}
 {{- if and .Values.credentials.rotation.enabled (ne .Values.credentials.mode "generated") -}}
@@ -188,9 +180,9 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- if and .Values.tls.superuserCertificate (ne .Values.tls.mode "certManager") -}}
 {{- fail "tls.superuserCertificate requires tls.mode=certManager" -}}
 {{- end -}}
-{{- $owned := list "inheritedMetadata" "imageName" "imageCatalogRef" "imagePullPolicy" "imagePullSecrets" "instances" "enableSuperuserAccess" "postgresql" "managed" "bootstrap" "externalClusters" "superuserSecret" "certificates" "primaryUpdateStrategy" "primaryUpdateMethod" "storage" "affinity" "topologySpreadConstraints" "resources" "plugins" "backup" "replicationSlots" "monitoring" -}}
-{{- range $key, $_ := .Values.clusterSpec -}}
-{{- if has $key $owned -}}{{- fail (printf "clusterSpec.%s conflicts with a chart-owned field; use its chart value" $key) -}}{{- end -}}
+{{- $owned := list "inheritedMetadata" "imageName" "imageCatalogRef" "imagePullPolicy" "imagePullSecrets" "instances" "enableSuperuserAccess" "postgresql" "managed" "bootstrap" "externalClusters" "superuserSecret" "certificates" "primaryUpdateStrategy" "primaryUpdateMethod" "smartShutdownTimeout" "storage" "affinity" "topologySpreadConstraints" "resources" "plugins" "backup" "replicationSlots" "monitoring" -}}
+{{- range $key, $_ := .Values.extraClusterSpec -}}
+{{- if has $key $owned -}}{{- fail (printf "extraClusterSpec.%s conflicts with a chart-owned field; use its chart value" $key) -}}{{- end -}}
 {{- end -}}
 {{- if and (eq .Values.credentials.mode "existing") .Values.enableSuperuserAccess (not (include "postgresql.superuserSecretName" .)) -}}
 {{- fail "credentials.existing.superuserSecretName is required when enableSuperuserAccess=true" -}}
@@ -206,27 +198,27 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- fail "imageCatalogRef and image.digest are mutually exclusive" -}}
 {{- end -}}
 {{- if hasKey .Values.monitoring.configuration "enablePodMonitor" -}}
-{{- fail "use monitoring.mode instead of monitoring.configuration.enablePodMonitor" -}}
+{{- fail "use monitoring.podMonitor.enabled instead of monitoring.configuration.enablePodMonitor" -}}
 {{- end -}}
 {{- if .Values.backup.objectStore.existingName -}}
-{{- if ne .Values.backup.provider "plugin" -}}{{- fail "backup.objectStore.existingName requires backup.provider=plugin" -}}{{- end -}}
+{{- if not .Values.backup.enabled -}}{{- fail "backup.objectStore.existingName requires backup.enabled" -}}{{- end -}}
 {{- if .Values.backup.configuration -}}{{- fail "backup.configuration is unused with an existing ObjectStore" -}}{{- end -}}
 {{- end -}}
-{{- if and .Values.backup.serverName (ne .Values.backup.provider "plugin") -}}
-{{- fail "backup.serverName requires backup.provider=plugin" -}}
+{{- if and .Values.backup.serverName (not .Values.backup.enabled) -}}
+{{- fail "backup.serverName requires backup.enabled" -}}
 {{- end -}}
 {{- if and .Values.tls.serverAltDNSNames (eq .Values.tls.mode "external") -}}
 {{- fail "tls.serverAltDNSNames is unused with tls.mode=external; put serverAltDNSNames in tls.certificates" -}}
 {{- end -}}
-{{- if and (eq .Values.backup.provider "plugin") .Values.backup.configuration.serverName -}}
+{{- if and .Values.backup.enabled .Values.backup.configuration.serverName -}}
 {{- fail "plugin ObjectStore configuration.serverName must be empty; set recovery serverName on externalClusters instead" -}}
 {{- end -}}
 {{- if .Values.backup.scheduled.enabled -}}
 {{- $method := .Values.backup.scheduled.method | default "plugin" -}}
 {{- if eq $method "volumeSnapshot" -}}
 {{- if not .Values.backup.volumeSnapshot -}}{{- fail "scheduled volumeSnapshot requires backup.volumeSnapshot" -}}{{- end -}}
-{{- else if ne .Values.backup.provider "plugin" -}}
-{{- fail "backup.scheduled.method plugin requires backup.provider=plugin, or use volumeSnapshot" -}}
+{{- else if not .Values.backup.enabled -}}
+{{- fail "backup.scheduled.method plugin requires backup.enabled, or use volumeSnapshot" -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
@@ -290,11 +282,7 @@ fqdn-jdbc-uri: {{ printf "jdbc:postgresql://%s:5432/%s?password=%s&user=%s" $fqd
 {{- end -}}
 
 {{- define "postgresql.poolerName" -}}
-{{- if .pooler.resourceName -}}
-{{- include "postgresql.sqlResourceName" (dict "root" .root "resourceName" .pooler.resourceName) -}}
-{{- else -}}
 {{- include "postgresql.resourceName" (dict "root" .root "suffix" (printf "pooler-%s" .key)) -}}
-{{- end -}}
 {{- end -}}
 
 {{- define "postgresql.poolerAuthSecretName" -}}
@@ -308,7 +296,7 @@ certificate unless a Pooler sets clientTLSSecret.
 {{- define "postgresql.poolerDNSNames" -}}
 {{- $names := list -}}
 {{- range $key, $pooler := .Values.poolers -}}
-{{- $name := include "postgresql.poolerName" (dict "root" $ "key" $key "pooler" $pooler) -}}
+{{- $name := include "postgresql.poolerName" (dict "root" $ "key" $key) -}}
 {{- $names = concat $names (list $name (printf "%s.%s" $name $.Release.Namespace) (printf "%s.%s.svc" $name $.Release.Namespace) (printf "%s.%s.svc.%s" $name $.Release.Namespace $.Values.clusterDomain)) -}}
 {{- end -}}
 {{- toJson $names -}}

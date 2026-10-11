@@ -33,9 +33,6 @@
     "imagePullSecrets": {
       "type": "array"
     },
-    "nameOverride": {
-      "type": "string"
-    },
     "fullnameOverride": {
       "type": "string"
     },
@@ -70,9 +67,6 @@
     "database": {
       "type": "object",
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
         "name": {
           "type": "string"
         },
@@ -119,13 +113,13 @@
           "type": "string",
           "minLength": 1
         },
-        "resourceName": {
-          "type": "string",
-          "maxLength": 63,
-          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-        }
+        "enabled": false
       },
-      "additionalProperties": true
+      "additionalProperties": true,
+      "required": [
+        "localeCType",
+        "localeCollate"
+      ]
     },
     "databases": {
       "type": "object",
@@ -155,11 +149,6 @@
                 "present",
                 "absent"
               ]
-            },
-            "resourceName": {
-              "type": "string",
-              "maxLength": 63,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
             }
           },
           "additionalProperties": true,
@@ -194,11 +183,6 @@
                 "retain",
                 "delete"
               ]
-            },
-            "resourceName": {
-              "type": "string",
-              "maxLength": 63,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
             }
           },
           "additionalProperties": true,
@@ -233,11 +217,6 @@
             },
             "template": {
               "type": "object"
-            },
-            "resourceName": {
-              "type": "string",
-              "maxLength": 63,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
             }
           },
           "additionalProperties": true
@@ -265,19 +244,26 @@
         "switchover"
       ]
     },
+    "smartShutdownTimeout": {
+      "type": "integer",
+      "minimum": 0
+    },
     "affinity": {
-      "type": [
-        "object",
-        "null"
-      ]
+      "type": "object"
+    },
+    "storageNodesOnly": {
+      "type": "boolean"
     },
     "topologySpreadConstraints": {
-      "type": [
-        "array",
-        "null"
-      ]
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
     },
-    "clusterSpec": {
+    "spreadAcrossNodes": {
+      "type": "boolean"
+    },
+    "extraClusterSpec": {
       "type": "object"
     },
     "labels": {
@@ -350,12 +336,8 @@
     "backup": {
       "type": "object",
       "properties": {
-        "provider": {
-          "type": "string",
-          "enum": [
-            "plugin",
-            "none"
-          ]
+        "enabled": {
+          "type": "boolean"
         },
         "objectBucket": {
           "type": "object",
@@ -443,19 +425,15 @@
     "monitoring": {
       "type": "object",
       "properties": {
-        "mode": {
-          "type": "string",
-          "enum": [
-            "podMonitor",
-            "disabled"
-          ]
-        },
         "configuration": {
           "type": "object"
         },
         "podMonitor": {
           "type": "object",
           "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
             "labels": {
               "type": "object"
             },
@@ -557,22 +535,6 @@
               "type": "string"
             }
           }
-        },
-        "resourceNames": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "user": {
-              "type": "string",
-              "maxLength": 63,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-            },
-            "superuser": {
-              "type": "string",
-              "maxLength": 63,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-            }
-          }
         }
       }
     },
@@ -588,5 +550,9 @@
       "type": "object"
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": [
+    "affinity",
+    "topologySpreadConstraints"
+  ]
 }

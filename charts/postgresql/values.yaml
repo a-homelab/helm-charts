@@ -45,7 +45,6 @@ image:
 imageCatalogRef: {}
 # Native list of {name: <Secret>} for private registries.
 imagePullSecrets: []
-nameOverride: ""
 # Sets the cluster name. Changing it on an existing release creates a new,
 # empty Cluster; it never renames one.
 fullnameOverride: ""
@@ -72,11 +71,6 @@ credentials:
   # userSecretName: Secret with username/password keys for database.owner.
   # superuserSecretName: Secret for postgres.
   existing: {}
-  # generated/copy modes: full-name overrides for the generator, ExternalSecret and
-  # target Secret. Changing a deployed name creates a new password.
-  resourceNames:
-    user: ""
-    superuser: ""
   # ESO Password generator spec (generated mode).
   # https://external-secrets.io/latest/api/generator/password/
   password:
@@ -118,14 +112,12 @@ credentials:
 #     dataDurability: required
 postgresql: {}
 # Extra Cluster.spec.bootstrap.initdb fields, merged with the chart-supplied
-# database, owner and secret. Applies only when the cluster is first created;
-# changing it later never reinitializes or alters an existing database.
+# database, owner, locales and secret. Applies only when the cluster is first
+# created; changing it later never reinitializes or alters an existing database.
 # Other useful native fields: dataChecksums (PG18 initdb enables checksums by
 # default), encoding, localeProvider, icuLocale, builtinLocale, walSegmentSize,
 # and postInit*SQLRefs.
 initdb:
-  localeCType: C
-  localeCollate: C
   # SQL run as superuser in the postgres database after initdb.
   postInitSQL: []
   # SQL run in template1, inherited by every database created later.
@@ -151,23 +143,20 @@ managed: {}
 
 # --- Declarative databases and roles --------------------------------------------
 
-# Manage the bootstrap database with a Database CR, named
-# <cluster>-db-<normalized SQL name>. name and owner are required either way:
-# initdb creates them. Other native Database.spec fields (extensions, schemas, fdws,
-# servers, connectionLimit, ...) pass through; the chart sets cluster.name,
-# ensure: present and databaseReclaimPolicy: retain. Omitting an extension or
-# schema never drops it; ensure: absent does.
+# The application database and its owner. initdb creates both, and a Database CR
+# named <cluster>-db-<normalized SQL name> manages it declaratively. Other native
+# Database.spec fields (extensions, schemas, fdws, servers, connectionLimit, ...)
+# pass through; the chart sets cluster.name, ensure: present and
+# databaseReclaimPolicy: retain. Omitting an extension or schema never drops it;
+# ensure: absent does.
 # https://cloudnative-pg.io/docs/1.30/declarative_database_management/
 database:
-  enabled: false
   name: ""
   owner: ""
-  # Full Kubernetes name override, e.g. to keep a previously deployed CR name.
-  resourceName: ""
-  # Creation-time locales. Explicit values override initdb locales and also reach
-  # the Database CR; they never change an existing database's collation.
-  # localeCType: C
-  # localeCollate: C
+  # Creation-time locales for initdb and the Database CR; changing them never
+  # changes an existing database's collation.
+  localeCType: C
+  localeCollate: C
   # Overrides the Database/DatabaseRole wave for this CR only.
   syncWave: ""
   # [{name, ensure, version, schema}]. Binaries must exist in the operand image.
@@ -178,8 +167,8 @@ database:
 # Additional databases and roles, keyed by an arbitrary values identifier.
 # Values are native Database.spec / DatabaseRole.spec objects. Resource names
 # come from the SQL name (<cluster>-db-<name>, <cluster>-role-<name>); renaming a
-# map key does not rename the CR. Each entry accepts resourceName. The chart
-# sets cluster.name and defaults reclaim policies to retain.
+# map key does not rename the CR. The chart sets cluster.name and defaults
+# reclaim policies to retain.
 # databases:
 #   visibility:
 #     name: temporal_visibility
@@ -201,7 +190,7 @@ databaseRoles: {}
 
 # PgBouncer Poolers, keyed by a values identifier. Values are native Pooler.spec
 # objects; the chart sets cluster.name. Each Pooler and its Service are named
-# <cluster>-pooler-<key> unless resourceName is set. Its DNS names are added to
+# <cluster>-pooler-<key>. Its DNS names are added to
 # the server certificate, which CNPG also uses for pooler client TLS.
 # Pooler pods inherit inheritedAnnotations (keeping them outside the mesh)
 # unless template.metadata.annotations overrides them.
@@ -235,26 +224,26 @@ resources: {}
 # After replicas update, unsupervised updates the primary automatically;
 # supervised waits for a manual switchover or restart (kubectl cnpg promote/restart).
 primaryUpdateStrategy: unsupervised
-# restart restarts the primary pod in place; switchover promotes the most
-# aligned, already-updated replica. With switchover, CNPG rejects changing the
-# image and PostgreSQL parameters in the same update.
+# switchover promotes the most aligned, already-updated replica instead of
+# restarting the primary, whose smart shutdown waits for clients and stalled
+# writes. CNPG then rejects changing the image and PostgreSQL parameters in one
+# update. restart restarts the primary pod in place.
 # https://cloudnative-pg.io/docs/1.30/rolling_update/
-primaryUpdateMethod: restart
+primaryUpdateMethod: switchover
+# Seconds a deleted pod waits for clients before a fast shutdown (CNPG default 180).
+smartShutdownTimeout: 30
 
+# Require nodes labelled node-role.benfu.me/storage=true.
+storageNodesOnly: true
 # Native CNPG AffinityConfiguration, not a Pod affinity: also accepts
 # enablePodAntiAffinity, podAntiAffinityType, topologyKey, nodeSelector and
-# tolerations. null removes it. The default pins instances to storage nodes.
-affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: node-role.benfu.me/storage
-              operator: In
-              values: ["true"]
-# null uses the chart's one-instance-per-hostname spread, selected by
-# cnpg.io/cluster; [] disables it; a list replaces it with native constraints.
-topologySpreadConstraints: null
+# tolerations. Merged over the storageNodesOnly node affinity.
+affinity: {}
+# At most one instance per node (maxSkew 1 by kubernetes.io/hostname, selected
+# by cnpg.io/cluster).
+spreadAcrossNodes: true
+# Native constraints added after the spreadAcrossNodes one.
+topologySpreadConstraints: []
 
 # Native Cluster.spec.replicationSlots, merged over the chart default
 # highAvailability.enabled: true. For example, highAvailability.
@@ -262,13 +251,14 @@ topologySpreadConstraints: null
 # replication slots usable after failover.
 replicationSlots: {}
 
-# Native Cluster.spec fields without a dedicated chart key, for example
-# walStorage, probes, enablePDB, priorityClassName, podSecurityContext,
-# tablespaces, serviceAccountName, serviceAccountTemplate, podSelectorRefs,
-# primaryLease, replica, env, or projectedVolumeTemplate.
-# Fields the chart owns fail rendering instead of silently overriding it.
-# Adding walStorage to an existing cluster is supported; removing it is not.
-clusterSpec: {}
+# Escape hatch for outliers: native Cluster.spec fields without a chart key,
+# for example walStorage, probes, enablePDB, priorityClassName,
+# podSecurityContext, tablespaces, serviceAccountTemplate, podSelectorRefs,
+# primaryLease, replica, env, or projectedVolumeTemplate. Add a chart key
+# instead when more than one consumer needs a field. Fields the chart owns fail
+# rendering instead of silently overriding it. Adding walStorage to an existing
+# cluster is supported; removing it is not.
+extraClusterSpec: {}
 # Metadata for chart resources. The Cluster passes inherited* to its pods,
 # PVCs and Services.
 labels: {}
@@ -278,8 +268,9 @@ inheritedAnnotations:
   # Database pods stay outside the mesh: CNPG terminates its own TLS, and
   # sidecars can block network access during startup and keep CNPG Jobs running.
   sidecar.istio.io/inject: "false"
-# Argo CD sync wave for every rendered resource. Certificates default to wave 0.
-syncWave: ""
+# Argo CD sync wave for every rendered resource: before the applications that
+# connect, so credentials exist and CNPG has applied them first.
+syncWave: "-5"
 # Empty derives Cluster wave + 1; applies to Database, DatabaseRole, Pooler and
 # ScheduledBackup resources.
 # Wave order alone does not wait for SQL reconciliation; check the CRs'
@@ -312,11 +303,9 @@ tls:
 # --- Backups --------------------------------------------------------------------
 
 backup:
-  # Where WAL archives and base backups go:
-  #   plugin  Barman Cloud plugin: an ObjectStore plus a WAL-archiver plugin entry
-  #   none    no WAL archiving
-  # WAL archiving alone is not a backup. Enable backup.scheduled as well.
-  provider: plugin
+  # WAL archiving through the Barman Cloud plugin: an ObjectStore plus a
+  # WAL-archiver plugin entry. WAL archiving alone is not a backup; see scheduled.
+  enabled: true
   # Rook ObjectBucketClaim for the <cluster>-backup bucket and its credentials.
   # Disabling it removes the claim and can delete the bucket.
   objectBucket:
@@ -325,12 +314,14 @@ backup:
   # Default instance for base backups: prefer-standby or primary.
   target: prefer-standby
   # Base backup and WAL retention, <n>d|w|m (ObjectStore.spec.retentionPolicy).
-  retentionPolicy: 30d
+  # The plugin supports one recovery window; weekly/monthly tiers are a pg_dump
+  # TODO (README, Backups).
+  retentionPolicy: 7d
   # Empty uses the Ceph RGW endpoint, s3://<cluster>-backup/ and the
   # objectBucket Secret. Nonempty replaces the entire native Barman configuration.
   # https://cloudnative-pg.io/plugin-barman-cloud/docs/object_stores/
   configuration: {}
-  # plugin provider: archive server name (Cluster plugin parameter). Empty uses
+  # Archive server name (Cluster plugin parameter). Empty uses
   # the cluster name. Change it together with the image for a major upgrade to
   # keep pre-upgrade backups separate.
   serverName: ""
@@ -344,7 +335,7 @@ backup:
   # snapshotOwnerReference. Requires a CSI snapshot class.
   volumeSnapshot: {}
   scheduled:
-    enabled: false
+    enabled: true
     # Six-field cron with seconds first: daily at 10:00:00 UTC.
     schedule: "0 0 10 * * *"
     # Take one backup as soon as the ScheduledBackup is created.
@@ -352,21 +343,21 @@ backup:
     suspend: false
     # Owner of the Backup objects: self (the ScheduledBackup), cluster, or none.
     backupOwnerReference: self
-    # Empty selects plugin; volumeSnapshot requires backup.volumeSnapshot.
+    # Empty selects plugin, which requires backup.enabled; volumeSnapshot requires
+    # backup.volumeSnapshot.
     method: ""
 
 # --- Monitoring -----------------------------------------------------------------
 
 monitoring:
-  # podMonitor  chart-owned PodMonitor named <cluster>-metrics
-  # disabled    no PodMonitor
-  mode: podMonitor
   # Native Cluster.spec.monitoring, excluding enablePodMonitor: for example
   # customQueriesConfigMap, disableDefaultQueries, metricsQueriesTTL, or
   # tls.enabled. With tls.enabled, the chart PodMonitor scrapes over HTTPS and
   # verifies the server CA.
   configuration: {}
   podMonitor:
+    # Chart-owned PodMonitor named <cluster>-metrics.
+    enabled: true
     # Add the labels your Prometheus podMonitorSelector requires.
     labels: {}
     annotations: {}

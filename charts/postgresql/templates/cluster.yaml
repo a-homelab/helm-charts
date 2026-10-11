@@ -57,10 +57,7 @@ spec:
     {{- toYaml $bootstrap | nindent 4 }}
     {{- else }}
     initdb:
-      {{- $initdb := mustMergeOverwrite (deepCopy .Values.initdb) (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .)) }}
-      {{- range $key := list "localeCType" "localeCollate" }}
-      {{- if hasKey $.Values.database $key }}{{- $_ := set $initdb $key (get $.Values.database $key) }}{{- end }}
-      {{- end }}
+      {{- $initdb := mustMergeOverwrite (deepCopy .Values.initdb) (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .) "localeCType" .Values.database.localeCType "localeCollate" .Values.database.localeCollate) }}
       {{- if eq .Values.credentials.mode "existing" }}
       {{- $_ := set $initdb "secret" (dict "name" (required "credentials.existing.userSecretName is required" (include "postgresql.userSecretName" .))) }}
       {{- else }}
@@ -102,27 +99,28 @@ spec:
   {{- end }}
   primaryUpdateStrategy: {{ .Values.primaryUpdateStrategy }}
   primaryUpdateMethod: {{ .Values.primaryUpdateMethod }}
+  smartShutdownTimeout: {{ .Values.smartShutdownTimeout }}
   storage:
     {{- toYaml .Values.storage | nindent 4 }}
-  {{- with .Values.affinity }}
+  {{- $affinity := dict }}
+  {{- if .Values.storageNodesOnly }}
+  {{- $_ := set $affinity "nodeAffinity" (dict "requiredDuringSchedulingIgnoredDuringExecution" (dict "nodeSelectorTerms" (list (dict "matchExpressions" (list (dict "key" "node-role.benfu.me/storage" "operator" "In" "values" (list "true"))))))) }}
+  {{- end }}
+  {{- with mustMergeOverwrite $affinity (deepCopy .Values.affinity) }}
   affinity:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- if eq (kindOf .Values.topologySpreadConstraints) "invalid" }}
+  {{- $spread := list }}
+  {{- if .Values.spreadAcrossNodes }}
+  {{- $spread = append $spread (dict "maxSkew" 1 "topologyKey" "kubernetes.io/hostname" "whenUnsatisfiable" "DoNotSchedule" "labelSelector" (dict "matchLabels" (dict "cnpg.io/cluster" $name))) }}
+  {{- end }}
+  {{- with concat $spread .Values.topologySpreadConstraints }}
   topologySpreadConstraints:
-    - maxSkew: 1
-      topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: DoNotSchedule
-      labelSelector:
-        matchLabels:
-          cnpg.io/cluster: {{ $name | quote }}
-  {{- else if .Values.topologySpreadConstraints }}
-  topologySpreadConstraints:
-    {{- toYaml .Values.topologySpreadConstraints | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
   resources:
     {{- toYaml .Values.resources | nindent 4 }}
-  {{- if eq .Values.backup.provider "plugin" }}
+  {{- if .Values.backup.enabled }}
   plugins:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
@@ -143,6 +141,6 @@ spec:
   monitoring:
     {{- /* Explicit false, CNPG's default: the chart owns any PodMonitor. */}}
     {{- mustMergeOverwrite (deepCopy .Values.monitoring.configuration) (dict "enablePodMonitor" false) | toYaml | nindent 4 }}
-  {{- with .Values.clusterSpec }}
+  {{- with .Values.extraClusterSpec }}
   {{- toYaml . | nindent 2 }}
   {{- end }}
