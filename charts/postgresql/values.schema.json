@@ -481,19 +481,6 @@
     "global": {
       "type": "object"
     },
-    "scheduling": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "topologySpreadSelector": {
-          "type": "string",
-          "enum": [
-            "legacy",
-            "stable"
-          ]
-        }
-      }
-    },
     "credentials": {
       "type": "object",
       "additionalProperties": false,

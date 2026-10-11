@@ -115,11 +115,7 @@ spec:
       whenUnsatisfiable: DoNotSchedule
       labelSelector:
         matchLabels:
-          {{- if eq .Values.scheduling.topologySpreadSelector "legacy" }}
-          {{- include "postgresql.podLabels" . | nindent 10 }}
-          {{- else }}
           cnpg.io/cluster: {{ $name | quote }}
-          {{- end }}
   {{- else if .Values.topologySpreadConstraints }}
   topologySpreadConstraints:
     {{- toYaml .Values.topologySpreadConstraints | nindent 4 }}

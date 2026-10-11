@@ -49,16 +49,11 @@ app.kubernetes.io/name: {{ include "postgresql.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
-{{- /* Pods never carry the current chart version: CNPG patches inherited labels
-onto every instance, so a version label would touch every pod on each chart
-release. The legacy selector matches on the label frozen at 0.1.0. */ -}}
+{{- /* Pods never carry the chart version: CNPG patches inherited labels onto
+every instance, so a version label would touch every pod on each chart release. */ -}}
 {{- define "postgresql.podLabels" -}}
 {{- $labels := include "postgresql.labels" . | fromYaml -}}
-{{- if eq .Values.scheduling.topologySpreadSelector "legacy" -}}
-{{- $_ := set $labels "helm.sh/chart" "postgresql-0.1.0" -}}
-{{- else -}}
 {{- $_ := unset $labels "helm.sh/chart" -}}
-{{- end -}}
 {{- toYaml $labels -}}
 {{- end -}}
 

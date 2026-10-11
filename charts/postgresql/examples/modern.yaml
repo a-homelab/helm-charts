@@ -46,8 +46,6 @@ monitoring:
     labels:
       release: kube-prometheus-stack
 primaryUpdateMethod: switchover
-scheduling:
-  topologySpreadSelector: stable
 resources:
   requests:
     cpu: 100m

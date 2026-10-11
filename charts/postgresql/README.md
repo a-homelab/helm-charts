@@ -16,12 +16,11 @@ the aliases `replicaCount`, `clientUsername`, `databaseName`,
 `backup.storageClassName`, plus `tls.profile`, `backup.provider: inTree` and
 `monitoring.mode: operator`. Values that still set them fail schema validation.
 
-The resource-level `helm.sh/chart` label reports the new chart version. Legacy
-pod labels and topology selectors deliberately retain `postgresql-0.1.0`:
-changing that selector triggers CNPG rolling updates. Set
-`scheduling.topologySpreadSelector: stable` to adopt `cnpg.io/cluster` during a
-maintenance window. Pods then carry no chart version label, so later chart
-releases change neither the selector nor pod metadata.
+Chart resources carry the `helm.sh/chart` label with the chart version; pods
+do not, and the default spread constraint selects `cnpg.io/cluster`, so chart
+releases change neither pod metadata nor the selector. Chart 0.4.0 removed
+`scheduling.topologySpreadSelector`; values that still set it fail schema
+validation.
 
 `credentials.existing` only applies in existing mode. Generated/copy modes select
 their own target names. A nonempty native `bootstrap` still replaces the entire
@@ -476,7 +475,7 @@ PostgreSQL parameters in one update. Change them in sequence. See
 
 [examples/modern.yaml](examples/modern.yaml) demonstrates DatabaseRole, plugin
 backups, generated credentials, the CNPG CA and admin certificate, checksums at
-initdb, stable scheduling labels, switchover updates, and an
+initdb, switchover updates, and an
 explicit PodMonitor. It is a starting point for a new cluster, not an overlay to
 apply wholesale to an existing database. Select a current operand image for the
 required PostgreSQL major, or use an existing ImageCatalog via `imageCatalogRef`.

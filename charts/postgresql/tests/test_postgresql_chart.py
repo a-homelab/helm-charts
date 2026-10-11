@@ -250,7 +250,6 @@ def test_chart_owned_monitor_has_distinct_identity_and_stable_selector(tmp_path)
         tmp_path,
         {
             "monitoring": {"mode": "podMonitor"},
-            "scheduling": {"topologySpreadSelector": "stable"},
         },
     )
     cluster = one(resources, "Cluster")
@@ -749,26 +748,10 @@ def test_database_roles_replace_inline_roles_of_the_same_name(tmp_path):
     assert one(resources, "Database")["spec"]["name"] == "newdb"
 
 
-def test_legacy_pod_labels_and_topology_are_stable_across_chart_versions(tmp_path):
-    cluster = one(
-        render(tmp_path, {"scheduling": {"topologySpreadSelector": "legacy"}}),
-        "Cluster",
-    )
+def test_spread_selector_and_pods_omit_the_chart_version(tmp_path):
+    cluster = one(render(tmp_path), "Cluster")
     version = yaml.safe_load((CHART / "Chart.yaml").read_text())["version"]
     assert cluster["metadata"]["labels"]["helm.sh/chart"] == f"postgresql-{version}"
-    pod_labels = cluster["spec"]["inheritedMetadata"]["labels"]
-    assert pod_labels["helm.sh/chart"] == "postgresql-0.1.0"
-    assert (
-        cluster["spec"]["topologySpreadConstraints"][0]["labelSelector"]["matchLabels"]
-        == pod_labels
-    )
-
-
-def test_stable_selector_keeps_the_chart_version_off_pods(tmp_path):
-    cluster = one(
-        render(tmp_path, {"scheduling": {"topologySpreadSelector": "stable"}}),
-        "Cluster",
-    )
     assert "helm.sh/chart" not in cluster["spec"]["inheritedMetadata"]["labels"]
     assert cluster["spec"]["topologySpreadConstraints"][0]["labelSelector"] == {
         "matchLabels": {"cnpg.io/cluster": "example-postgres"}
