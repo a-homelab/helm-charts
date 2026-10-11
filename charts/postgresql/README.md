@@ -20,7 +20,8 @@ The resource-level `helm.sh/chart` label reports the new chart version. Legacy
 pod labels and topology selectors deliberately retain `postgresql-0.1.0`:
 changing that selector triggers CNPG rolling updates. Set
 `scheduling.topologySpreadSelector: stable` to adopt `cnpg.io/cluster` during a
-maintenance window. Subsequent chart releases then do not affect that selector.
+maintenance window. Pods then carry no chart version label, so later chart
+releases change neither the selector nor pod metadata.
 
 `credentials.existing` only applies in existing mode. Generated/copy modes select
 their own target names. A nonempty native `bootstrap` still replaces the entire

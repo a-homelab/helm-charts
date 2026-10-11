@@ -259,7 +259,8 @@ scheduling:
   # Label selector of the default spread constraint. CNPG rolls every pod when it
   # changes, so switch only in a maintenance window.
   #   legacy  original selector, which freezes the 0.1.0 pod chart label
-  #   stable  cnpg.io/cluster; later chart versions never change it
+  #   stable  cnpg.io/cluster, and no chart version label on pods; later chart
+  #           versions change neither
   topologySpreadSelector: legacy
 
 # Native Cluster.spec.replicationSlots, merged over the chart default

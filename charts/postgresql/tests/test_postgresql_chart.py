@@ -761,6 +761,17 @@ def test_legacy_pod_labels_and_topology_are_stable_across_chart_versions(tmp_pat
     )
 
 
+def test_stable_selector_keeps_the_chart_version_off_pods(tmp_path):
+    cluster = one(
+        render(tmp_path, {"scheduling": {"topologySpreadSelector": "stable"}}),
+        "Cluster",
+    )
+    assert "helm.sh/chart" not in cluster["spec"]["inheritedMetadata"]["labels"]
+    assert cluster["spec"]["topologySpreadConstraints"][0]["labelSelector"] == {
+        "matchLabels": {"cnpg.io/cluster": "example-postgres"}
+    }
+
+
 def test_disabled_role_certificate_does_not_require_operator_ca(tmp_path):
     resources = render(
         tmp_path,
