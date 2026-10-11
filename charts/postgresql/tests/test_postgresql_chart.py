@@ -806,8 +806,9 @@ def test_generated_credentials_create_named_secrets_and_disable_scheduled_rotati
     assert secret["target"]["name"] == "example-postgres-app"
     assert secret["target"]["creationPolicy"] == "Orphan"
     assert secret["target"]["template"]["data"]["username"] == "app"
-    assert secret["refreshPolicy"] == "Periodic"
+    assert secret["refreshPolicy"] == "CreatedOnce"
     assert secret["refreshInterval"] == "0s"
+    assert secret["target"]["immutable"] is True
     assert secret["target"]["template"]["metadata"]["labels"] == {
         "cnpg.io/reload": "true"
     }
@@ -1065,7 +1066,9 @@ def test_rotation_and_superuser_are_explicit_with_independent_password_generator
     assert fields["dbname"] == "postgres"
     assert ":5432:*:postgres:" in fields["pgpass"]
     for secret in secrets:
+        assert secret["spec"]["refreshPolicy"] == "Periodic"
         assert secret["spec"]["refreshInterval"] == "48h"
+        assert secret["spec"]["target"]["immutable"] is False
         assert (
             secret["spec"]["dataFrom"][0]["sourceRef"]["generatorRef"]["name"]
             == secret["metadata"]["name"]
@@ -1104,7 +1107,9 @@ def test_recovery_copy_restricts_reads_and_retains_secrets_after_removal(tmp_pat
     )
     for secret in (d for d in resources if d["kind"] == "ExternalSecret"):
         assert secret["spec"]["target"]["creationPolicy"] == "Orphan"
+        assert secret["spec"]["refreshPolicy"] == "CreatedOnce"
         assert secret["spec"]["refreshInterval"] == "0s"
+        assert secret["spec"]["target"]["immutable"] is True
         fields = secret["spec"]["target"]["template"]["data"]
         assert "source credential username" in fields["password"]
         assert "example-restored-rw.test" in fields["uri"]

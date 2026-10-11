@@ -92,9 +92,10 @@ credentials:
     noUpper: false
     allowRepeat: true
   # Scheduled password rotation (generated mode). Disabled means
-  # refreshInterval 0s and an immutable target Secret: ESO generates once, never
-  # updates the Secret (not even for chart template changes), and a recreated
-  # ExternalSecret cannot overwrite the password.
+  # refreshPolicy CreatedOnce and an immutable target Secret: ESO generates once,
+  # never updates the Secret (not even for chart template changes or a
+  # force-sync annotation), and a recreated ExternalSecret cannot overwrite the
+  # password.
   # Enabling rotation makes new Secrets mutable. The first rotation requires
   # deleting the existing immutable Secret; see README.md "Credentials and
   # rotation". Deploy Reloader and wire every consumer first.

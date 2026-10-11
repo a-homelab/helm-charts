@@ -252,10 +252,14 @@ Merge; that implementation was never activated in the homelab and is removed.
 Any external deployment of that mode needs a deliberate Secret ownership and
 reference migration before adopting this version.
 
-Rotation is disabled by default (`Periodic`, `refreshInterval: 0s`), and the
-target Secret is then created with `immutable: true`. After the first successful
-sync, ESO 2.11 does not refresh such an ExternalSecret again, even when its
-template changes. Consequences:
+Rotation is disabled by default. The ExternalSecret then uses
+`refreshPolicy: CreatedOnce` (with `refreshInterval: 0s`, so the CRD default of
+`1h` does not suggest a schedule), and the target Secret is created with
+`immutable: true`. After the first successful sync, ESO 2.11 never refreshes
+such an ExternalSecret again, even when its template changes or a `force-sync`
+annotation is added. `Periodic` with `0s` behaves the same in ESO 2.11;
+`CreatedOnce` states the intent in the resource itself and does not depend on
+how a future ESO interprets a zero interval. Consequences:
 
 - Recreating the ExternalSecret, for example by pruning it, a Replace sync, a Helm
   reinstall or a restore without its status, runs the generator again. Because
