@@ -215,7 +215,8 @@ Secrets: the controllers would compete over its data.
 [examples/generated.yaml](examples/generated.yaml) opts into
 `credentials.mode: generated`. ESO Password generators and ExternalSecrets are
 named `<cluster>-<role-name>` and create Secrets with those names. The
-application role is `database.owner`; the optional superuser role is `postgres`.
+application role is `database.owner`; the optional superuser role is `postgres`,
+whose resources are named `<cluster>-superuser` (CNPG's own name for that Secret).
 The Cluster explicitly references those Secrets through `bootstrap.initdb.secret`
 and, when `enableSuperuserAccess` is true, `superuserSecret`. ESO supplies the
 matching username, password and connection fields; CNPG uses those credentials.

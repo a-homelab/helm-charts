@@ -915,11 +915,11 @@ def test_sql_names_control_resource_names_without_changing_sql_identity(tmp_path
     assert cluster["bootstrap"]["initdb"]["secret"] == {
         "name": "example-postgres-codecov-user"
     }
-    assert cluster["superuserSecret"] == {"name": "example-postgres-postgres"}
+    assert cluster["superuserSecret"] == {"name": "example-postgres-superuser"}
     generators = {d["metadata"]["name"] for d in resources if d["kind"] == "Password"}
     assert generators == {
         "example-postgres-codecov-user",
-        "example-postgres-postgres",
+        "example-postgres-superuser",
     }
     for secret in (d for d in resources if d["kind"] == "ExternalSecret"):
         assert secret["spec"]["target"]["name"] == secret["metadata"]["name"]
@@ -927,7 +927,7 @@ def test_sql_names_control_resource_names_without_changing_sql_identity(tmp_path
         fields = secret["spec"]["target"]["template"]["data"]
         assert fields["username"] == (
             "postgres"
-            if secret["metadata"]["name"].endswith("-postgres")
+            if secret["metadata"]["name"].endswith("-superuser")
             else "Codecov_User"
         )
         assert (
@@ -1056,10 +1056,10 @@ def test_rotation_and_superuser_are_explicit_with_independent_password_generator
     generators = {d["metadata"]["name"] for d in resources if d["kind"] == "Password"}
     assert generators == {
         "example-postgres-app",
-        "example-postgres-postgres",
+        "example-postgres-superuser",
     }
     admin = next(
-        d for d in secrets if d["spec"]["target"]["name"].endswith("-postgres")
+        d for d in secrets if d["spec"]["target"]["name"].endswith("-superuser")
     )
     fields = admin["spec"]["target"]["template"]["data"]
     assert fields["dbname"] == "postgres"
@@ -1086,7 +1086,7 @@ def test_recovery_copy_restricts_reads_and_retains_secrets_after_removal(tmp_pat
         "name": "example-restored-recovery-app"
     }
     assert cluster["superuserSecret"] == {
-        "name": "example-restored-recovery-postgres"
+        "name": "example-restored-recovery-superuser"
     }
     assert one(resources, "Role")["rules"] == [
         {
