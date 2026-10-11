@@ -2,10 +2,6 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "replicaCount": {
-      "type": "integer",
-      "minimum": 1
-    },
     "image": {
       "type": "object",
       "properties": {
@@ -43,35 +39,8 @@
     "fullnameOverride": {
       "type": "string"
     },
-    "clientUsername": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "databaseName": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "userCredsSecretName": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "superuserCredsSecretName": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
     "enableSuperuserAccess": {
       "type": "boolean"
-    },
-    "postgresqlConfig": {
-      "type": "object"
     },
     "initdb": {
       "type": "object"
@@ -276,13 +245,6 @@
       },
       "additionalProperties": false
     },
-    "storageSize": {
-      "type": "string",
-      "minLength": 1
-    },
-    "storageClass": {
-      "type": "string"
-    },
     "storage": {
       "type": "object"
     },
@@ -330,9 +292,6 @@
     "inheritedAnnotations": {
       "type": "object"
     },
-    "certificateIssuerRef": {
-      "type": "object"
-    },
     "syncWave": {
       "oneOf": [
         {
@@ -372,13 +331,6 @@
         "clientCertificate": {
           "type": "boolean"
         },
-        "profile": {
-          "type": "string",
-          "enum": [
-            "legacy",
-            "cnpg"
-          ]
-        },
         "issuerRef": {
           "type": "object"
         },
@@ -401,13 +353,9 @@
         "provider": {
           "type": "string",
           "enum": [
-            "inTree",
             "plugin",
             "none"
           ]
-        },
-        "storageClassName": {
-          "type": "string"
         },
         "objectBucket": {
           "type": "object",
@@ -480,7 +428,6 @@
               "enum": [
                 "",
                 "plugin",
-                "barmanObjectStore",
                 "volumeSnapshot"
               ]
             }
@@ -499,7 +446,6 @@
         "mode": {
           "type": "string",
           "enum": [
-            "operator",
             "podMonitor",
             "disabled"
           ]
@@ -648,17 +594,11 @@
       "minLength": 1
     },
     "instances": {
-      "type": [
-        "integer",
-        "null"
-      ],
+      "type": "integer",
       "minimum": 1
     },
     "postgresql": {
-      "type": [
-        "object",
-        "null"
-      ]
+      "type": "object"
     }
   },
   "additionalProperties": false

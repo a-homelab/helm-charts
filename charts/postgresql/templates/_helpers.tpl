@@ -75,10 +75,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{- define "postgresql.databaseName" -}}
-{{- required "databaseName or database.name is required" (coalesce .Values.database.name .Values.databaseName) -}}
+{{- required "database.name is required" .Values.database.name -}}
 {{- end -}}
 {{- define "postgresql.databaseOwner" -}}
-{{- required "clientUsername or database.owner is required" (coalesce .Values.database.owner .Values.clientUsername) -}}
+{{- required "database.owner is required" .Values.database.owner -}}
 {{- end -}}
 
 {{- define "postgresql.objectStoreName" -}}
@@ -193,7 +193,7 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- if has $key $owned -}}{{- fail (printf "clusterSpec.%s conflicts with a chart-owned field; use its chart value" $key) -}}{{- end -}}
 {{- end -}}
 {{- if and (eq .Values.credentials.mode "existing") .Values.enableSuperuserAccess (not (include "postgresql.superuserSecretName" .)) -}}
-{{- fail "credentials.existing.superuserSecretName or superuserCredsSecretName is required when enableSuperuserAccess=true" -}}
+{{- fail "credentials.existing.superuserSecretName is required when enableSuperuserAccess=true" -}}
 {{- end -}}
 
 {{- if and (eq .Values.tls.mode "external") (not .Values.tls.certificates) -}}
@@ -213,7 +213,7 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- if .Values.backup.configuration -}}{{- fail "backup.configuration is unused with an existing ObjectStore" -}}{{- end -}}
 {{- end -}}
 {{- if and .Values.backup.serverName (ne .Values.backup.provider "plugin") -}}
-{{- fail "backup.serverName requires backup.provider=plugin; in-tree archives use backup.configuration.serverName" -}}
+{{- fail "backup.serverName requires backup.provider=plugin" -}}
 {{- end -}}
 {{- if and .Values.tls.serverAltDNSNames (eq .Values.tls.mode "external") -}}
 {{- fail "tls.serverAltDNSNames is unused with tls.mode=external; put serverAltDNSNames in tls.certificates" -}}
@@ -222,11 +222,11 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- fail "plugin ObjectStore configuration.serverName must be empty; set recovery serverName on externalClusters instead" -}}
 {{- end -}}
 {{- if .Values.backup.scheduled.enabled -}}
-{{- $method := .Values.backup.scheduled.method | default (ternary "plugin" "barmanObjectStore" (eq .Values.backup.provider "plugin")) -}}
+{{- $method := .Values.backup.scheduled.method | default "plugin" -}}
 {{- if eq $method "volumeSnapshot" -}}
 {{- if not .Values.backup.volumeSnapshot -}}{{- fail "scheduled volumeSnapshot requires backup.volumeSnapshot" -}}{{- end -}}
-{{- else if or (and (eq $method "plugin") (ne .Values.backup.provider "plugin")) (and (eq $method "barmanObjectStore") (ne .Values.backup.provider "inTree")) -}}
-{{- fail "backup.scheduled.method must match backup.provider, or use volumeSnapshot" -}}
+{{- else if ne .Values.backup.provider "plugin" -}}
+{{- fail "backup.scheduled.method plugin requires backup.provider=plugin, or use volumeSnapshot" -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
@@ -234,11 +234,9 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- define "postgresql.issuerRef" -}}
 {{- if .Values.tls.issuerRef -}}
 {{- toYaml .Values.tls.issuerRef -}}
-{{- else if eq .Values.tls.profile "cnpg" -}}
+{{- else -}}
 name: cnpg-ca
 kind: ClusterIssuer
-{{- else -}}
-{{- toYaml .Values.certificateIssuerRef -}}
 {{- end -}}
 {{- end -}}
 
@@ -284,27 +282,11 @@ fqdn-jdbc-uri: {{ printf "jdbc:postgresql://%s:5432/%s?password=%s&user=%s" $fqd
 {{- end -}}
 
 {{- define "postgresql.userSecretName" -}}
-{{- if hasKey .Values.credentials.existing "userSecretName" -}}
-{{- .Values.credentials.existing.userSecretName -}}
-{{- else -}}
-{{- default "" .Values.userCredsSecretName -}}
-{{- end -}}
+{{- default "" .Values.credentials.existing.userSecretName -}}
 {{- end -}}
 
 {{- define "postgresql.superuserSecretName" -}}
-{{- if hasKey .Values.credentials.existing "superuserSecretName" -}}
-{{- .Values.credentials.existing.superuserSecretName -}}
-{{- else -}}
-{{- default "" .Values.superuserCredsSecretName -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "postgresql.bucketStorageClassName" -}}
-{{- if hasKey .Values.backup.objectBucket "storageClassName" -}}
-{{- .Values.backup.objectBucket.storageClassName -}}
-{{- else -}}
-{{- .Values.backup.storageClassName -}}
-{{- end -}}
+{{- default "" .Values.credentials.existing.superuserSecretName -}}
 {{- end -}}
 
 {{- define "postgresql.poolerName" -}}

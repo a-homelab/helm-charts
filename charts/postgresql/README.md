@@ -5,58 +5,22 @@ DatabaseRole resources, cert-manager TLS, Ceph bucket provisioning, Barman Cloud
 plugin backups, scheduled backups, generated/recovered credentials, optional
 superuser client certificates, and a chart-owned PodMonitor.
 
-## Compatibility contract
+## Values
 
-Version 0.2.x preserves the resource identities and specs rendered by 0.1.0 for
-existing homelab values. New behavior requires an explicit opt-in, with two
-exceptions that every deployed consumer already overrides: since 0.2.2 there is
-no default image tag, and since 0.2.3 `tls.profile` defaults to `cnpg`. Values
-that relied on the old defaults must set `image.tag` and `tls.profile: legacy`. The old keys
-remain supported, including `databaseName`, `clientUsername`, `storageSize`,
-`storageClass`, `initdb`, `certificateIssuerRef`, and `backup.storageClassName`.
-Existing image pins, bootstrap SQL, credentials, certificates, storage,
-in-tree WAL archiving, and operator-owned monitoring remain unchanged.
+Start a new cluster from [examples/modern.yaml](examples/modern.yaml);
+[examples/existing.yaml](examples/existing.yaml) uses credential Secrets managed
+elsewhere. Chart 0.3.0 removed the compatibility layer for chart 0.1.0 values:
+the aliases `replicaCount`, `clientUsername`, `databaseName`,
+`userCredsSecretName`, `superuserCredsSecretName`, `postgresqlConfig`,
+`storageSize`, `storageClass`, `certificateIssuerRef` and
+`backup.storageClassName`, plus `tls.profile`, `backup.provider: inTree` and
+`monitoring.mode: operator`. Values that still set them fail schema validation.
 
 The resource-level `helm.sh/chart` label reports the new chart version. Legacy
 pod labels and topology selectors deliberately retain `postgresql-0.1.0`:
 changing that selector triggers CNPG rolling updates. Set
 `scheduling.topologySpreadSelector: stable` to adopt `cnpg.io/cluster` during a
 maintenance window. Subsequent chart releases then do not affect that selector.
-
-Old and new settings can coexist. Explicit new settings take precedence:
-
-| New setting | Legacy setting it replaces |
-| --- | --- |
-| `instances` | `replicaCount` when non-null |
-| `postgresql` | The whole `postgresqlConfig` object when non-null; `{}` clears it |
-| `credentials.existing.userSecretName` | `userCredsSecretName` when the nested field is present |
-| `credentials.existing.superuserSecretName` | `superuserCredsSecretName` when present; `""` clears the reference |
-| `backup.objectBucket.storageClassName` | `backup.storageClassName` when present |
-| `database.localeCType`, `database.localeCollate` | Corresponding `initdb` locales when present; also feed the Database CR |
-| `credentials.mode: generated` or `copy` | Legacy credential Secret references; explicit migration required |
-| `tls.issuerRef` | TLS profile issuer and `certificateIssuerRef` when nonempty |
-| `tls.profile: cnpg` (default since 0.2.3) | `certificateIssuerRef`, which only `tls.profile: legacy` reads |
-| `database.name`, `database.owner` | `databaseName`, `clientUsername` when nonempty |
-| `storage` fields | Corresponding `storageSize` and `storageClass` fields |
-| `bootstrap` | The complete generated `bootstrap.initdb` when nonempty |
-| `imageCatalogRef` | `image.repository` and `image.tag` |
-| `databaseRoles` entries | Inline `managed.roles` entries with the same SQL role name |
-| `backup.configuration` | The entire generated Ceph Barman configuration when nonempty |
-
-[examples/compatible-keys.yaml](examples/compatible-keys.yaml) renders exactly the
-same resources as the legacy example using the preferred keys. Migrate names by
-first adding new keys with the same effective values, compare the complete render,
-then remove old keys later. The chart does not infer a feature opt-in from a key
-rename: nested existing credentials still use the same SealedSecrets, and an
-explicit legacy issuer still issues the same certificates. Keep values valid in
-both syntaxes while they coexist; schema validation applies to both.
-
-For homelab consumers, put the preferred keys in a migration block with comments in
-the existing values file. No additional values file or Application source change
-is needed. Keep legacy aliases during adoption, then consolidate the file after
-verification. Update the preferred keys in the block when both forms exist: editing
-only a legacy alias will not change its effective value. Never repeat the same YAML
-mapping key in two blocks; merge fields into the existing mapping when necessary.
 
 `credentials.existing` only applies in existing mode. Generated/copy modes select
 their own target names. A nonempty native `bootstrap` still replaces the entire
@@ -68,8 +32,7 @@ Changing a value does not migrate database contents. In particular, new database
 names do not rename an existing database, and bootstrap does not restore an existing
 Cluster. Changing the PostgreSQL major version in the image tag, or
 `imageCatalogRef.major`, is not inert: CNPG starts an offline in-place major
-upgrade. See [Major upgrades](#major-upgrades). Keep identities unchanged when
-first adopting the new keys.
+upgrade. See [Major upgrades](#major-upgrades).
 
 `clusterSpec` accepts additional native Cluster.spec fields such as `walStorage`,
 `probes`, `tablespaces`, `serviceAccountTemplate`, `replica`, `podSelectorRefs`, or
@@ -86,13 +49,13 @@ for resources that the chart coordinates.
 
 | Netail setting | Preferred homelab setting | Difference |
 | --- | --- | --- |
-| `database.name`, `owner`, locales, extensions | Same `database` fields | Locales also override generated initdb settings; CR remains opt-in |
-| `replicaCount` | `instances` | Native CNPG naming; old name remains supported |
-| `postgresqlConfig` | `postgresql` | Native CNPG object, including parameters and pg_hba; old name remains supported |
+| `database.name`, `owner`, locales, extensions | Same `database` fields | Locales also override `initdb` locales; CR remains opt-in |
+| `replicaCount` | `instances` | Native CNPG naming |
+| `postgresqlConfig` | `postgresql` | Native CNPG object, including parameters and pg_hba |
 | `storageSize`, `storageClass` | `storage.size`, `storage.storageClass` | Native StorageConfiguration allows additional settings |
-| `certificateIssuerRef` | `tls.issuerRef` or `tls.profile: cnpg` | Explicit override plus operator/external TLS modes |
+| `certificateIssuerRef` | `tls.issuerRef` (default ClusterIssuer `cnpg-ca`) | Explicit override plus operator/external TLS modes |
 | `externalSecrets.passwordGenerator.excludeSymbols` | `credentials.password.symbols: 0` | Full Password generator settings, credential modes, and rotation controls |
-| `walArchiving.enabled` | `backup.provider: plugin` | Explicit backend selection also preserves in-tree backups during migration |
+| `walArchiving.enabled` | `backup.provider: plugin` (default) | Explicit backend selection, or `none` |
 | `walArchiving.destinationPath`, `wal`, `data` | `backup.configuration.destinationPath`, `wal`, `data` | Complete native Barman configuration, including non-AWS credentials/endpoints |
 | `walArchiving.retentionPolicy`, `sidecar` | `backup.retentionPolicy`, `backup.objectStore.instanceSidecarConfiguration` | Plugin settings grouped with backups |
 | `backup.enabled`, `schedule`, `method`, `immediate` | Corresponding fields under `backup.scheduled` | Separate schedule from archive configuration; snapshots supported |
@@ -102,10 +65,7 @@ for resources that the chart coordinates.
 | PushSecret/KMS settings under `externalSecrets` | Not implemented by request | SealedSecret compatibility and generation do not imply external escrow |
 
 Homelab also exposes `databases`, `databaseRoles`, `managed`, `imageCatalogRef`,
-`clusterSpec`, and monitoring options. Do not copy Netail's image, replica, storage,
-checksum, backup, credential-generation, or issuer defaults onto existing clusters
-as part of a naming cleanup. The preferred schema and changing runtime behavior
-are separate migrations.
+`clusterSpec`, and monitoring options.
 
 ## Feature prerequisites
 
@@ -124,7 +84,7 @@ depend on API discovery, so Argo CD and offline Helm render the same manifests.
 | `monitoring.mode: podMonitor` | Prometheus Operator PodMonitor CRD and a matching Prometheus selector |
 | `credentials.mode: generated` | ESO ExternalSecret v1 and Password v1alpha1 CRDs; validated against ESO 2.11.0 |
 | `credentials.mode: copy` | ESO SecretStore/ExternalSecret v1; source Secrets available in this namespace |
-| `tls.profile: cnpg` | Ready `cnpg-ca` ClusterIssuer from homelab cert-issuers; clients trust the estate root |
+| Default `tls.issuerRef` | Ready `cnpg-ca` ClusterIssuer from homelab cert-issuers; clients trust the estate root |
 | `tls.mode: certManager` | cert-manager and the configured issuer, whose Secrets contain `ca.crt` |
 
 The live homelab was CNPG 1.28.1 on Kubernetes 1.31.14 during the
@@ -154,11 +114,6 @@ colliding normalized names instead of truncating or merging identities. Use
 chart fields do not reach the CNPG spec. Map-key changes alone do not rename CRs.
 See [Kubernetes naming constraints](https://kubernetes.io/docs/concepts/overview/working-with-objects/names/).
 
-Version 0.2.0 used `<cluster>-app` and `<cluster>-<map-key>` for these CRs. If those
-resources were already deployed, set explicit `resourceName` overrides to their
-existing names before upgrading. Creating a second Database CR for the same SQL
-database is not an ownership transfer. No Database CRs were live in the homelab
-when this naming change was prepared on 2026-10-02.
 
 The default Database/DatabaseRole/Pooler/ScheduledBackup wave is one greater than
 the Cluster wave, so Argo CD waits for a healthy Cluster (including a plugin
@@ -208,8 +163,8 @@ An explicit `clientCertificate.enabled: false` is allowed with any TLS mode.
 
 ## Credentials and rotation
 
-`credentials.mode: existing` preserves the legacy SealedSecret references and
-renders no ESO resources. Do not point ESO at a Secret still reconciled by Sealed
+`credentials.mode: existing` references Secrets managed elsewhere, such as
+SealedSecrets, and renders no ESO resources. Do not point ESO at a Secret still reconciled by Sealed
 Secrets: the controllers would compete over its data.
 
 [examples/generated.yaml](examples/generated.yaml) opts into
@@ -247,10 +202,7 @@ When superuser access is enabled, an explicit superuser Secret is required.
 Password generators, ExternalSecrets and their target Secrets. Changing a
 generator or ExternalSecret identity can generate a fresh password even with
 scheduled rotation disabled. Keep deployed identities stable until a deliberate
-credential migration. Version 0.2.0's generated mode used CNPG-owned targets with
-Merge; that implementation was never activated in the homelab and is removed.
-Any external deployment of that mode needs a deliberate Secret ownership and
-reference migration before adopting this version.
+credential migration.
 
 Rotation is disabled by default. The ExternalSecret then uses
 `refreshPolicy: CreatedOnce` (with `refreshInterval: 0s`, so the CRD default of
@@ -316,12 +268,11 @@ its inherited pod metadata. All referenced Secrets must be in the workload's
 namespace. Reloader restarts consumers; CNPG reloads the database password.
 These operations are asynchronous and do not guarantee uninterrupted new
 connections. Test reconnects and rolling availability for each application
-before enabling rotation. Reloader is absent from the live cluster as checked
-2026-10-01; automatic rotation remains deferred. See
+before enabling rotation. See
 [Reloader's workload configuration](https://github.com/stakater/Reloader#how-to-use-reloader).
 
-For an existing cluster, leave `existing` on the initial chart upgrade. Migrate
-credentials separately: back up the current credential Secrets, record all app
+To move an existing cluster from `existing` to `generated` credentials, back up
+the current credential Secrets, record all app
 references (including data keys) and managed-role passwordSecret references, adopt the new target
 names deliberately, wait for ESO/CNPG reconciliation, and verify authentication
 before switching consumers. Existing `bootstrap.initdb` fields do not reinitialize
@@ -341,8 +292,8 @@ do not track later ESO-generated passwords.
 It copies username/password from explicitly named Secrets in the same namespace
 into `<new-cluster>-recovery-<role-name>`, optionally including `postgres`, and rebuilds
 connection fields for the replacement hostname. It checks the copied username
-against the intended role. The new bootstrap Secret reference overrides the
-legacy name and any explicit `bootstrap.recovery.secret`.
+against the intended role. The new bootstrap Secret reference overrides any
+explicit `bootstrap.recovery.secret`.
 
 The physical backup contains role password hashes but no Kubernetes Secrets.
 CNPG applies the copied application's password after promotion using the declared
@@ -370,17 +321,15 @@ it did not issue a `postgres` superuser client certificate. Set
 CN `postgres` and client-auth usage. Password-based superuser access remains
 independent and disabled by default.
 
-`tls.profile` defaults to `cnpg` since 0.2.3: ClusterIssuer `cnpg-ca`, declared
-in homelab's cert-issuers chart under the estate's `k8s-clusters-ca`, so replica
-clusters on other Kubernetes clusters share its root. This profile also
-includes full service FQDN SANs. Clusters created earlier set
-`tls.profile: legacy`, which keeps the `apps-ca-issuer` signer from
-`certificateIssuerRef` and their original SANs, until a planned certificate
-migration. `tls.issuerRef` explicitly overrides either profile.
+Certificates come from ClusterIssuer `cnpg-ca`, declared in homelab's
+cert-issuers chart under the estate's `k8s-clusters-ca`, so replica clusters on
+other Kubernetes clusters share its root. The server certificate includes full
+service FQDN SANs. `tls.issuerRef` explicitly overrides the issuer.
 
 Sync the new CA first and verify its Certificate and ClusterIssuer are Ready.
-Before migrating an existing cluster, distribute the new root trust to consumers,
-then change issuer/profile during a planned certificate migration. Verify the
+Before moving an existing cluster to another issuer, distribute the new root
+trust to consumers, then change `tls.issuerRef` during a planned certificate
+migration. Verify the
 issued leaf chains and client connections before retiring old trust. Server
 clients can mount the existing `homelab-root-ca` bundle in namespaces
 labelled `bundle.benfu.me/inject: "true"`. No additional root bundle is needed.
@@ -413,40 +362,20 @@ No broad HBA rule is injected automatically.
 
 ## Backups and recovery
 
-Legacy `backup.provider: inTree` preserves the existing Ceph endpoint, bucket,
-credential Secret keys, WAL compression, and retention. Setting
-`backup.scheduled.enabled: true` adds a ScheduledBackup with the corresponding
-method. Schedules have six fields, with seconds first. `immediate: true` triggers
-a backup on initial schedule creation. WAL archiving alone is not a base backup.
-
-To migrate an existing archive to the Barman plugin:
-
-1. Install and verify compatible plugin/controller versions and CRDs. Confirm the
-   existing bucket, Secrets, archival health, and a restorable base backup.
-2. Plan for a rolling restart. Set only `backup.provider: plugin` initially.
-   Keep `backup.objectBucket.enabled: true`, the Cluster name, image, endpoint,
-   destination, and credentials unchanged. The chart creates an ObjectStore with
-   the same configuration and moves retention there. In one Cluster spec update,
-   it removes in-tree Barman configuration and activates the WAL archiver plugin.
-3. Enable the schedule if needed. Verify plugin readiness, continuous archiving,
-   a completed base backup, and recovery into a separate Cluster before treating
-   the migration as proven. Update alert/dashboard queries for plugin metric names.
-4. Only after backups work, consider moving from a system image with bundled
-   Barman to an explicitly pinned standard/minimal image at the same PostgreSQL
-   major. Keep the version tag when pinning a digest: `repository:tag@digest`.
-
-Follow the [upstream migration procedure](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/)
-and [observability guidance](https://cloudnative-pg.io/plugin-barman-cloud/docs/observability/).
-In-tree Barman is deprecated and scheduled for removal in CNPG 1.31. Its default
-here is a compatibility bridge, not the recommendation for new installations.
+`backup.provider: plugin`, the default, archives WAL through the Barman Cloud
+plugin to the Ceph bucket of `backup.objectBucket`, with gzip WAL compression and
+the configured retention on the ObjectStore. Setting
+`backup.scheduled.enabled: true` adds a ScheduledBackup. Schedules have six
+fields, with seconds first. `immediate: true` triggers a backup on initial
+schedule creation. WAL archiving alone is not a base backup. See the plugin's
+[observability guidance](https://cloudnative-pg.io/plugin-barman-cloud/docs/observability/).
 
 `backup.configuration` is a complete native Barman configuration. It replaces
 Ceph defaults rather than mixing credential providers. For an externally managed
 ObjectStore, use `backup.objectStore.existingName`; configure retention and
 credentials on that resource. Disabling `backup.objectBucket.enabled` removes
 the OBC from desired manifests and may cause GitOps pruning and bucket deletion.
-Do not disable it just to switch backup providers. `backup.provider: none` alone
-keeps the claim but stops archiving.
+`backup.provider: none` alone keeps the claim but stops archiving.
 
 The Barman Cloud plugin supports only a recovery-window retention, applied to every
 base backup in the archive, and it takes the ObjectStore and server name for a
@@ -550,17 +479,14 @@ initdb, stable scheduling labels, switchover updates, and an
 explicit PodMonitor. It is a starting point for a new cluster, not an overlay to
 apply wholesale to an existing database. Select a current operand image for the
 required PostgreSQL major, or use an existing ImageCatalog via `imageCatalogRef`.
-The chart has no default image tag since 0.2.2: every release sets `image.tag`
-or `imageCatalogRef`. All homelab consumers already pinned a tag.
+The chart has no default image tag: every release sets `image.tag` or
+`imageCatalogRef`.
 
-`monitoring.mode: podMonitor` disables the deprecated operator-created monitor
-and creates `<cluster>-metrics`, avoiding ownership conflicts with the existing
-`<cluster>` monitor. Like the operator's monitor, it selects
+`monitoring.mode: podMonitor`, the default, creates `<cluster>-metrics`. Like
+CNPG's deprecated operator-created monitor, it selects
 `cnpg.io/podRole: instance`; Pooler pods share `cnpg.io/cluster` and also expose
 a `metrics` port. With `monitoring.configuration.tls.enabled`, every endpoint
-defaults to HTTPS, the server CA Secret and server name `<cluster>-rw`. Ensure Prometheus selects the new monitor's labels and
-scrapes it successfully; remove any old monitor left behind after checking
-ownership. See [CNPG monitoring](https://cloudnative-pg.io/docs/1.30/monitoring/).
+defaults to HTTPS, the server CA Secret and server name `<cluster>-rw`. Ensure Prometheus selects the monitor's labels. See [CNPG monitoring](https://cloudnative-pg.io/docs/1.30/monitoring/).
 
 `postgresql` accepts native configuration, including synchronous replication
 and supported extension-image definitions. Extension image volumes additionally
@@ -581,11 +507,11 @@ later is not. See [storage](https://cloudnative-pg.io/docs/1.30/storage/).
 From the repository root:
 
 ```sh
-helm lint charts/postgresql --strict -f charts/postgresql/examples/legacy.yaml
+helm lint charts/postgresql --strict -f charts/postgresql/examples/existing.yaml
 python -m pytest charts/postgresql/tests -q
 python scripts/validate_postgresql_schemas.py --cache /tmp/postgresql-schema-sources
 python scripts/check_postgresql_consumers.py \
-  --baseline-ref fc4c7194ec2fb1e2adf2fbe201bad3f8b80aeb9c \
+  --baseline-ref <commit the consumers pin> \
   --manifests ../kubernetes-manifests
 ```
 
@@ -594,8 +520,8 @@ checksum-locked upstream CRDs into its external cache, reuses repository
 Certificate/PodMonitor and Kubernetes schemas, ESO 2.11.0 CRDs, and rejects
 unknown native fields. It does not
 evaluate Kubernetes CEL, admission webhooks, credentials, or runtime behavior.
-ObjectBucketClaim compatibility is covered by the original consumer render
-comparison rather than upstream schema validation.
+The consumer render comparison, not upstream schema validation, covers the
+ObjectBucketClaim.
 
 The consumer checker renders the actual Argo Applications and compares every
 resource spec and identity, ignoring only the CR chart-version label and empty

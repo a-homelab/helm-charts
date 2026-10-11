@@ -1,0 +1,13 @@
+# Credentials from Secrets managed elsewhere, such as SealedSecrets, with
+# username and password keys. The Secrets must exist before the Cluster.
+fullnameOverride: example-postgres
+image:
+  tag: "18.6-standard-trixie"
+database:
+  name: app
+  owner: app
+credentials:
+  mode: existing
+  existing:
+    userSecretName: example-app
+    superuserSecretName: example-superuser

@@ -10,5 +10,4 @@ credentials:
   rotation:
     enabled: false
 tls:
-  profile: cnpg
   superuserCertificate: true

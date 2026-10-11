@@ -1,8 +1,12 @@
 image:
   tag: "18.6-system-trixie"
-clientUsername: app
-databaseName: app
-userCredsSecretName: example-app
+database:
+  name: app
+  owner: app
+credentials:
+  mode: existing
+  existing:
+    userSecretName: example-app
 backup:
   volumeSnapshot:
     className: database-snapshots

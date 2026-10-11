@@ -7,7 +7,7 @@ import yaml
 CHART = Path(__file__).resolve().parents[1]
 
 
-def render(tmp_path, values=None, example="legacy", success=True):
+def render(tmp_path, values=None, example="existing", success=True):
     overlay = tmp_path / "values.yaml"
     overlay.write_text(yaml.safe_dump(values or {}))
     result = subprocess.run(
@@ -40,7 +40,24 @@ def one(resources, kind):
     return matches[0]
 
 
-def test_legacy_preserves_identity_bootstrap_tls_and_archive(tmp_path):
+DEFAULT_ARCHIVE = {
+    "destinationPath": "s3://example-postgres-backup/",
+    "endpointURL": "http://rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc",
+    "s3Credentials": {
+        "accessKeyId": {
+            "name": "example-postgres-backup-bucket",
+            "key": "AWS_ACCESS_KEY_ID",
+        },
+        "secretAccessKey": {
+            "name": "example-postgres-backup-bucket",
+            "key": "AWS_SECRET_ACCESS_KEY",
+        },
+    },
+    "wal": {"compression": "gzip", "maxParallel": 8},
+}
+
+
+def test_existing_credentials_identity_bootstrap_tls_and_archive(tmp_path):
     resources = render(tmp_path)
     assert sorted(d["kind"] for d in resources) == [
         "Certificate",
@@ -48,11 +65,13 @@ def test_legacy_preserves_identity_bootstrap_tls_and_archive(tmp_path):
         "Certificate",
         "Cluster",
         "ObjectBucketClaim",
+        "ObjectStore",
+        "PodMonitor",
     ]
     cluster = one(resources, "Cluster")
     assert cluster["metadata"]["name"] == "example-postgres"
     spec = cluster["spec"]
-    assert spec["imageName"] == "ghcr.io/cloudnative-pg/postgresql:15.3"
+    assert spec["imageName"] == "ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie"
     assert spec["instances"] == 3
     assert spec["bootstrap"] == {
         "initdb": {
@@ -73,35 +92,26 @@ def test_legacy_preserves_identity_bootstrap_tls_and_archive(tmp_path):
         "clientCASecret": "example-postgres-client-replica-tls",
         "replicationTLSSecret": "example-postgres-client-replica-tls",
     }
-    assert spec["backup"] == {
-        "target": "prefer-standby",
-        "retentionPolicy": "30d",
-        "barmanObjectStore": {
-            "destinationPath": "s3://example-postgres-backup/",
-            "endpointURL": "http://rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc",
-            "s3Credentials": {
-                "accessKeyId": {
-                    "name": "example-postgres-backup-bucket",
-                    "key": "AWS_ACCESS_KEY_ID",
-                },
-                "secretAccessKey": {
-                    "name": "example-postgres-backup-bucket",
-                    "key": "AWS_SECRET_ACCESS_KEY",
-                },
-            },
-            "wal": {"compression": "gzip", "maxParallel": 8},
-        },
-    }
+    assert spec["backup"] == {"target": "prefer-standby"}
+    assert spec["plugins"] == [
+        {
+            "name": "barman-cloud.cloudnative-pg.io",
+            "isWALArchiver": True,
+            "parameters": {"barmanObjectName": "example-postgres"},
+        }
+    ]
+    store = one(resources, "ObjectStore")["spec"]
+    assert store["configuration"] == DEFAULT_ARCHIVE
+    assert store["retentionPolicy"] == "30d"
     assert one(resources, "ObjectBucketClaim")["spec"] == {
         "bucketName": "example-postgres-backup",
         "storageClassName": "rook-ceph-bucket-ssd",
     }
-    assert spec["monitoring"] == {"enablePodMonitor": True}
+    assert spec["monitoring"] == {"enablePodMonitor": False}
     assert "managed" not in spec
-    assert "plugins" not in spec
 
 
-def test_legacy_locale_sql_and_custom_image_survive(tmp_path):
+def test_locale_sql_and_custom_image_survive(tmp_path):
     resources = render(
         tmp_path,
         {
@@ -109,7 +119,7 @@ def test_legacy_locale_sql_and_custom_image_survive(tmp_path):
                 "repository": "bennycooly/cloudnative-pg-timescaledb",
                 "tag": "15.4-debian-timescaledb-2.12.2",
             },
-            "postgresqlConfig": {"shared_preload_libraries": ["timescaledb"]},
+            "postgresql": {"shared_preload_libraries": ["timescaledb"]},
             "initdb": {
                 "localeCType": "en_US.UTF-8",
                 "localeCollate": "en_US.UTF-8",
@@ -128,26 +138,9 @@ def test_legacy_locale_sql_and_custom_image_survive(tmp_path):
     ]
 
 
-def test_plugin_migration_preserves_bucket_and_archive_configuration(tmp_path):
-    legacy = render(tmp_path)
-    migrated = render(
-        tmp_path, {"backup": {"provider": "plugin", "scheduled": {"enabled": True}}}
-    )
-    old = one(legacy, "Cluster")["spec"]
-    new = one(migrated, "Cluster")["spec"]
-    store = one(migrated, "ObjectStore")["spec"]
-    assert store["configuration"] == old["backup"]["barmanObjectStore"]
-    assert store["retentionPolicy"] == old["backup"]["retentionPolicy"]
-    assert one(legacy, "ObjectBucketClaim") == one(migrated, "ObjectBucketClaim")
-    assert new["backup"] == {"target": "prefer-standby"}
-    assert new["plugins"] == [
-        {
-            "name": "barman-cloud.cloudnative-pg.io",
-            "isWALArchiver": True,
-            "parameters": {"barmanObjectName": "example-postgres"},
-        }
-    ]
-    schedule = one(migrated, "ScheduledBackup")["spec"]
+def test_scheduled_plugin_backup(tmp_path):
+    resources = render(tmp_path, {"backup": {"scheduled": {"enabled": True}}})
+    schedule = one(resources, "ScheduledBackup")["spec"]
     assert schedule["method"] == "plugin"
     assert schedule["pluginConfiguration"] == {"name": "barman-cloud.cloudnative-pg.io"}
     assert schedule["immediate"] is True
@@ -243,7 +236,7 @@ def test_recovery_replaces_initdb_and_keeps_source_separate(tmp_path):
 
 def test_snapshot_schedule_keeps_wal_archiving(tmp_path):
     resources = render(tmp_path, example="snapshot")
-    assert "barmanObjectStore" in one(resources, "Cluster")["spec"]["backup"]
+    assert one(resources, "Cluster")["spec"]["plugins"][0]["isWALArchiver"] is True
     assert (
         one(resources, "Cluster")["spec"]["backup"]["volumeSnapshot"]["className"]
         == "database-snapshots"
@@ -632,7 +625,7 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
 @pytest.mark.parametrize(
     "values,message",
     [
-        ({"replicaCount": 0}, "replicaCount"),
+        ({"instances": 0}, "instances"),
         ({"backpu": {}}, "backpu"),
         ({"backup": {"provider": "unknown"}}, "provider"),
         (
@@ -641,11 +634,7 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
         ),
         (
             {"backup": {"provider": "none", "scheduled": {"enabled": True}}},
-            "must match",
-        ),
-        (
-            {"backup": {"scheduled": {"enabled": True, "method": "plugin"}}},
-            "must match",
+            "requires backup.provider=plugin",
         ),
         (
             {"backup": {"scheduled": {"enabled": True, "method": "volumeSnapshot"}}},
@@ -698,8 +687,11 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
             "requires tls.mode=operator",
         ),
         (
-            {"enableSuperuserAccess": True, "superuserCredsSecretName": None},
-            "superuserCredsSecretName is required",
+            {
+                "enableSuperuserAccess": True,
+                "credentials": {"existing": {"superuserSecretName": ""}},
+            },
+            "credentials.existing.superuserSecretName is required",
         ),
         (
             {
@@ -715,7 +707,10 @@ def test_false_values_and_zero_wave_are_preserved(tmp_path):
             {"monitoring": {"configuration": {"enablePodMonitor": True}}},
             "use monitoring.mode",
         ),
-        ({"backup": {"serverName": "pg18"}}, "backup.serverName requires"),
+        (
+            {"backup": {"provider": "none", "serverName": "pg18"}},
+            "backup.serverName requires",
+        ),
         (
             {
                 "tls": {
@@ -732,7 +727,7 @@ def test_invalid_configuration_fails_before_apply(tmp_path, values, message):
     assert message in render(tmp_path, values, success=False)
 
 
-def test_new_keys_override_legacy_keys_without_duplicate_role_controllers(tmp_path):
+def test_database_roles_replace_inline_roles_of_the_same_name(tmp_path):
     resources = render(
         tmp_path,
         {
@@ -833,7 +828,7 @@ def test_generated_credentials_create_named_secrets_and_disable_scheduled_rotati
 
 
 @pytest.mark.parametrize(
-    "example,mode", [("legacy", "generated"), ("recovery", "copy")]
+    "example,mode", [("existing", "generated"), ("recovery", "copy")]
 )
 @pytest.mark.parametrize("admin", [False, True])
 def test_eso_targets_are_explicit_cluster_credentials(tmp_path, example, mode, admin):
@@ -1116,16 +1111,8 @@ def test_recovery_copy_restricts_reads_and_retains_secrets_after_removal(tmp_pat
     assert not any(d["kind"] == "Password" for d in resources)
 
 
-def test_new_tls_profile_and_issuer_override_preserve_legacy_fallback(tmp_path):
-    legacy = render(tmp_path)
-    assert all(
-        d["spec"]["issuerRef"]["name"] == "apps-ca-issuer"
-        for d in legacy
-        if d["kind"] == "Certificate"
-    )
-    modern = render(
-        tmp_path, {"tls": {"profile": "cnpg", "superuserCertificate": True}}
-    )
+def test_cnpg_ca_issuer_superuser_certificate_and_issuer_override(tmp_path):
+    modern = render(tmp_path, {"tls": {"superuserCertificate": True}})
     certs = [d for d in modern if d["kind"] == "Certificate"]
     assert len(certs) == 4
     assert all(d["spec"]["issuerRef"]["name"] == "cnpg-ca" for d in certs)
@@ -1138,7 +1125,7 @@ def test_new_tls_profile_and_issuer_override_preserve_legacy_fallback(tmp_path):
     assert "postgresql" not in one(modern, "Cluster")["spec"]
     override = render(
         tmp_path,
-        {"tls": {"profile": "cnpg", "issuerRef": {"name": "custom", "kind": "Issuer"}}},
+        {"tls": {"issuerRef": {"name": "custom", "kind": "Issuer"}}},
     )
     assert all(
         d["spec"]["issuerRef"] == {"name": "custom", "kind": "Issuer"}
@@ -1263,19 +1250,11 @@ def test_copy_template_rejects_wrong_username_instead_of_relabeling_password(tmp
     assert rendered["host"] == "example-restored-rw"
 
 
-def test_schema_only_migration_is_identical_to_legacy_values(tmp_path):
-    assert render(tmp_path, example="compatible-keys") == render(tmp_path)
-
-
-def test_canonical_keys_override_legacy_values_together(tmp_path):
+def test_explicit_settings_reach_cluster_database_and_bucket(tmp_path):
     resources = render(
         tmp_path,
         {
-            "replicaCount": 3,
             "instances": 1,
-            "postgresqlConfig": {
-                "parameters": {"max_connections": "100", "work_mem": "4MB"}
-            },
             "postgresql": {"parameters": {"max_connections": "200"}},
             "credentials": {
                 "existing": {
@@ -1305,49 +1284,13 @@ def test_canonical_keys_override_legacy_values_together(tmp_path):
         assert one(resources, "Database")["spec"][key] == "en_US.UTF-8"
 
 
-def test_empty_native_postgresql_and_superuser_reference_clear_legacy_settings(
-    tmp_path,
-):
+def test_empty_superuser_reference_renders_no_superuser_secret(tmp_path):
     resources = render(
-        tmp_path,
-        {
-            "postgresqlConfig": {"parameters": {"work_mem": "4MB"}},
-            "postgresql": {},
-            "credentials": {"existing": {"superuserSecretName": ""}},
-        },
+        tmp_path, {"credentials": {"existing": {"superuserSecretName": ""}}}
     )
     spec = one(resources, "Cluster")["spec"]
     assert "postgresql" not in spec
     assert "superuserSecret" not in spec
-    assert "superuserCredsSecretName is required" in render(
-        tmp_path,
-        {
-            "enableSuperuserAccess": True,
-            "credentials": {"existing": {"superuserSecretName": ""}},
-        },
-        success=False,
-    )
-
-
-def test_null_native_settings_inherit_legacy_and_nested_admin_satisfies_validation(
-    tmp_path,
-):
-    resources = render(
-        tmp_path,
-        {
-            "instances": None,
-            "postgresql": None,
-            "replicaCount": 2,
-            "postgresqlConfig": {"enableAlterSystem": False},
-            "enableSuperuserAccess": True,
-            "superuserCredsSecretName": None,
-            "credentials": {"existing": {"superuserSecretName": "nested-admin"}},
-        },
-    )
-    spec = one(resources, "Cluster")["spec"]
-    assert spec["instances"] == 2
-    assert spec["postgresql"] == {"enableAlterSystem": False}
-    assert spec["superuserSecret"] == {"name": "nested-admin"}
 
 
 def test_native_bootstrap_and_generated_credentials_keep_their_precedence(tmp_path):

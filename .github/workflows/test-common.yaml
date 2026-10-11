@@ -47,7 +47,7 @@ jobs:
           helm lint charts/common-tests --strict
           helm lint charts/blender --strict
           helm lint charts/opencode --strict
-          helm lint charts/postgresql --strict -f charts/postgresql/examples/legacy.yaml
+          helm lint charts/postgresql --strict -f charts/postgresql/examples/existing.yaml
       - name: Install helm-unittest
         if: startsWith(matrix.helm, 'v3.')
         run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.5.2

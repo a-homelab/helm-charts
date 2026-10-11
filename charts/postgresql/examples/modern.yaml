@@ -12,7 +12,6 @@ database:
 credentials:
   mode: generated
 tls:
-  profile: cnpg
   superuserCertificate: true
 initdb:
   dataChecksums: true

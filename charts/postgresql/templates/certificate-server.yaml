@@ -36,11 +36,9 @@ spec:
     - "{{ include "postgresql.fullname" . }}-ro"
     - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}"
     - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}.svc"
-    {{- if eq .Values.tls.profile "cnpg" }}
     - "{{ include "postgresql.fullname" . }}-rw.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
     - "{{ include "postgresql.fullname" . }}-r.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
     - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
-    {{- end }}
     {{- range concat (include "postgresql.poolerDNSNames" . | fromJsonArray) .Values.tls.serverAltDNSNames }}
     - {{ . | quote }}
     {{- end }}

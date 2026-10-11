@@ -8,5 +8,5 @@ metadata:
     {{- include "postgresql.annotations" . | nindent 4 }}
 spec:
   bucketName: "{{ include "postgresql.fullname" . }}-backup"
-  storageClassName: {{ include "postgresql.bucketStorageClassName" . | quote }}
+  storageClassName: {{ .Values.backup.objectBucket.storageClassName | quote }}
 {{- end }}

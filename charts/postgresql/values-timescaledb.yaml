@@ -3,7 +3,7 @@ image:
   repository: bennycooly/cloudnative-pg-timescaledb
   tag: "15.4-debian-timescaledb-2.12.2"
 
-postgresqlConfig:
+postgresql:
   shared_preload_libraries:
     - timescaledb
 

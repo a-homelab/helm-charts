@@ -28,17 +28,9 @@ spec:
   imagePullSecrets:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- if eq (kindOf .Values.instances) "invalid" }}
-  instances: {{ .Values.replicaCount }}
-  {{- else }}
   instances: {{ .Values.instances }}
-  {{- end }}
   enableSuperuserAccess: {{ .Values.enableSuperuserAccess }}
-  {{- $postgresql := .Values.postgresqlConfig }}
-  {{- if ne (kindOf .Values.postgresql) "invalid" }}
-  {{- $postgresql = .Values.postgresql }}
-  {{- end }}
-  {{- with $postgresql }}
+  {{- with .Values.postgresql }}
   postgresql:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -70,7 +62,7 @@ spec:
       {{- if hasKey $.Values.database $key }}{{- $_ := set $initdb $key (get $.Values.database $key) }}{{- end }}
       {{- end }}
       {{- if eq .Values.credentials.mode "existing" }}
-      {{- $_ := set $initdb "secret" (dict "name" (required "credentials.existing.userSecretName or userCredsSecretName is required" (include "postgresql.userSecretName" .))) }}
+      {{- $_ := set $initdb "secret" (dict "name" (required "credentials.existing.userSecretName is required" (include "postgresql.userSecretName" .))) }}
       {{- else }}
       {{- $_ := set $initdb "secret" (dict "name" (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app"))) }}
       {{- end }}
@@ -111,7 +103,7 @@ spec:
   primaryUpdateStrategy: {{ .Values.primaryUpdateStrategy }}
   primaryUpdateMethod: {{ .Values.primaryUpdateMethod }}
   storage:
-    {{- mustMergeOverwrite (dict "storageClass" .Values.storageClass "size" .Values.storageSize) (deepCopy .Values.storage) | toYaml | nindent 4 }}
+    {{- toYaml .Values.storage | nindent 4 }}
   {{- with .Values.affinity }}
   affinity:
     {{- toYaml . | nindent 4 }}
@@ -146,11 +138,6 @@ spec:
   {{- end }}
   backup:
     target: {{ .Values.backup.target }}
-    {{- if eq .Values.backup.provider "inTree" }}
-    barmanObjectStore:
-      {{- include "postgresql.backupConfiguration" . | nindent 6 }}
-    retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
-    {{- end }}
     {{- with .Values.backup.volumeSnapshot }}
     volumeSnapshot:
       {{- toYaml . | nindent 6 }}
@@ -158,7 +145,8 @@ spec:
   replicationSlots:
     {{- mustMergeOverwrite (dict "highAvailability" (dict "enabled" true)) (deepCopy .Values.replicationSlots) | toYaml | nindent 4 }}
   monitoring:
-    {{- mustMergeOverwrite (deepCopy .Values.monitoring.configuration) (dict "enablePodMonitor" (eq .Values.monitoring.mode "operator")) | toYaml | nindent 4 }}
+    {{- /* Explicit false, CNPG's default: the chart owns any PodMonitor. */}}
+    {{- mustMergeOverwrite (deepCopy .Values.monitoring.configuration) (dict "enablePodMonitor" false) | toYaml | nindent 4 }}
   {{- with .Values.clusterSpec }}
   {{- toYaml . | nindent 2 }}
   {{- end }}

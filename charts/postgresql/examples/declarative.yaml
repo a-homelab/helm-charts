@@ -1,12 +1,15 @@
 image:
   tag: "18.6-system-trixie"
 fullnameOverride: example-postgres
-clientUsername: app
-databaseName: app
-userCredsSecretName: example-app
+credentials:
+  mode: existing
+  existing:
+    userSecretName: example-app
 syncWave: "-5"
 database:
   enabled: true
+  name: app
+  owner: app
   extensions:
     - name: pg_trgm
       ensure: present

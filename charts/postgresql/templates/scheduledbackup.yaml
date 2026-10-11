@@ -1,5 +1,5 @@
 {{- if .Values.backup.scheduled.enabled }}
-{{- $method := .Values.backup.scheduled.method | default (ternary "plugin" "barmanObjectStore" (eq .Values.backup.provider "plugin")) }}
+{{- $method := .Values.backup.scheduled.method | default "plugin" }}
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
