@@ -1,12 +1,11 @@
 import argparse
-import hashlib
 import json
 import subprocess
 from pathlib import Path
-from urllib.request import urlopen
 
 import jsonschema
 import yaml
+from download import cached_download
 from update_common_schemas import reduce_schema
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,12 +29,7 @@ def load_schemas(cache):
     cache.mkdir(parents=True, exist_ok=True)
     for name, source in sources.items():
         path = cache / name
-        if not path.exists():
-            with urlopen(source["url"], timeout=30) as response:
-                path.write_bytes(response.read())
-        payload = path.read_bytes()
-        if hashlib.sha256(payload).hexdigest() != source["sha256"]:
-            raise ValueError(f"Upstream checksum mismatch: {name}")
+        payload = cached_download(source["url"], path, source["sha256"], timeout=30)
         crd = yaml.safe_load(payload)
         schema = reduce_schema(
             next(v for v in crd["spec"]["versions"] if v["storage"])["schema"][

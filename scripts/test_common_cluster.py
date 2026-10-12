@@ -2,7 +2,6 @@
 
 import argparse
 import copy
-import hashlib
 import json
 import shutil
 import socket
@@ -14,6 +13,7 @@ from urllib.request import Request, urlopen
 
 import yaml
 from common_schema import ROOT, compose, validate_manifest
+from download import cached_download
 
 
 def run(*args, data=None, check=True, timeout=180):
@@ -61,11 +61,7 @@ def main():
         if name.startswith("kubernetes-"):
             continue
         path = args.cache / name
-        if not path.exists():
-            with urlopen(source["url"], timeout=120) as response:
-                path.write_bytes(response.read())
-        if hashlib.sha256(path.read_bytes()).hexdigest() != source["sha256"]:
-            raise ValueError(f"CRD checksum mismatch: {name}")
+        cached_download(source["url"], path, source["sha256"])
         for crd in yaml.safe_load_all(path.read_text()):
             if (
                 crd

@@ -1,12 +1,11 @@
 """Rebuild offline output schemas from checksum-locked upstream downloads."""
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
-from urllib.request import urlopen
 
 import yaml
+from download import cached_download
 
 VENDOR = Path(__file__).resolve().parents[1] / "charts/common/schema/vendor"
 
@@ -54,12 +53,7 @@ def main():
     registry = {}
     for name, source in sources.items():
         path = args.cache / name
-        if not path.exists():
-            with urlopen(source["url"], timeout=120) as response:
-                path.write_bytes(response.read())
-        data = path.read_bytes()
-        if hashlib.sha256(data).hexdigest() != source["sha256"]:
-            raise ValueError(f"Upstream checksum mismatch: {name}")
+        data = cached_download(source["url"], path, source["sha256"])
         if name.startswith("kubernetes-"):
             original = json.loads(data)
             schema = reduce_schema(original)
