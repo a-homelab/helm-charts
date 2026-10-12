@@ -36,7 +36,8 @@ image:
   # sha256:<64 hex>. Pins the exact image while keeping the tag for major detection.
   digest: ""
 # Use an ImageCatalog or ClusterImageCatalog instead of image.repository/tag.
-# Mutually exclusive with image.digest. Catalog extensions require CNPG 1.29+.
+# Leave image.tag and image.digest empty with it. All four fields are required.
+# Catalog extensions require CNPG 1.29+.
 # imageCatalogRef:
 #   apiGroup: postgresql.cnpg.io
 #   kind: ClusterImageCatalog

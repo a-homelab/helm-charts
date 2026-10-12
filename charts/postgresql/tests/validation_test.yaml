@@ -309,3 +309,75 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: storageClassName
+
+  - it: rejects image.tag beside an image catalog
+    set:
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: ClusterImageCatalog
+        name: postgresql-minimal-trixie
+        major: 18
+    asserts:
+      - failedTemplate:
+          errorPattern: imageCatalogRef replaces image\.tag and image\.digest
+
+  - it: rejects image.digest beside an image catalog
+    set:
+      image.tag: ""
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: ClusterImageCatalog
+        name: postgresql-minimal-trixie
+        major: 18
+    asserts:
+      - failedTemplate:
+          errorPattern: imageCatalogRef replaces image\.tag and image\.digest
+
+  - it: rejects an image catalog reference without a major
+    set:
+      image.tag: ""
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: ClusterImageCatalog
+        name: postgresql-minimal-trixie
+    asserts:
+      - failedTemplate:
+          errorPattern: major
+
+  - it: rejects an image catalog reference of another kind
+    set:
+      image.tag: ""
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: Cluster
+        name: postgresql-minimal-trixie
+        major: 18
+    asserts:
+      - failedTemplate:
+          errorPattern: imageCatalogRef(\.|/)kind
+
+  - it: rejects a misspelled image catalog field
+    set:
+      image.tag: ""
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: ClusterImageCatalog
+        name: postgresql-minimal-trixie
+        major: 18
+        majr: 18
+    asserts:
+      - failedTemplate:
+          errorPattern: majr
+
+  - it: rejects a string major
+    set:
+      image.tag: ""
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: ClusterImageCatalog
+        name: postgresql-minimal-trixie
+        major: "18"
+    asserts:
+      - failedTemplate:
+          errorPattern: imageCatalogRef(\.|/)major

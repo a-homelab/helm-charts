@@ -463,17 +463,28 @@ yourself. See [connection pooling](https://cloudnative-pg.io/docs/1.30/connectio
 Since CNPG 1.26, changing the image to a newer PostgreSQL major runs an offline
 in-place upgrade with `pg_upgrade --link`. CNPG shuts down every instance, runs an
 upgrade Job, then destroys and re-clones the replicas. Applications have no
-database during the whole operation. If the Job fails, reverting the image
-restarts the old version; CNPG does not modify the original data on failure.
+database during the whole operation. Until the Job succeeds, reverting the image
+restarts the old version. After it succeeds there is no way back in place: the old
+data directory and replica volumes are gone, so recovery means restoring a
+pre-upgrade backup into a new Cluster. CNPG 1.30 accepts only targets of 16 or
+later and allows skipping majors.
+
+The old and new images must be built on the same operating system distribution,
+because the Job runs the old binaries inside the new image. Move a cluster on a
+legacy tag (Debian bullseye) to an image on the target distro at its current major
+first; that is an ordinary rolling update. Changing distro changes glibc, so
+reindex text indexes that use a libc collation other than `C` afterwards.
 
 1. Take and verify a fresh base backup. Confirm that every extension in the
    operand image is available for the target major.
 2. With `backup.enabled`, change `backup.serverName` in the same update
    as the image, for example `<cluster>-pg18`. The Barman Cloud plugin does not
    separate archives by major, and pre-upgrade backups cannot recover to a point
-   after the upgrade.
-3. After the upgrade, take a new base backup and run `ANALYZE`; `pg_upgrade`
-   does not transfer optimizer statistics.
+   after the upgrade. Nothing checks that the new prefix is empty, so confirm it
+   in the bucket first.
+3. After the upgrade, take a new base backup and run `ANALYZE`. Before PostgreSQL
+   18, `pg_upgrade` does not transfer optimizer statistics; from 18 it transfers
+   them except extended statistics.
 
 With `primaryUpdateMethod: switchover`, CNPG rejects changing the image and
 PostgreSQL parameters in one update. Change them in sequence. See
@@ -488,7 +499,7 @@ explicit PodMonitor. It is a starting point for a new cluster, not an overlay to
 apply wholesale to an existing database. Select a current operand image for the
 required PostgreSQL major, or use an existing ImageCatalog via `imageCatalogRef`.
 The chart has no default image tag: every release sets `image.tag` or
-`imageCatalogRef`.
+`imageCatalogRef`, never both, so the values always show the running version.
 
 `monitoring.podMonitor.enabled`, the default, creates `<cluster>-metrics`. Like
 CNPG's deprecated operator-created monitor, it selects

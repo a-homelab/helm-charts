@@ -194,8 +194,8 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- if and (ne .Values.tls.mode "external") .Values.tls.certificates -}}
 {{- fail "tls.certificates requires tls.mode=external" -}}
 {{- end -}}
-{{- if and .Values.imageCatalogRef .Values.image.digest -}}
-{{- fail "imageCatalogRef and image.digest are mutually exclusive" -}}
+{{- if and .Values.imageCatalogRef (or .Values.image.tag .Values.image.digest) -}}
+{{- fail "imageCatalogRef replaces image.tag and image.digest; remove them so the values show the running version" -}}
 {{- end -}}
 {{- if hasKey .Values.monitoring.configuration "enablePodMonitor" -}}
 {{- fail "use monitoring.podMonitor.enabled instead of monitoring.configuration.enablePodMonitor" -}}
