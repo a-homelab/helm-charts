@@ -1,3 +1,4 @@
+import re
 import subprocess
 from pathlib import Path
 
@@ -29,7 +30,11 @@ def render(tmp_path, values=None, example="existing", success=True):
     )
     if not success:
         assert result.returncode != 0, result.stdout
-        return result.stderr
+        # Helm 4 reports schema paths as JSON pointers ('/backup/enabled'),
+        # Helm 3 as dotted paths ('backup.enabled'); compare the dotted form.
+        return re.sub(
+            r"'/([^']*)'", lambda m: m.group(1).replace("/", "."), result.stderr
+        )
     assert result.returncode == 0, result.stderr
     return [doc for doc in yaml.safe_load_all(result.stdout) if doc]
 
