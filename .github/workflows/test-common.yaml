@@ -49,13 +49,12 @@ jobs:
           helm lint charts/opencode --strict
           helm lint charts/postgresql --strict -f charts/postgresql/examples/existing.yaml
       - name: Install helm-unittest
-        if: startsWith(matrix.helm, 'v3.')
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v0.5.2
-      - name: Run unit tests
-        if: startsWith(matrix.helm, 'v3.')
-        run: helm unittest charts/common-tests
-      - name: Validate overlays, references, native outputs and migration examples
-        run: python -m pytest scripts/test_common.py charts/blender/tests charts/opencode/tests charts/postgresql/tests -q
+        # Helm 4 cannot verify plugins installed from a git repository.
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.2 ${{ startsWith(matrix.helm, 'v4.') && '--verify=false' || '' }}
+      - name: Run chart unit tests
+        run: helm unittest charts/common-tests charts/postgresql charts/blender charts/opencode
+      - name: Test chart scripts and schema tooling
+        run: python -m pytest scripts/test_common.py charts/blender/tests charts/opencode/tests -q
       - name: Validate PostgreSQL examples against pinned upstream CRDs
         run: python scripts/validate_postgresql_schemas.py --cache '${{ runner.temp }}/postgresql-schema-sources'
       - name: Render harness fixtures

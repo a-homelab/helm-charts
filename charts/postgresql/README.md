@@ -516,14 +516,16 @@ From the repository root:
 
 ```sh
 helm lint charts/postgresql --strict -f charts/postgresql/examples/existing.yaml
-python -m pytest charts/postgresql/tests -q
+helm unittest charts/postgresql
 python scripts/validate_postgresql_schemas.py --cache /tmp/postgresql-schema-sources
 python scripts/check_postgresql_consumers.py \
   --baseline-ref <commit the consumers pin> \
   --manifests ../kubernetes-manifests
 ```
 
-Python checks require PyYAML, pytest, and jsonschema. The schema checker downloads
+The chart's render and validation tests are helm-unittest suites in `tests/`
+(plugin v1.1.2; on Helm 4 install it with `--verify=false`). The Python checks
+require PyYAML and jsonschema. The schema checker downloads
 checksum-locked upstream CRDs into its external cache, reuses repository
 Certificate/PodMonitor and Kubernetes schemas, ESO 2.11.0 CRDs, and rejects
 unknown native fields. It does not

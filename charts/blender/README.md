@@ -348,6 +348,7 @@ listing and a background Blender call in the prepared environment.
 
 ```sh
 helm lint charts/blender --strict
+helm unittest charts/blender
 uv run --project ~/.agents/toolkit pytest charts/blender/tests
 ```
 

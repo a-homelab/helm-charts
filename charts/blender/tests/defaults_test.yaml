@@ -1,0 +1,110 @@
+suite: CPU-only workspace defaults
+templates:
+  - templates/all.yaml
+release:
+  name: test-blender
+  namespace: test
+tests:
+  - it: renders a CPU workspace with no GPU or MCP exposure
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.strategy
+          value:
+            type: Recreate
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.runtimeClassName
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.spec.containers[0].resources.limits
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.containers[0].resources.limits["nvidia.com/gpu"]
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notEqual:
+          path: kind
+          value: HTTPRoute
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+        documentSelector:
+          path: kind
+          value: Service
+      - contains:
+          path: spec.ports
+          content:
+            port: 3000
+          any: true
+        documentSelector:
+          path: kind
+          value: Service
+      - contains:
+          path: spec.ports
+          content:
+            port: 3001
+          any: true
+        documentSelector:
+          path: kind
+          value: Service
+      - equal:
+          path: spec.template.spec.volumes[?(@.name == "shm")].emptyDir
+          value:
+            medium: Memory
+            sizeLimit: 1Gi
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.spec.volumes[?(@.name == "config")].persistentVolumeClaim
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.spec.volumes[?(@.name == "workspace")].persistentVolumeClaim
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.volumes[?(@.name == "user-scripts")].emptyDir
+          value: {}
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_ENABLED")].value
+          value: "false"
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: does not validate MCP pins while MCP is disabled
+    set:
+      mcp.version: unused
+      mcp.sha256: unused
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_ENABLED")].value
+          value: "false"
+        documentSelector:
+          path: kind
+          value: Deployment

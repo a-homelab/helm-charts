@@ -1,0 +1,171 @@
+suite: poolers
+release:
+  name: test
+  namespace: test
+tests:
+  - it: gives cert-manager Poolers a chart-issued auth_query certificate
+    values:
+      - ../examples/existing.yaml
+    set:
+      poolers.rw.instances: 2
+      poolers.rw.pgbouncer.poolMode: transaction
+      poolers.ro.type: ro
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^example-postgres-pooler-(ro|rw)$
+        documentSelector:
+          path: kind
+          value: Pooler
+          matchMany: true
+      - isKind:
+          of: Pooler
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-ro
+      - isKind:
+          of: Pooler
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-rw
+      - equal:
+          path: spec.cluster
+          value:
+            name: example-postgres
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-rw
+      - equal:
+          path: spec.pgbouncer
+          value:
+            poolMode: transaction
+            authQuerySecret:
+              name: example-postgres-pooler-auth-tls
+            authQuery: SELECT usename, passwd FROM public.user_search($1)
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-rw
+      - equal:
+          path: spec.template
+          value:
+            metadata:
+              annotations:
+                sidecar.istio.io/inject: "false"
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-rw
+      - isKind:
+          of: Certificate
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-auth-tls
+      - equal:
+          path: spec.commonName
+          value: cnpg_pooler_pgbouncer
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-auth-tls
+      # The full list is pinned; the Python test checked that client auth is last.
+      - equal:
+          path: spec.usages
+          value:
+            - digital signature
+            - key encipherment
+            - client auth
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-auth-tls
+      - contains:
+          path: spec.dnsNames
+          content: example-postgres-pooler-ro.test.svc
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-server-tls
+      - contains:
+          path: spec.dnsNames
+          content: example-postgres-pooler-rw.test.svc.cluster.local
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-server-tls
+
+  - it: preserves an explicit pooler auth secret and pod template
+    values:
+      - ../examples/existing.yaml
+    set:
+      poolers.rw.pgbouncer.authQuerySecret.name: custom
+      poolers.rw.template.metadata.annotations:
+        sidecar.istio.io/inject: "true"
+    asserts:
+      - equal:
+          path: spec.pgbouncer
+          value:
+            authQuerySecret:
+              name: custom
+        documentSelector:
+          path: kind
+          value: Pooler
+      - equal:
+          path: spec.template.metadata.annotations
+          value:
+            sidecar.istio.io/inject: "true"
+        documentSelector:
+          path: kind
+          value: Pooler
+      - notEqual:
+          path: metadata.name
+          value: example-postgres-pooler-auth-tls
+        documentSelector:
+          path: kind
+          value: Certificate
+          matchMany: true
+
+  - it: keeps CNPG's pooler integration in operator TLS mode and adds pooler SANs
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: operator
+      tls.serverAltDNSNames:
+        - db.example.internal
+      poolers.rw.pgbouncer: {}
+    asserts:
+      - equal:
+          path: spec.pgbouncer
+          value: {}
+        documentSelector:
+          path: kind
+          value: Pooler
+      - equal:
+          path: spec.certificates
+          value:
+            serverAltDNSNames:
+              - example-postgres-pooler-rw
+              - example-postgres-pooler-rw.test
+              - example-postgres-pooler-rw.test.svc
+              - example-postgres-pooler-rw.test.svc.cluster.local
+              - db.example.internal
+        documentSelector:
+          path: kind
+          value: Cluster
+      - isKind:
+          of: PodMonitor
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-metrics
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            cnpg.io/cluster: example-postgres
+            cnpg.io/podRole: pooler
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-pooler-metrics
+
+  - it: rejects a Pooler that sets its own cluster
+    values:
+      - ../examples/existing.yaml
+    set:
+      poolers.rw.cluster.name: other
+      poolers.rw.pgbouncer: {}
+    asserts:
+      - failedTemplate:
+          errorPattern: cluster

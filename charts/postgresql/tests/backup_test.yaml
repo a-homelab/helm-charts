@@ -1,0 +1,161 @@
+suite: backups
+release:
+  name: test
+  namespace: test
+tests:
+  - it: schedules plugin backups by default
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - equal:
+          path: spec.method
+          value: plugin
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+      - equal:
+          path: spec.pluginConfiguration
+          value:
+            name: barman-cloud.cloudnative-pg.io
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+      - equal:
+          path: spec.immediate
+          value: true
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+
+  - it: uses an external object store configuration without the Ceph bucket claim
+    values:
+      - ../examples/existing.yaml
+    set:
+      backup.objectBucket.enabled: false
+      backup.configuration:
+        destinationPath: s3://offsite/app
+        s3Credentials:
+          inheritFromIAMRole: true
+    asserts:
+      - isKind:
+          of: ObjectBucketClaim
+        not: true
+      - equal:
+          path: spec.configuration
+          value:
+            destinationPath: s3://offsite/app
+            s3Credentials:
+              inheritFromIAMRole: true
+        documentSelector:
+          path: kind
+          value: ObjectStore
+
+  - it: archives to an existing ObjectStore without rendering one
+    values:
+      - ../examples/existing.yaml
+    set:
+      backup.objectStore.existingName: offsite
+    asserts:
+      - isKind:
+          of: ObjectStore
+        not: true
+      - equal:
+          path: spec.plugins[0].parameters.barmanObjectName
+          value: offsite
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: replaces initdb with recovery and keeps the source archive separate
+    values:
+      - ../examples/recovery.yaml
+    asserts:
+      - notExists:
+          path: spec.bootstrap.initdb
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.bootstrap.recovery.source
+          value: source
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.externalClusters[0].plugin.parameters
+          value:
+            barmanObjectName: example-postgres
+            serverName: example-postgres
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.plugins[0].parameters.barmanObjectName
+          value: example-restored
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.configuration.destinationPath
+          value: s3://example-restored-backup/
+        documentSelector:
+          path: kind
+          value: ObjectStore
+
+  - it: keeps WAL archiving with scheduled volume snapshots
+    values:
+      - ../examples/snapshot.yaml
+    asserts:
+      - equal:
+          path: spec.plugins[0].isWALArchiver
+          value: true
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.backup.volumeSnapshot.className
+          value: database-snapshots
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.method
+          value: volumeSnapshot
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+      - notExists:
+          path: spec.pluginConfiguration
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+
+  - it: passes the plugin server name to separate archives
+    values:
+      - ../examples/existing.yaml
+    set:
+      backup.serverName: example-postgres-pg18
+    asserts:
+      - equal:
+          path: spec.plugins[0].parameters
+          value:
+            barmanObjectName: example-postgres
+            serverName: example-postgres-pg18
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: omits the plugin server name by default
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - exists:
+          path: spec.plugins[0].parameters
+        documentSelector:
+          path: kind
+          value: Cluster
+      - notExists:
+          path: spec.plugins[0].parameters.serverName
+        documentSelector:
+          path: kind
+          value: Cluster

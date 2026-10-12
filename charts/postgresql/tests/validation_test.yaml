@@ -1,0 +1,311 @@
+# Helm 4 prints schema error paths as JSON pointers (/backup/enabled) and Helm 3 as
+# dotted paths (backup.enabled); (\.|/) matches either.
+suite: validation
+release:
+  name: test
+  namespace: test
+values:
+  - ../examples/existing.yaml
+tests:
+  - it: rejects zero instances
+    set:
+      instances: 0
+    asserts:
+      - failedTemplate:
+          errorPattern: instances
+
+  - it: rejects a misspelled top-level key
+    set:
+      backpu: {}
+    asserts:
+      - failedTemplate:
+          errorPattern: backpu
+
+  - it: rejects a non-boolean backup.enabled
+    set:
+      backup.enabled: plugin
+    asserts:
+      - failedTemplate:
+          errorPattern: backup(\.|/)enabled
+
+  - it: rejects the removed backup.provider key
+    set:
+      backup.provider: plugin
+    asserts:
+      - failedTemplate:
+          errorPattern: provider
+
+  - it: rejects the removed monitoring.mode key
+    set:
+      monitoring.mode: podMonitor
+    asserts:
+      - failedTemplate:
+          errorPattern: mode
+
+  - it: rejects nameOverride
+    set:
+      nameOverride: other
+    asserts:
+      - failedTemplate:
+          errorPattern: nameOverride
+
+  - it: rejects a five-field backup schedule
+    set:
+      backup.scheduled.enabled: true
+      backup.scheduled.schedule: 0 10 * * *
+    asserts:
+      - failedTemplate:
+          errorPattern: schedule
+
+  - it: rejects scheduled plugin backups without WAL archiving
+    set:
+      backup.enabled: false
+    asserts:
+      - failedTemplate:
+          errorPattern: backup\.scheduled\.method plugin requires backup\.enabled
+
+  - it: rejects scheduled volume snapshots without a snapshot class
+    set:
+      backup.scheduled.enabled: true
+      backup.scheduled.method: volumeSnapshot
+    asserts:
+      - failedTemplate:
+          errorPattern: requires backup\.volumeSnapshot
+
+  - it: requires a backup configuration without the bucket claim
+    set:
+      backup.objectBucket.enabled: false
+    asserts:
+      - failedTemplate:
+          errorPattern: backup\.configuration is required
+
+  - it: rejects an ObjectStore configuration serverName
+    set:
+      backup.configuration.destinationPath: s3://test/
+      backup.configuration.serverName: other
+    asserts:
+      - failedTemplate:
+          errorPattern: serverName must be empty
+
+  - it: rejects extraClusterSpec.imageName
+    set:
+      extraClusterSpec.imageName: other
+    asserts:
+      - failedTemplate:
+          errorPattern: extraClusterSpec\.imageName conflicts with a chart-owned field
+
+  - it: rejects extraClusterSpec.smartShutdownTimeout
+    set:
+      extraClusterSpec.smartShutdownTimeout: 180
+    asserts:
+      - failedTemplate:
+          errorPattern: extraClusterSpec\.smartShutdownTimeout conflicts with a chart-owned field
+
+  - it: rejects the removed clusterSpec key
+    set:
+      clusterSpec.walStorage.size: 5Gi
+    asserts:
+      - failedTemplate:
+          errorPattern: clusterSpec
+
+  - it: rejects the removed database.enabled key
+    set:
+      database.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: database(\.|/)enabled
+
+  - it: reserves databases.app for the database key
+    set:
+      databases.app.name: other
+      databases.app.owner: app
+    asserts:
+      - failedTemplate:
+          errorPattern: databases\.app is reserved
+
+  - it: rejects duplicate database names
+    set:
+      databases.a.name: same
+      databases.a.owner: app
+      databases.b.name: same
+      databases.b.owner: app
+    asserts:
+      - failedTemplate:
+          errorPattern: duplicate database name
+
+  - it: rejects duplicate DatabaseRole names
+    set:
+      databaseRoles.app.name: app
+      databaseRoles.other.name: app
+    asserts:
+      - failedTemplate:
+          errorPattern: duplicate DatabaseRole name
+
+  - it: rejects DatabaseRole ensure absent
+    set:
+      databaseRoles.app.name: app
+      databaseRoles.app.ensure: absent
+    asserts:
+      - failedTemplate:
+          errorPattern: ensure
+
+  - it: rejects a DatabaseRole client certificate without operator TLS
+    set:
+      databaseRoles.app.name: app
+      databaseRoles.app.clientCertificate.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: requires tls\.mode=operator
+
+  - it: requires an existing superuser Secret for superuser access
+    set:
+      enableSuperuserAccess: true
+      credentials.existing.superuserSecretName: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: credentials\.existing\.superuserSecretName is required
+
+  - it: rejects more than one bootstrap method
+    set:
+      bootstrap.recovery.source: a
+      bootstrap.pg_basebackup.source: a
+    asserts:
+      - failedTemplate:
+          errorPattern: bootstrap
+
+  - it: requires certificates for external TLS
+    set:
+      tls.mode: external
+    asserts:
+      - failedTemplate:
+          errorPattern: tls\.certificates is required
+
+  - it: rejects monitoring.configuration.enablePodMonitor
+    set:
+      monitoring.configuration.enablePodMonitor: true
+    asserts:
+      - failedTemplate:
+          errorPattern: use monitoring\.podMonitor\.enabled instead of monitoring\.configuration\.enablePodMonitor
+
+  - it: rejects a backup server name without WAL archiving
+    set:
+      backup.enabled: false
+      backup.scheduled.enabled: false
+      backup.serverName: pg18
+    asserts:
+      - failedTemplate:
+          errorPattern: backup\.serverName requires backup\.enabled
+
+  - it: rejects extra server DNS names with external TLS
+    set:
+      tls.mode: external
+      tls.certificates.serverTLSSecret: s
+      tls.serverAltDNSNames:
+        - x
+    asserts:
+      - failedTemplate:
+          errorPattern: tls\.serverAltDNSNames is unused
+
+  - it: rejects database names that normalize to the same resource name
+    set:
+      databases.one.name: sql_name
+      databases.one.owner: app
+      databases.two.name: sql-name
+      databases.two.owner: app
+    asserts:
+      - failedTemplate:
+          errorPattern: duplicate Database resource name
+
+  - it: rejects role names that normalize to the same resource name
+    set:
+      databaseRoles.one.name: sql_name
+      databaseRoles.two.name: sql-name
+    asserts:
+      - failedTemplate:
+          errorPattern: duplicate DatabaseRole resource name
+
+  - it: rejects a resource name longer than a DNS label
+    set:
+      database.name: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    asserts:
+      - failedTemplate:
+          errorPattern: must be a DNS label of at most 63 characters
+
+  - it: rejects a SQL name with no characters usable in a resource name
+    set:
+      database.name: _
+    asserts:
+      - failedTemplate:
+          errorPattern: SQL name "_" cannot form a Kubernetes resource name
+
+  - it: rejects a fullnameOverride that is not a DNS label
+    set:
+      fullnameOverride: Bad_Name
+    asserts:
+      - failedTemplate:
+          errorPattern: must be a DNS label
+
+  - it: rejects rotation outside generated mode
+    set:
+      credentials.rotation.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: requires credentials\.mode=generated
+
+  - it: rejects copy mode without a recovery bootstrap
+    set:
+      credentials.mode: copy
+    asserts:
+      - failedTemplate:
+          errorPattern: requires bootstrap\.recovery
+
+  - it: rejects generated credentials with a native bootstrap
+    set:
+      credentials.mode: generated
+      bootstrap.initdb.database: other
+    asserts:
+      - failedTemplate:
+          errorPattern: requires the chart initdb settings
+
+  - it: rejects a superuser certificate outside cert-manager TLS
+    set:
+      tls.mode: operator
+      tls.superuserCertificate: true
+    asserts:
+      - failedTemplate:
+          errorPattern: requires tls\.mode=certManager
+
+  - it: rejects a zero rotation interval
+    set:
+      credentials.rotation.interval: 0s
+    asserts:
+      - failedTemplate:
+          errorPattern: interval
+
+  - it: rejects zero instances in schema validation
+    set:
+      instances: 0
+    asserts:
+      - failedTemplate:
+          errorPattern: instances
+
+  - it: rejects an empty existing user Secret name
+    set:
+      credentials.existing.userSecretName: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: userSecretName
+
+  - it: rejects a null database locale
+    set:
+      database.localeCType: null
+    asserts:
+      - failedTemplate:
+          errorPattern: localeCType
+
+  - it: rejects an empty bucket storage class
+    set:
+      backup.objectBucket.storageClassName: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: storageClassName

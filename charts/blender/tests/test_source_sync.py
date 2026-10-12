@@ -4,7 +4,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-import yaml
 
 CHART = Path(__file__).resolve().parents[1]
 SCRIPT = CHART / "files/sync_sources.sh"
@@ -210,58 +209,3 @@ def test_verified_revision_recovered_after_interrupted_pointer_switch(capture):
     target(capture).unlink()
     assert run(capture).returncode == 0
     assert target(capture).resolve() == previous
-
-
-def test_chart_uses_rclone_only_and_shared_workspace():
-    output = subprocess.check_output(
-        [
-            "helm",
-            "template",
-            "mi-casa-blender",
-            str(CHART),
-            "--namespace",
-            "mi-casa",
-            "--set",
-            "components.source-sync.enabled=true",
-        ]
-    )
-    resources = list(yaml.safe_load_all(output))
-    cron = next(r for r in resources if r["kind"] == "CronJob")
-    desktop = next(r for r in resources if r["kind"] == "Deployment")
-    spec = cron["spec"]
-    pod = spec["jobTemplate"]["spec"]["template"]["spec"]
-    assert spec["concurrencyPolicy"] == "Forbid"
-    assert spec["jobTemplate"]["spec"]["activeDeadlineSeconds"] == 7200
-    assert not pod.get("runtimeClassName")
-    assert not pod.get("initContainers")
-    assert len(pod["containers"]) == 1
-    container = pod["containers"][0]
-    assert container["image"] == "rclone/rclone:1.75.1"
-    assert container["command"] == ["/bin/sh", "/opt/blender-bootstrap/sync_sources.sh"]
-    assert "nvidia.com/gpu" not in str(container["resources"])
-    assert pod["affinity"]["podAffinity"][
-        "requiredDuringSchedulingIgnoredDuringExecution"
-    ] == [
-        {
-            "labelSelector": {
-                "matchLabels": desktop["spec"]["selector"]["matchLabels"]
-            },
-            "topologyKey": "kubernetes.io/hostname",
-        }
-    ]
-    assert {
-        "key": "nvidia.com/gpu",
-        "operator": "Exists",
-        "effect": "NoSchedule",
-    } in pod["tolerations"]
-    claim = next(v for v in pod["volumes"] if v["name"] == "workspace")
-    assert claim["persistentVolumeClaim"]["claimName"] == "mi-casa-blender-workspace"
-    mount = next(v for v in container["volumeMounts"] if v["name"] == "workspace")
-    assert mount == {"name": "workspace", "mountPath": "/source", "subPath": "source"}
-    assert all(e["name"] != "SOURCE_DELIVERIES" for e in container["env"])
-    assert pod["automountServiceAccountToken"] is False
-
-
-def test_sync_disabled_by_default():
-    output = subprocess.check_output(["helm", "template", "test", str(CHART)])
-    assert all(r["kind"] != "CronJob" for r in yaml.safe_load_all(output))

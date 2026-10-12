@@ -1,0 +1,188 @@
+suite: bootstrap scripts and OpenCode configuration
+templates:
+  - templates/all.yaml
+release:
+  name: test-opencode
+  namespace: test
+tests:
+  - it: mounts every bootstrap script from the bootstrap ConfigMap
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes[?(@.name == "bootstrap")].configMap.items
+          content:
+            key: bootstrap__workspace.sh
+            path: bootstrap/workspace.sh
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.volumes[?(@.name == "bootstrap")].configMap.items
+          content:
+            key: services__github__git_credentials.py
+            path: services/github/git_credentials.py
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.volumes[?(@.name == "bootstrap")].configMap.items
+          content:
+            key: services__github__github_token.py
+            path: services/github/github_token.py
+        documentSelector:
+          path: kind
+          value: Deployment
+      - isNotNullOrEmpty:
+          path: data["bootstrap__workspace.sh"]
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-bootstrap
+      - isNotNullOrEmpty:
+          path: data["services__github__git_credentials.py"]
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-bootstrap
+      - isNotNullOrEmpty:
+          path: data["services__github__github_token.py"]
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-bootstrap
+      - notMatchRegex:
+          path: spec.template.spec.volumes[?(@.name == "bootstrap")].configMap.items[*].path
+          pattern: ^skills/
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: serves global instructions and skills from a read-only config directory
+    values:
+      - ../examples/immutable-config-values.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "configuration")].mountPath
+          value: /opt/opencode-config
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "configuration")].readOnly
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "configuration")].subPath
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].volumeMounts[*].mountPath
+          pattern: ^/opt/opencode-defaults
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENCODE_CONFIG_DIR
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENCODE_CONFIG
+            value: /opt/opencode-config/opencode.json
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OPENCODE_CONFIG_PROJECT_DISABLE
+            value: "true"
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.volumes[?(@.name == "configuration")].configMap.name
+          value: test-opencode-configuration
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.volumes[?(@.name == "configuration")].configMap.items
+          content:
+            path: skills/workspace-review/SKILL.md
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - isNotNullOrEmpty:
+          path: data["purpose.md"]
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-configuration
+      - notExists:
+          path: data["AGENTS.md"]
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-configuration
+      - matchRegex:
+          path: data["opencode.json"]
+          pattern: '"agents":\{"build":\{([^{}]*,)?"system":"\{file:/opt/opencode-config/purpose\.md\}"'
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-configuration
+      - notMatchRegex:
+          path: data["opencode.json"]
+          pattern: '"instructions":'
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-configuration
+      - matchRegex:
+          path: data["opencode.json"]
+          pattern: '"update":"disable"'
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-configuration
+      - matchRegex:
+          path: data["opencode.json"]
+          pattern: '"share":"disabled"'
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-configuration
+
+  - it: renders a SHA-256 configuration checksum by default
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/opencode-configuration"]
+          pattern: ^[0-9a-f]{64}$
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  # The two pinned checksums differ only by opencode.instructions, so the pod
+  # template rolls when the instructions change. Both hashes also cover the
+  # opencode.config defaults rendered into opencode.json.
+  - it: hashes the configuration for one set of instructions
+    set:
+      opencode.instructions: Policy A
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/opencode-configuration"]
+          value: e8da5232d0124ec9da62a40ff5166cba4c35c0bafc89b252c938de2669f5b304
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: rolls the pod when the instructions change
+    set:
+      opencode.instructions: Different policy
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/opencode-configuration"]
+          value: cfe1ca303881a06402335ba32c604c541de50e0e6832dd693d4d9d4df947db28
+        documentSelector:
+          path: kind
+          value: Deployment

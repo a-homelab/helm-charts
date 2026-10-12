@@ -1,0 +1,500 @@
+suite: MCP sidecar and HTTP route
+templates:
+  - templates/all.yaml
+release:
+  name: test-blender
+  namespace: test
+tests:
+  # helm-unittest cannot compare two paths, so each "same image" test sets the
+  # image and expects it on every container.
+  - it: routes HTTP to a GPU-free sidecar that shares the workspace
+    values:
+      - ../examples/nvidia-values.yaml
+    set:
+      mcp.enabled: true
+      components.main.routes.mcp.enabled: true
+      components.main.routes.mcp.hostnames:
+        - blender.example.com
+      components.main.container.image.repository: registry.example.com/blender
+      components.main.container.image.tag: route-test
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/blender:route-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].image
+          value: registry.example.com/blender:route-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].resources.limits
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].resources.limits["nvidia.com/gpu"]
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].volumeMounts
+          count: 4
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].volumeMounts
+          content:
+            mountPath: /workspace
+            name: workspace
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].volumeMounts
+          content:
+            mountPath: /tmp
+            name: mcp-tmp
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].volumeMounts
+          content:
+            mountPath: /config
+            name: config
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].volumeMounts
+          content:
+            mountPath: /opt/blender-bootstrap
+            name: bootstrap
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].command
+          value:
+            - /lsiopy/bin/python3
+            - /opt/blender-bootstrap/start_server.py
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].workingDir
+          value: /workspace
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].startupProbe.failureThreshold
+          value: 180
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].startupProbe.tcpSocket.port
+          value: mcp
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].livenessProbe
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].securityContext.readOnlyRootFilesystem
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].env[?(@.name == "BLENDER_MCP_HOST")].value
+          value: 127.0.0.1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].env
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.initContainers[?(@.name == "mcp")].env[?(@.name == "MCP_AUTH_TOKEN")]
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.ports
+          count: 3
+        documentSelector:
+          path: kind
+          value: Service
+      - contains:
+          path: spec.ports
+          content:
+            port: 3000
+          any: true
+        documentSelector:
+          path: kind
+          value: Service
+      - contains:
+          path: spec.ports
+          content:
+            port: 3001
+          any: true
+        documentSelector:
+          path: kind
+          value: Service
+      - contains:
+          path: spec.ports
+          content:
+            port: 8000
+          any: true
+        documentSelector:
+          path: kind
+          value: Service
+      - equal:
+          path: spec.ports[?(@.name == "mcp")].targetPort
+          value: 8000
+        documentSelector:
+          path: kind
+          value: Service
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 8000
+        documentSelector:
+          path: kind
+          value: HTTPRoute
+      - equal:
+          path: spec.rules[0].matches
+          value:
+            - path:
+                type: Exact
+                value: /
+        documentSelector:
+          path: kind
+          value: HTTPRoute
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 350s
+        documentSelector:
+          path: kind
+          value: HTTPRoute
+
+  - it: omits the add-on, sidecar, port and scratch volume when mcp.enabled is false
+    set:
+      mcp.enabled: false
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: main
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: prepare
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.ports
+        documentSelector:
+          path: kind
+          value: Service
+      - notExists:
+          path: spec.ports[?(@.port == 8000)]
+        documentSelector:
+          path: kind
+          value: Service
+      - exists:
+          path: spec.template.spec.volumes
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.volumes[?(@.name == "mcp-tmp")]
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_ENABLED")].value
+          value: "false"
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notEqual:
+          path: kind
+          value: HTTPRoute
+
+  - it: enables the add-on, sidecar, port and scratch volume when mcp.enabled is true
+    set:
+      mcp.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: main
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 2
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: prepare
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: mcp
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.ports
+          content:
+            port: 8000
+          any: true
+        documentSelector:
+          path: kind
+          value: Service
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mcp-tmp
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_ENABLED")].value
+          value: "true"
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notEqual:
+          path: kind
+          value: HTTPRoute
+
+  - it: sidecar inherits a tag image and the persistent cache identity
+    set:
+      mcp.enabled: true
+      components.main.container.image.repository: registry.example.com/blender
+      components.main.container.image.tag: future-blender
+      components.main.container.env.PUID: "1234"
+      components.main.container.env.PGID: "5678"
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 2
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: prepare
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: mcp
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].restartPolicy
+          value: Always
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].securityContext.runAsUser
+          value: 1234
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].securityContext.runAsGroup
+          value: 5678
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_ENABLED")].value
+          value: "true"
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value:
+            - /bin/bash
+            - /opt/blender-bootstrap/prepare.sh
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].volumeMounts[?(@.name == "config")].mountPath
+          value: /config
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.spec.volumes[?(@.name == "config")].persistentVolumeClaim
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/blender:future-blender
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: registry.example.com/blender:future-blender
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].image
+          value: registry.example.com/blender:future-blender
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_IMAGE")].value
+          value: registry.example.com/blender:future-blender
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: sidecar inherits a digest image and the persistent cache identity
+    set:
+      mcp.enabled: true
+      components.main.container.image.repository: registry.example.com/blender
+      components.main.container.image.tag: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      components.main.container.env.PUID: "1234"
+      components.main.container.env.PGID: "5678"
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 2
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: prepare
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: mcp
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].restartPolicy
+          value: Always
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].securityContext.runAsUser
+          value: 1234
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].securityContext.runAsGroup
+          value: 5678
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_ENABLED")].value
+          value: "true"
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value:
+            - /bin/bash
+            - /opt/blender-bootstrap/prepare.sh
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].volumeMounts[?(@.name == "config")].mountPath
+          value: /config
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.spec.volumes[?(@.name == "config")].persistentVolumeClaim
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/blender@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: registry.example.com/blender@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].image
+          value: registry.example.com/blender@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "MCP_IMAGE")].value
+          value: registry.example.com/blender@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        documentSelector:
+          path: kind
+          value: Deployment

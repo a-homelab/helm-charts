@@ -1,0 +1,215 @@
+suite: GitHub App token renewal and CLI access
+templates:
+  - templates/all.yaml
+release:
+  name: test-opencode
+  namespace: test
+set:
+  git.enabled: true
+  git.owner: example
+  git.repositories:
+    - name: notes
+      path: notes
+tests:
+  - it: mounts the GitHub App private key only in the token renewer
+    set:
+      components.main.container.image.repository: registry.example.test/opencode-under-test
+      components.main.container.image.tag: 0.0.0-test
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 2
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: github-token
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].restartPolicy
+          value: Always
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].startupProbe.exec.command[-1]
+          value: check
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: workspace
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: main
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.initContainers[1].restartPolicy
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: registry.example.test/opencode-under-test:0.0.0-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].image
+          value: registry.example.test/opencode-under-test:0.0.0-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/opencode-under-test:0.0.0-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].imagePullPolicy
+          value: IfNotPresent
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].imagePullPolicy
+          value: IfNotPresent
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: IfNotPresent
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            name: github-app
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notContains:
+          path: spec.template.spec.initContainers[1].volumeMounts
+          content:
+            name: github-app
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: github-app
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].volumeMounts[?(@.name == "github-token")].readOnly
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "github-token")].readOnly
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.volumes[?(@.name == "github-token")].emptyDir.medium
+          value: Memory
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: uses git and the gh CLI without an MCP bridge
+    set:
+      opencode.config.mcp.servers.blender.type: remote
+      opencode.config.mcp.servers.blender.url: http://blender:8000/
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 2
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: github-token
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: workspace
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notMatchRegex:
+          path: spec.template.spec.volumes[*].name
+          pattern: ^github-mcp
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PATH
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GH_CONFIG_DIR
+            value: /run/github-token/gh
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GH_TOKEN
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - matchRegex:
+          path: data["opencode.json"]
+          pattern: '"mcp":\{([^{}]*,)?"servers":\{"blender":\{"type":"remote","url":"http://blender:8000/"\}\}'
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-configuration
+      - notMatchRegex:
+          path: spec.template.spec.volumes[?(@.name == "bootstrap")].configMap.items[*].path
+          pattern: ^bin/
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "github-token")].readOnly
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment

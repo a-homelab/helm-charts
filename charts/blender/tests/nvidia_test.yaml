@@ -1,0 +1,111 @@
+suite: NVIDIA example with MCP enabled
+templates:
+  - templates/all.yaml
+release:
+  name: test-blender
+  namespace: test
+values:
+  - ../examples/nvidia-values.yaml
+tests:
+  # helm-unittest cannot compare two paths, so the test sets the image and
+  # expects it on every container.
+  - it: requests a GPU through resources without a runtime class
+    set:
+      mcp.enabled: true
+      components.main.container.image.repository: registry.example.com/blender
+      components.main.container.image.tag: nvidia-test
+    asserts:
+      - notExists:
+          path: spec.template.spec.runtimeClassName
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests["nvidia.com/gpu"]
+          value: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits["nvidia.com/gpu"]
+          value: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "NVIDIA_DRIVER_CAPABILITIES")].value
+          value: compute,utility,graphics,video,display
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.containers[0].env[?(@.name == "NVIDIA_VISIBLE_DEVICES")]
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "BLENDER_USER_SCRIPTS")].value
+          value: /opt/blender-user-scripts
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/blender:nvidia-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: registry.example.com/blender:nvidia-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          count: 4
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            mountPath: /config
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            mountPath: /workspace
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            mountPath: /opt/blender-bootstrap
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            mountPath: /opt/blender-user-scripts
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.ports
+        documentSelector:
+          path: kind
+          value: Service
+      - notExists:
+          path: spec.ports[?(@.port == 9876)]
+        documentSelector:
+          path: kind
+          value: Service

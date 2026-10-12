@@ -1,0 +1,219 @@
+suite: server defaults, runtime image and password secret
+templates:
+  - templates/all.yaml
+release:
+  name: test-opencode
+  namespace: test
+tests:
+  - it: keeps the server private, persistent and unprivileged by default
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].command
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notExists:
+          path: spec.template.spec.containers[0].args
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.replicas
+          value: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.strategy
+          value:
+            type: Recreate
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: workspace
+        documentSelector:
+          path: kind
+          value: Deployment
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: '^ghcr\.io/a-homelab/opencode-container:'
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notEqual:
+          path: kind
+          value: HTTPRoute
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.type
+          value: ClusterIP
+        documentSelector:
+          path: kind
+          value: Service
+      - hasDocuments:
+          count: 2
+          filterAware: true
+        documentSelector:
+          path: kind
+          value: PersistentVolumeClaim
+          matchMany: true
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-options"]
+          value: Prune=false,Delete=false
+        documentSelector:
+          path: kind
+          value: PersistentVolumeClaim
+          matchMany: true
+
+  - it: runs every tool from the image without runtime installation
+    set:
+      components.main.container.image.repository: registry.example.test/opencode-under-test
+      components.main.container.image.tag: 0.0.0-test
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: workspace
+        documentSelector:
+          path: kind
+          value: Deployment
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: tools
+          any: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: registry.example.test/opencode-under-test:0.0.0-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.test/opencode-under-test:0.0.0-test
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsUser
+          value: 65532
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsUser
+          value: 65532
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[0].volumeMounts[*].mountPath
+          pattern: ^/tools$
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].volumeMounts[*].mountPath
+          pattern: ^/tools$
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[0].env[*].name
+          pattern: ^(LD_LIBRARY_PATH|PYTHONHOME|GIT_EXEC_PATH|PATH|HOME|XDG_CONFIG_HOME|XDG_DATA_HOME|XDG_CACHE_HOME|XDG_STATE_HOME|OPENCODE_CONFIG_DIR|PYTHONDONTWRITEBYTECODE|UV_PYTHON_DOWNLOADS|UV_CACHE_DIR|UV_LINK_MODE)$
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].env[*].name
+          pattern: ^(LD_LIBRARY_PATH|PYTHONHOME|GIT_EXEC_PATH|PATH|HOME|XDG_CONFIG_HOME|XDG_DATA_HOME|XDG_CACHE_HOME|XDG_STATE_HOME|OPENCODE_CONFIG_DIR|PYTHONDONTWRITEBYTECODE|UV_PYTHON_DOWNLOADS|UV_CACHE_DIR|UV_LINK_MODE)$
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: data["git.json"]
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-bootstrap
+      - notExists:
+          path: data.packages
+        documentSelector:
+          path: metadata.name
+          value: test-opencode-bootstrap
+
+  - it: reads the password from the opencode-server secret
+    set:
+      components.main.container.env.OPENCODE_PASSWORD.valueFrom.secretKeyRef.name: opencode-server
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "OPENCODE_PASSWORD")].valueFrom.secretKeyRef
+          value:
+            name: opencode-server
+            key: password
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: reads the password from the mi-casa-opencode-server secret
+    set:
+      components.main.container.env.OPENCODE_PASSWORD.valueFrom.secretKeyRef.name: mi-casa-opencode-server
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[?(@.name == "OPENCODE_PASSWORD")].valueFrom.secretKeyRef
+          value:
+            name: mi-casa-opencode-server
+            key: password
+        documentSelector:
+          path: kind
+          value: Deployment

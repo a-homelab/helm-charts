@@ -262,6 +262,7 @@ mkdir -p charts/opencode/charts
 helm package charts/common --destination charts/opencode/charts
 python scripts/common_schema.py charts/opencode --extensions charts/opencode/schema/extensions.json --check
 helm lint charts/opencode --strict
+helm unittest charts/opencode
 python -m pytest charts/opencode/tests -q
 shellcheck charts/opencode/files/bootstrap/*.sh
 python charts/opencode/tests/smoke_image.py

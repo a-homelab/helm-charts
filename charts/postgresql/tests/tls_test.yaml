@@ -1,0 +1,192 @@
+suite: TLS
+release:
+  name: test
+  namespace: test
+tests:
+  - it: adds extra server DNS names to the cert-manager server Certificate
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.serverAltDNSNames:
+        - example-postgres-pooler-rw
+        - db.example.internal
+    asserts:
+      # The full list is pinned; the Python test checked the last two entries.
+      - equal:
+          path: spec.dnsNames
+          value:
+            - example-postgres-rw
+            - example-postgres-rw.test
+            - example-postgres-rw.test.svc
+            - example-postgres-r
+            - example-postgres-r.test
+            - example-postgres-r.test.svc
+            - example-postgres-ro
+            - example-postgres-ro.test
+            - example-postgres-ro.test.svc
+            - example-postgres-rw.test.svc.cluster.local
+            - example-postgres-r.test.svc.cluster.local
+            - example-postgres-ro.test.svc.cluster.local
+            - example-postgres-pooler-rw
+            - db.example.internal
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-server-tls
+
+  - it: passes extra server DNS names to CNPG in operator mode
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: operator
+      tls.serverAltDNSNames:
+        - example-postgres-pooler-rw
+        - db.example.internal
+    asserts:
+      - equal:
+          path: spec.certificates
+          value:
+            serverAltDNSNames:
+              - example-postgres-pooler-rw
+              - db.example.internal
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: issues every Certificate from the cnpg-ca ClusterIssuer by default
+    values:
+      - ../examples/snapshot.yaml
+    asserts:
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: cnpg-ca
+            kind: ClusterIssuer
+        documentSelector:
+          path: kind
+          value: Certificate
+          matchMany: true
+      # Stronger than the Python check that some SAN ends in .svc.cluster.local.
+      - contains:
+          path: spec.dnsNames
+          content: test-postgresql-rw.test.svc.cluster.local
+        documentSelector:
+          path: metadata.name
+          value: test-postgresql-server-tls
+
+  - it: renders no cert-manager resources in operator mode
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: operator
+      tls.certificates: {}
+    asserts:
+      - isKind:
+          of: Certificate
+        not: true
+      - notExists:
+          path: spec.certificates
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: renders no cert-manager resources in external mode
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: external
+      tls.certificates:
+        serverTLSSecret: server
+        serverCASecret: ca
+    asserts:
+      - isKind:
+          of: Certificate
+        not: true
+      - equal:
+          path: spec.certificates
+          value:
+            serverTLSSecret: server
+            serverCASecret: ca
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: issues a superuser client Certificate from cnpg-ca without enabling superuser access
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.superuserCertificate: true
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^example-postgres-(client-replica|client-superuser|client-user|server)-tls$
+        documentSelector:
+          path: kind
+          value: Certificate
+          matchMany: true
+      - isKind:
+          of: Certificate
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-replica-tls
+      - isKind:
+          of: Certificate
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-superuser-tls
+      - isKind:
+          of: Certificate
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-user-tls
+      - isKind:
+          of: Certificate
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-server-tls
+      - equal:
+          path: spec.issuerRef.name
+          value: cnpg-ca
+        documentSelector:
+          path: kind
+          value: Certificate
+          matchMany: true
+      - equal:
+          path: spec.commonName
+          value: postgres
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-superuser-tls
+      - contains:
+          path: spec.usages
+          content: client auth
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-superuser-tls
+      - equal:
+          path: spec.enableSuperuserAccess
+          value: false
+        documentSelector:
+          path: kind
+          value: Cluster
+      - notExists:
+          path: spec.postgresql
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: issues every Certificate from an overridden issuer
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.issuerRef.name: custom
+      tls.issuerRef.kind: Issuer
+    asserts:
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: custom
+            kind: Issuer
+        documentSelector:
+          path: kind
+          value: Certificate
+          matchMany: true

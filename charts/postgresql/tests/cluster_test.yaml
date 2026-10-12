@@ -1,0 +1,746 @@
+suite: Cluster spec
+release:
+  name: test
+  namespace: test
+tests:
+  - it: renders the existing example's resource set with its identity, bootstrap, TLS and archive
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: certificate-client-pooler.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-replica.yaml
+      - isKind:
+          of: Certificate
+        template: certificate-client-replica.yaml
+      - hasDocuments:
+          count: 0
+        template: certificate-client-superuser.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-user.yaml
+      - isKind:
+          of: Certificate
+        template: certificate-client-user.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-server.yaml
+      - isKind:
+          of: Certificate
+        template: certificate-server.yaml
+      - hasDocuments:
+          count: 1
+        template: cluster.yaml
+      - isKind:
+          of: Cluster
+        template: cluster.yaml
+      - hasDocuments:
+          count: 0
+        template: credentials.yaml
+      - hasDocuments:
+          count: 0
+        template: databaseroles.yaml
+      - hasDocuments:
+          count: 1
+        template: databases.yaml
+      - isKind:
+          of: Database
+        template: databases.yaml
+      - hasDocuments:
+          count: 1
+        template: obc-backup.yaml
+      - isKind:
+          of: ObjectBucketClaim
+        template: obc-backup.yaml
+      - hasDocuments:
+          count: 1
+        template: objectstore.yaml
+      - isKind:
+          of: ObjectStore
+        template: objectstore.yaml
+      - hasDocuments:
+          count: 1
+        template: podmonitor.yaml
+      - isKind:
+          of: PodMonitor
+        template: podmonitor.yaml
+      - hasDocuments:
+          count: 0
+        template: poolers.yaml
+      - hasDocuments:
+          count: 0
+        template: recovery-secretstore.yaml
+      - hasDocuments:
+          count: 1
+        template: scheduledbackup.yaml
+      - isKind:
+          of: ScheduledBackup
+        template: scheduledbackup.yaml
+      - equal:
+          path: metadata.name
+          value: example-postgres
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.imageName
+          value: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.instances
+          value: 3
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.bootstrap
+          value:
+            initdb:
+              database: app
+              owner: app
+              secret:
+                name: example-app
+              localeCType: C
+              localeCollate: C
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.superuserSecret
+          value:
+            name: example-superuser
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.enableSuperuserAccess
+          value: false
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.primaryUpdateMethod
+          value: switchover
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.smartShutdownTimeout
+          value: 30
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.storage
+          value:
+            storageClass: rook-ceph-block-ssd
+            size: 10Gi
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.certificates
+          value:
+            serverTLSSecret: example-postgres-server-tls
+            serverCASecret: example-postgres-server-tls
+            clientCASecret: example-postgres-client-replica-tls
+            replicationTLSSecret: example-postgres-client-replica-tls
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.backup
+          value:
+            target: prefer-standby
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.plugins
+          value:
+            - name: barman-cloud.cloudnative-pg.io
+              isWALArchiver: true
+              parameters:
+                barmanObjectName: example-postgres
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.configuration
+          value:
+            destinationPath: s3://example-postgres-backup/
+            endpointURL: http://rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc
+            s3Credentials:
+              accessKeyId:
+                name: example-postgres-backup-bucket
+                key: AWS_ACCESS_KEY_ID
+              secretAccessKey:
+                name: example-postgres-backup-bucket
+                key: AWS_SECRET_ACCESS_KEY
+            wal:
+              compression: gzip
+              maxParallel: 8
+        documentSelector:
+          path: kind
+          value: ObjectStore
+      - equal:
+          path: spec.retentionPolicy
+          value: 7d
+        documentSelector:
+          path: kind
+          value: ObjectStore
+      - equal:
+          path: spec
+          value:
+            bucketName: example-postgres-backup
+            storageClassName: rook-ceph-bucket-ssd
+        documentSelector:
+          path: kind
+          value: ObjectBucketClaim
+      - equal:
+          path: spec.monitoring
+          value:
+            enablePodMonitor: false
+        documentSelector:
+          path: kind
+          value: Cluster
+      - notExists:
+          path: spec.managed
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: keeps locales, initdb SQL and a custom image
+    values:
+      - ../examples/existing.yaml
+    set:
+      image.repository: bennycooly/cloudnative-pg-timescaledb
+      image.tag: 15.4-debian-timescaledb-2.12.2
+      postgresql.shared_preload_libraries:
+        - timescaledb
+      database.localeCType: en_US.UTF-8
+      database.localeCollate: en_US.UTF-8
+      initdb.localeCType: POSIX
+      initdb.postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS timescaledb;
+    asserts:
+      - matchRegex:
+          path: spec.imageName
+          pattern: 15\.4-debian-timescaledb-2\.12\.2$
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.postgresql.shared_preload_libraries
+          value:
+            - timescaledb
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.bootstrap.initdb.localeCType
+          value: en_US.UTF-8
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.bootstrap.initdb.localeCollate
+          value: en_US.UTF-8
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.localeCType
+          value: en_US.UTF-8
+        documentSelector:
+          path: kind
+          value: Database
+      - equal:
+          path: spec.bootstrap.initdb.postInitApplicationSQL
+          value:
+            - CREATE EXTENSION IF NOT EXISTS timescaledb;
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: defaults replication slots to high availability
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - equal:
+          path: spec.replicationSlots
+          value:
+            highAvailability:
+              enabled: true
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: merges replication slot settings over the high availability default
+    values:
+      - ../examples/existing.yaml
+    set:
+      replicationSlots.highAvailability.synchronizeLogicalDecoding: true
+      replicationSlots.synchronizeReplicas.enabled: false
+    asserts:
+      - equal:
+          path: spec.replicationSlots
+          value:
+            highAvailability:
+              enabled: true
+              synchronizeLogicalDecoding: true
+            synchronizeReplicas:
+              enabled: false
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: passes native cluster fields and an image catalog through
+    values:
+      - ../examples/existing.yaml
+    set:
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: ClusterImageCatalog
+        name: postgres
+        major: 18
+      extraClusterSpec:
+        walStorage:
+          size: 5Gi
+        priorityClassName: database
+      storage.size: 30Gi
+      storageNodesOnly: false
+      spreadAcrossNodes: false
+    asserts:
+      - notExists:
+          path: spec.imageName
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.imageCatalogRef.major
+          value: 18
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.walStorage
+          value:
+            size: 5Gi
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.priorityClassName
+          value: database
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.storage.size
+          value: 30Gi
+        documentSelector:
+          path: kind
+          value: Cluster
+      - notExists:
+          path: spec.affinity
+        documentSelector:
+          path: kind
+          value: Cluster
+      - notExists:
+          path: spec.topologySpreadConstraints
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: defaults to storage-node affinity and one instance per node
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - equal:
+          path: spec.affinity
+          value:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.benfu.me/storage
+                        operator: In
+                        values:
+                          - "true"
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.topologySpreadConstraints
+          value:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: DoNotSchedule
+              labelSelector:
+                matchLabels:
+                  cnpg.io/cluster: example-postgres
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: merges affinity over storage nodes and appends extra spread constraints after the default
+    values:
+      - ../examples/existing.yaml
+    set:
+      affinity.enablePodAntiAffinity: true
+      topologySpreadConstraints:
+        - maxSkew: 2
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+    asserts:
+      - equal:
+          path: spec.affinity
+          value:
+            enablePodAntiAffinity: true
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.benfu.me/storage
+                        operator: In
+                        values:
+                          - "true"
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.topologySpreadConstraints
+          value:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: DoNotSchedule
+              labelSelector:
+                matchLabels:
+                  cnpg.io/cluster: example-postgres
+            - maxSkew: 2
+              topologyKey: topology.kubernetes.io/zone
+              whenUnsatisfiable: ScheduleAnyway
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: preserves false values and a zero sync wave
+    values:
+      - ../examples/existing.yaml
+    set:
+      syncWave: 0
+      databaseSyncWave: 0
+      backup.scheduled.immediate: false
+      backup.scheduled.suspend: true
+      initdb.dataChecksums: false
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "0"
+        documentSelector:
+          path: kind
+          value: Database
+      - equal:
+          path: spec.bootstrap.initdb.dataChecksums
+          value: false
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.immediate
+          value: false
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+      - equal:
+          path: spec.suspend
+          value: true
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+
+  # The counts cover every template, so the wave checks below reach every rendered document.
+  - it: orders the Cluster wave before dependent CRs by default
+    values:
+      - ../examples/existing.yaml
+    set:
+      poolers.rw.pgbouncer: {}
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: certificate-client-pooler.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-replica.yaml
+      - hasDocuments:
+          count: 0
+        template: certificate-client-superuser.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-user.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-server.yaml
+      - hasDocuments:
+          count: 1
+        template: cluster.yaml
+      - hasDocuments:
+          count: 0
+        template: credentials.yaml
+      - hasDocuments:
+          count: 0
+        template: databaseroles.yaml
+      - hasDocuments:
+          count: 1
+        template: databases.yaml
+      - hasDocuments:
+          count: 1
+        template: obc-backup.yaml
+      - hasDocuments:
+          count: 1
+        template: objectstore.yaml
+      - hasDocuments:
+          count: 2
+        template: podmonitor.yaml
+      - hasDocuments:
+          count: 1
+        template: poolers.yaml
+      - hasDocuments:
+          count: 0
+        template: recovery-secretstore.yaml
+      - hasDocuments:
+          count: 1
+        template: scheduledbackup.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: certificate-client-pooler.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: certificate-client-replica.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: certificate-client-user.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: certificate-server.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: cluster.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: obc-backup.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: objectstore.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        template: podmonitor.yaml
+      - isKind:
+          of: Database
+        template: databases.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-4"
+        template: databases.yaml
+      - isKind:
+          of: Pooler
+        template: poolers.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-4"
+        template: poolers.yaml
+      - isKind:
+          of: ScheduledBackup
+        template: scheduledbackup.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-4"
+        template: scheduledbackup.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-4"
+        documentSelector:
+          path: kind
+          value: Database
+          matchMany: true
+          skipEmptyTemplates: true
+      - isKind:
+          of: DatabaseRole
+        not: true
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-4"
+        documentSelector:
+          path: kind
+          value: Pooler
+          matchMany: true
+          skipEmptyTemplates: true
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-4"
+        documentSelector:
+          path: kind
+          value: ScheduledBackup
+          matchMany: true
+          skipEmptyTemplates: true
+
+  # chart.version replaces the Python test's read of Chart.yaml: the label must follow
+  # whatever version the chart carries.
+  - it: labels the Cluster with the chart version but keeps it off pods and the spread selector
+    values:
+      - ../examples/existing.yaml
+    chart:
+      version: 9.9.9
+    asserts:
+      - equal:
+          path: metadata.labels["helm.sh/chart"]
+          value: postgresql-9.9.9
+        documentSelector:
+          path: kind
+          value: Cluster
+      - notExists:
+          path: spec.inheritedMetadata.labels["helm.sh/chart"]
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.topologySpreadConstraints[0].labelSelector
+          value:
+            matchLabels:
+              cnpg.io/cluster: example-postgres
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: requires image.tag without an image catalog
+    values:
+      - ../examples/existing.yaml
+    set:
+      image.tag: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: image\.tag or imageCatalogRef is required
+
+  - it: omits imageName when an image catalog replaces the tag
+    values:
+      - ../examples/existing.yaml
+    set:
+      image.tag: ""
+      imageCatalogRef:
+        apiGroup: postgresql.cnpg.io
+        kind: ClusterImageCatalog
+        name: postgresql
+        major: 18
+    asserts:
+      - notExists:
+          path: spec.imageName
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: keeps the version tag in front of a digest for CNPG major detection
+    values:
+      - ../examples/existing.yaml
+    set:
+      image.tag: 18.6-standard-trixie
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.imageName
+          value: ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: requires image.tag with a digest
+    values:
+      - ../examples/existing.yaml
+    set:
+      image.tag: ""
+      image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate:
+          errorPattern: image\.tag is required
+
+  - it: passes explicit settings to the Cluster, Database and bucket claim
+    values:
+      - ../examples/existing.yaml
+    set:
+      instances: 1
+      postgresql.parameters.max_connections: "200"
+      credentials.existing.userSecretName: new-app
+      credentials.existing.superuserSecretName: new-admin
+      database.localeCType: en_US.UTF-8
+      database.localeCollate: en_US.UTF-8
+      backup.objectBucket.storageClassName: new-bucket-class
+    asserts:
+      - equal:
+          path: spec.instances
+          value: 1
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.postgresql
+          value:
+            parameters:
+              max_connections: "200"
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.bootstrap.initdb.secret.name
+          value: new-app
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.superuserSecret.name
+          value: new-admin
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.storageClassName
+          value: new-bucket-class
+        documentSelector:
+          path: kind
+          value: ObjectBucketClaim
+      - equal:
+          path: spec.bootstrap.initdb.localeCType
+          value: en_US.UTF-8
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.localeCType
+          value: en_US.UTF-8
+        documentSelector:
+          path: kind
+          value: Database
+      - equal:
+          path: spec.bootstrap.initdb.localeCollate
+          value: en_US.UTF-8
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.localeCollate
+          value: en_US.UTF-8
+        documentSelector:
+          path: kind
+          value: Database

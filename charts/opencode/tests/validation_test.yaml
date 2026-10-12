@@ -1,0 +1,55 @@
+suite: rejected configuration
+templates:
+  - templates/all.yaml
+release:
+  name: test
+  namespace: default
+tests:
+  - it: rejects more than one replica
+    set:
+      components.main.deployment.replicas: 2
+    asserts:
+      - failedTemplate:
+          errorPattern: components(\.|/)main(\.|/)deployment(\.|/)replicas
+  - it: rejects a RollingUpdate strategy
+    set:
+      components.main.deployment.strategy.type: RollingUpdate
+    asserts:
+      - failedTemplate:
+          errorPattern: components(\.|/)main(\.|/)deployment(\.|/)strategy(\.|/)type
+  - it: rejects a horizontal pod autoscaler
+    set:
+      components.main.hpa.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: components(\.|/)main(\.|/)hpa(\.|/)enabled
+  - it: rejects the removed server.existingSecret setting
+    set:
+      server.existingSecret: legacy
+    asserts:
+      - failedTemplate:
+          errorPattern: additional properties 'server' not allowed
+  - it: rejects git without an owner and repositories
+    set:
+      git.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: git(\.|/)owner
+  - it: rejects the removed git.mcp setting
+    set:
+      git.mcp.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: additional properties 'mcp' not allowed
+  - it: rejects a tools package that is an option
+    set:
+      tools.packages[0]: --allow-untrusted
+    asserts:
+      - failedTemplate:
+          errorPattern: additional properties 'tools' not allowed
+  - it: rejects a tools package with a shell metacharacter
+    set:
+      tools.packages[0]: git;whoami
+    asserts:
+      - failedTemplate:
+          errorPattern: additional properties 'tools' not allowed

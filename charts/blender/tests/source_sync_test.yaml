@@ -1,0 +1,140 @@
+suite: source-sync CronJob
+templates:
+  - templates/all.yaml
+release:
+  name: mi-casa-blender
+  namespace: mi-casa
+tests:
+  # helm-unittest cannot compare across documents, so the CronJob affinity and
+  # the Deployment selector are both pinned to the same label set.
+  - it: runs rclone only on the desktop node against the shared workspace
+    set:
+      components.source-sync.enabled: true
+    asserts:
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 7200
+        documentSelector:
+          path: kind
+          value: CronJob
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.runtimeClassName
+        documentSelector:
+          path: kind
+          value: CronJob
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.initContainers
+        documentSelector:
+          path: kind
+          value: CronJob
+      - lengthEqual:
+          path: spec.jobTemplate.spec.template.spec.containers
+          count: 1
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].image
+          value: rclone/rclone:1.75.1
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].command
+          value:
+            - /bin/sh
+            - /opt/blender-bootstrap/sync_sources.sh
+        documentSelector:
+          path: kind
+          value: CronJob
+      - exists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources
+        documentSelector:
+          path: kind
+          value: CronJob
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.limits["nvidia.com/gpu"]
+        documentSelector:
+          path: kind
+          value: CronJob
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.requests["nvidia.com/gpu"]
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution
+          value:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: main
+                  app.kubernetes.io/instance: mi-casa-blender
+                  app.kubernetes.io/name: blender
+              topologyKey: kubernetes.io/hostname
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/component: main
+            app.kubernetes.io/instance: mi-casa-blender
+            app.kubernetes.io/name: blender
+        documentSelector:
+          path: kind
+          value: Deployment
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.tolerations
+          content:
+            key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.volumes[?(@.name == "workspace")].persistentVolumeClaim.claimName
+          value: mi-casa-blender-workspace
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts[?(@.name == "workspace")]
+          value:
+            name: workspace
+            mountPath: /source
+            subPath: source
+        documentSelector:
+          path: kind
+          value: CronJob
+      - exists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+        documentSelector:
+          path: kind
+          value: CronJob
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env[?(@.name == "SOURCE_DELIVERIES")]
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.automountServiceAccountToken
+          value: false
+        documentSelector:
+          path: kind
+          value: CronJob
+
+  - it: renders no CronJob by default
+    release:
+      name: test
+      namespace: default
+    asserts:
+      - notEqual:
+          path: kind
+          value: CronJob

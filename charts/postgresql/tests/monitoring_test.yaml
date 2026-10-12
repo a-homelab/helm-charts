@@ -1,0 +1,147 @@
+suite: monitoring
+release:
+  name: test
+  namespace: test
+tests:
+  - it: gives the chart-owned PodMonitor its own name and a stable instance selector
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: example-postgres
+        documentSelector:
+          path: kind
+          value: Cluster
+      - notEqual:
+          path: metadata.name
+          value: example-postgres
+        documentSelector:
+          path: kind
+          value: PodMonitor
+      - equal:
+          path: spec.monitoring.enablePodMonitor
+          value: false
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            cnpg.io/cluster: example-postgres
+            cnpg.io/podRole: instance
+        documentSelector:
+          path: kind
+          value: PodMonitor
+      - equal:
+          path: spec.podMetricsEndpoints
+          value:
+            - port: metrics
+        documentSelector:
+          path: kind
+          value: PodMonitor
+      - equal:
+          path: spec.topologySpreadConstraints[0].labelSelector
+          value:
+            matchLabels:
+              cnpg.io/cluster: example-postgres
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: renders no PodMonitor when disabled and keeps the operator one off
+    values:
+      - ../examples/existing.yaml
+    set:
+      monitoring.podMonitor.enabled: false
+    asserts:
+      - isKind:
+          of: PodMonitor
+        not: true
+      - equal:
+          path: spec.monitoring
+          value:
+            enablePodMonitor: false
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: scrapes metrics over HTTPS with the cert-manager server CA
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: certManager
+      monitoring.configuration.tls.enabled: true
+      monitoring.podMonitor.podMetricsEndpoints:
+        - port: metrics
+          interval: 30s
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints
+          value:
+            - port: metrics
+              interval: 30s
+              scheme: https
+              tlsConfig:
+                ca:
+                  secret:
+                    name: example-postgres-server-tls
+                    key: ca.crt
+                serverName: example-postgres-rw
+        documentSelector:
+          path: kind
+          value: PodMonitor
+
+  - it: scrapes metrics over HTTPS with the operator CA
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: operator
+      monitoring.configuration.tls.enabled: true
+      monitoring.podMonitor.podMetricsEndpoints:
+        - port: metrics
+          interval: 30s
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints
+          value:
+            - port: metrics
+              interval: 30s
+              scheme: https
+              tlsConfig:
+                ca:
+                  secret:
+                    name: example-postgres-ca
+                    key: ca.crt
+                serverName: example-postgres-rw
+        documentSelector:
+          path: kind
+          value: PodMonitor
+
+  - it: scrapes metrics over HTTPS with the external server CA
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: external
+      tls.certificates.serverTLSSecret: srv
+      tls.certificates.serverCASecret: srv-ca
+      monitoring.configuration.tls.enabled: true
+      monitoring.podMonitor.podMetricsEndpoints:
+        - port: metrics
+          interval: 30s
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints
+          value:
+            - port: metrics
+              interval: 30s
+              scheme: https
+              tlsConfig:
+                ca:
+                  secret:
+                    name: srv-ca
+                    key: ca.crt
+                serverName: example-postgres-rw
+        documentSelector:
+          path: kind
+          value: PodMonitor

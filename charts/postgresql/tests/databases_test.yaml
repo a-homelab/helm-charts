@@ -1,0 +1,402 @@
+suite: declarative databases and roles
+release:
+  name: test
+  namespace: test
+tests:
+  - it: names declarative Databases independently of SQL names and retains their data
+    values:
+      - ../examples/declarative.yaml
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^example-postgres-db-(app|app-analytics)$
+        documentSelector:
+          path: kind
+          value: Database
+          matchMany: true
+      - isKind:
+          of: Database
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-app
+      - isKind:
+          of: Database
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-app-analytics
+      - equal:
+          path: spec.name
+          value: app_analytics
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-app-analytics
+      - equal:
+          path: spec.databaseReclaimPolicy
+          value: retain
+        documentSelector:
+          path: kind
+          value: Database
+          matchMany: true
+      - equal:
+          path: spec.cluster
+          value:
+            name: example-postgres
+        documentSelector:
+          path: kind
+          value: Database
+          matchMany: true
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-4"
+        documentSelector:
+          path: kind
+          value: Database
+          matchMany: true
+      - equal:
+          path: spec.managed.roles[0].passwordSecret
+          value:
+            name: example-app
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: renders opt-in DatabaseRole CRs that retain their roles
+    values:
+      - ../examples/modern.yaml
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^example-postgres-role-(app|reporting)$
+        documentSelector:
+          path: kind
+          value: DatabaseRole
+          matchMany: true
+      - isKind:
+          of: DatabaseRole
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-role-app
+      - isKind:
+          of: DatabaseRole
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-role-reporting
+      - equal:
+          path: spec.databaseRoleReclaimPolicy
+          value: retain
+        documentSelector:
+          path: kind
+          value: DatabaseRole
+          matchMany: true
+      - equal:
+          path: spec.cluster
+          value:
+            name: example-postgres
+        documentSelector:
+          path: kind
+          value: DatabaseRole
+          matchMany: true
+      - notExists:
+          path: spec.managed
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.bootstrap.initdb.dataChecksums
+          value: true
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: omits empty lists the operator would drop but keeps the required pgbouncer
+    values:
+      - ../examples/existing.yaml
+    set:
+      databaseRoles.r.name: reporting
+      databaseRoles.r.inRoles: []
+      poolers.rw.pgbouncer: {}
+    asserts:
+      - notExists:
+          path: spec.extensions
+        documentSelector:
+          path: kind
+          value: Database
+      - notExists:
+          path: spec.schemas
+        documentSelector:
+          path: kind
+          value: Database
+      - notExists:
+          path: spec.inRoles
+        documentSelector:
+          path: kind
+          value: DatabaseRole
+      # The Pooler CRD requires pgbouncer even when it is empty.
+      - exists:
+          path: spec.pgbouncer
+        documentSelector:
+          path: kind
+          value: Pooler
+
+  - it: drops inline managed roles that a DatabaseRole of the same name replaces
+    values:
+      - ../examples/existing.yaml
+    set:
+      database.name: newdb
+      database.owner: newowner
+      databaseRoles.app.name: app
+      databaseRoles.app.login: false
+      managed.roles:
+        - name: app
+          login: true
+        - name: other
+          login: false
+    asserts:
+      - equal:
+          path: spec.bootstrap.initdb.database
+          value: newdb
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.bootstrap.initdb.owner
+          value: newowner
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.managed.roles
+          value:
+            - name: other
+              login: false
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.login
+          value: false
+        documentSelector:
+          path: kind
+          value: DatabaseRole
+      - equal:
+          path: spec.name
+          value: newdb
+        documentSelector:
+          path: kind
+          value: Database
+
+  - it: accepts a disabled role client certificate without operator TLS
+    values:
+      - ../examples/existing.yaml
+    set:
+      databaseRoles.app.name: app
+      databaseRoles.app.clientCertificate.enabled: false
+    asserts:
+      - equal:
+          path: spec.clientCertificate.enabled
+          value: false
+        documentSelector:
+          path: kind
+          value: DatabaseRole
+
+  - it: derives Database and DatabaseRole names from SQL names before a map key rename
+    values:
+      - ../examples/existing.yaml
+    set:
+      databases.first.name: reporting_db
+      databases.first.owner: app
+      databaseRoles.first.name: reporting_user
+      databaseRoles.first.login: false
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: certificate-client-pooler.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-replica.yaml
+      - hasDocuments:
+          count: 0
+        template: certificate-client-superuser.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-user.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-server.yaml
+      - hasDocuments:
+          count: 1
+        template: cluster.yaml
+      - hasDocuments:
+          count: 0
+        template: credentials.yaml
+      - hasDocuments:
+          count: 1
+        template: databaseroles.yaml
+      - hasDocuments:
+          count: 2
+        template: databases.yaml
+      - hasDocuments:
+          count: 1
+        template: obc-backup.yaml
+      - hasDocuments:
+          count: 1
+        template: objectstore.yaml
+      - hasDocuments:
+          count: 1
+        template: podmonitor.yaml
+      - hasDocuments:
+          count: 0
+        template: poolers.yaml
+      - hasDocuments:
+          count: 0
+        template: recovery-secretstore.yaml
+      - hasDocuments:
+          count: 1
+        template: scheduledbackup.yaml
+      - matchRegex:
+          path: metadata.name
+          pattern: ^example-postgres-db-(app|reporting-db)$
+        documentSelector:
+          path: kind
+          value: Database
+          matchMany: true
+      - isKind:
+          of: Database
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-app
+      - equal:
+          path: spec.name
+          value: app
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-app
+      - isKind:
+          of: Database
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-reporting-db
+      - equal:
+          path: spec.name
+          value: reporting_db
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-reporting-db
+      - isKind:
+          of: DatabaseRole
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-role-reporting-user
+      - equal:
+          path: spec.name
+          value: reporting_user
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-role-reporting-user
+      - equal:
+          path: metadata.name
+          value: example-postgres-role-reporting-user
+        documentSelector:
+          path: kind
+          value: DatabaseRole
+
+  - it: derives Database and DatabaseRole names from SQL names after a map key rename
+    values:
+      - ../examples/existing.yaml
+    set:
+      databases.second.name: reporting_db
+      databases.second.owner: app
+      databaseRoles.second.name: reporting_user
+      databaseRoles.second.login: false
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: certificate-client-pooler.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-replica.yaml
+      - hasDocuments:
+          count: 0
+        template: certificate-client-superuser.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-client-user.yaml
+      - hasDocuments:
+          count: 1
+        template: certificate-server.yaml
+      - hasDocuments:
+          count: 1
+        template: cluster.yaml
+      - hasDocuments:
+          count: 0
+        template: credentials.yaml
+      - hasDocuments:
+          count: 1
+        template: databaseroles.yaml
+      - hasDocuments:
+          count: 2
+        template: databases.yaml
+      - hasDocuments:
+          count: 1
+        template: obc-backup.yaml
+      - hasDocuments:
+          count: 1
+        template: objectstore.yaml
+      - hasDocuments:
+          count: 1
+        template: podmonitor.yaml
+      - hasDocuments:
+          count: 0
+        template: poolers.yaml
+      - hasDocuments:
+          count: 0
+        template: recovery-secretstore.yaml
+      - hasDocuments:
+          count: 1
+        template: scheduledbackup.yaml
+      - matchRegex:
+          path: metadata.name
+          pattern: ^example-postgres-db-(app|reporting-db)$
+        documentSelector:
+          path: kind
+          value: Database
+          matchMany: true
+      - isKind:
+          of: Database
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-app
+      - equal:
+          path: spec.name
+          value: app
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-app
+      - isKind:
+          of: Database
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-reporting-db
+      - equal:
+          path: spec.name
+          value: reporting_db
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-db-reporting-db
+      - isKind:
+          of: DatabaseRole
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-role-reporting-user
+      - equal:
+          path: spec.name
+          value: reporting_user
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-role-reporting-user
+      - equal:
+          path: metadata.name
+          value: example-postgres-role-reporting-user
+        documentSelector:
+          path: kind
+          value: DatabaseRole

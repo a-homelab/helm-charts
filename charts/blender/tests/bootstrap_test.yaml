@@ -1,0 +1,184 @@
+suite: bootstrap ConfigMap and prepare init container
+templates:
+  - templates/all.yaml
+release:
+  name: test-blender
+  namespace: test
+tests:
+  - it: renders every bootstrap file into the ConfigMap with a checksum
+    asserts:
+      - isNotNullOrEmpty:
+          path: data["prepare.sh"]
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - isNotNullOrEmpty:
+          path: data["mcp_autostart.py"]
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - isNotNullOrEmpty:
+          path: data["verify_gpu.py"]
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - isNotNullOrEmpty:
+          path: data["sync_sources.sh"]
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - isNotNullOrEmpty:
+          path: data["start_server.py"]
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - isNotNullOrEmpty:
+          path: data["requirements.txt"]
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - equal:
+          path: spec.template.spec.volumes[?(@.name == "bootstrap")].configMap
+          value:
+            name: test-blender-bootstrap
+        documentSelector:
+          path: kind
+          value: Deployment
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/blender-bootstrap"]
+          pattern: ^[0-9a-f]{64}$
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: follows a bootstrap data override
+    set:
+      appResources:
+        configMap:
+          bootstrap:
+            data:
+              prepare.sh: custom bootstrap
+    asserts:
+      - equal:
+          path: data["prepare.sh"]
+          value: custom bootstrap
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/blender-bootstrap"]
+          pattern: ^[0-9a-f]{64}$
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  # The two checksums below hash only test-controlled data, so they change when
+  # the hashing template changes, not when files/ changes. They must differ.
+  - it: renders exactly the bootstrap keys and hashes test-controlled data
+    set:
+      appResources:
+        configMap:
+          bootstrap:
+            data:
+              prepare.sh: prepare.sh-one
+              mcp_autostart.py: mcp_autostart.py-one
+              verify_gpu.py: verify_gpu.py-one
+              sync_sources.sh: sync_sources.sh-one
+              start_server.py: start_server.py-one
+              requirements.txt: requirements.txt-one
+    asserts:
+      - equal:
+          path: data
+          value:
+            prepare.sh: prepare.sh-one
+            mcp_autostart.py: mcp_autostart.py-one
+            verify_gpu.py: verify_gpu.py-one
+            sync_sources.sh: sync_sources.sh-one
+            start_server.py: start_server.py-one
+            requirements.txt: requirements.txt-one
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - equal:
+          path: spec.template.metadata.annotations["checksum/blender-bootstrap"]
+          value: 2fb4042f0df0929daf3ce0ec5d675a8fa1e0c36abe73eb8731435d7abbe4c556
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: changes the checksum when the bootstrap data changes
+    set:
+      appResources:
+        configMap:
+          bootstrap:
+            data:
+              prepare.sh: prepare.sh-two
+              mcp_autostart.py: mcp_autostart.py-two
+              verify_gpu.py: verify_gpu.py-two
+              sync_sources.sh: sync_sources.sh-two
+              start_server.py: start_server.py-two
+              requirements.txt: requirements.txt-two
+    asserts:
+      - equal:
+          path: data["prepare.sh"]
+          value: prepare.sh-two
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - equal:
+          path: spec.template.metadata.annotations["checksum/blender-bootstrap"]
+          value: f4ecd30641873b07bd16c840ebe1473bcbcc972ba3aa5804fe858bcd5645d36e
+        documentSelector:
+          path: kind
+          value: Deployment
+      - notEqual:
+          path: spec.template.metadata.annotations["checksum/blender-bootstrap"]
+          value: 2fb4042f0df0929daf3ce0ec5d675a8fa1e0c36abe73eb8731435d7abbe4c556
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: prepare inherits the main image and accepts resource overrides
+    set:
+      components.main.container.image.repository: registry.example.com/blender
+      components.main.container.image.tag: custom
+      components.main.container.env.PUID: "1234"
+      components.main.container.env.PGID: "5678"
+      components.main.initContainers.prepare.resources.limits.memory: 512Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/blender:custom
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: registry.example.com/blender:custom
+        documentSelector:
+          path: kind
+          value: Deployment
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].image
+          pattern: :custom$
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.limits.memory
+          value: 512Mi
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "PUID")].value
+          value: "1234"
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].env[?(@.name == "PGID")].value
+          value: "5678"
+        documentSelector:
+          path: kind
+          value: Deployment
