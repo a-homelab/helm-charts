@@ -69,7 +69,7 @@ def main():
     )
     parser.add_argument("--baseline-ref", required=True)
     parser.add_argument(
-        "--manifests", type=Path, default=ROOT.parent / "kubernetes-manifests"
+        "--manifests", type=Path, default=ROOT.parent / "gitops"
     )
     parser.add_argument(
         "--live-clusters",

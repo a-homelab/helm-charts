@@ -531,7 +531,7 @@ helm unittest charts/postgresql
 python scripts/validate_postgresql_schemas.py --cache /tmp/postgresql-schema-sources
 python scripts/check_postgresql_consumers.py \
   --baseline-ref <commit the consumers pin> \
-  --manifests ../kubernetes-manifests
+  --manifests ../gitops
 ```
 
 The chart's render and validation tests are helm-unittest suites in `tests/`
