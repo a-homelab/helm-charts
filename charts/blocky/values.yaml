@@ -1,0 +1,144 @@
+# Blocky's own settings. The chart renders this map as Blocky's config.yml, so
+# every key is Blocky's: https://0xerr0r.github.io/blocky/latest/configuration/
+# Maps here merge with an instance's values; lists replace. The instance must
+# supply upstreams.groups.default, which Blocky requires.
+blocky:
+  config:
+    # The DNS port must stay 53 for the Service and the healthcheck probes; the
+    # HTTP port serves /metrics for the ServiceMonitor.
+    ports:
+      dns: 53
+      http: 4000
+    log:
+      format: json
+    prometheus:
+      enable: true
+
+appResources:
+  configMap:
+    # The rendered config.yml, mounted at the image's BLOCKY_CONFIG_FILE.
+    config:
+      tpl: true
+      data:
+        config.yml: '{{ toYaml .Values.blocky.config }}'
+
+components:
+  main:
+    kind: Deployment
+    deployment:
+      # Blocky keeps no state, so replicas are interchangeable. Three survive a
+      # node loss while a rollout or drain takes another.
+      replicas: 3
+      # maxUnavailable 0: a rollout adds a ready pod before it removes one.
+      strategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 0
+          maxSurge: 1
+    container:
+      # The tag defaults to appVersion.
+      image:
+        repository: ghcr.io/0xerr0r/blocky
+      ports:
+        dns-udp:
+          port: 53
+          protocol: UDP
+        dns-tcp:
+          port: 53
+          protocol: TCP
+        http:
+          port: 4000
+      # The image's binary carries cap_net_bind_service=+p and raises it itself,
+      # so port 53 needs only that capability back under drop ALL.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 100
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+          add:
+            - NET_BIND_SERVICE
+        seccompProfile:
+          type: RuntimeDefault
+      # Not tuned until measured. The OISD wildcard list takes about 15Mi of
+      # heap (Blocky's string cache benchmark); the rest is the answer cache.
+      resources:
+        requests:
+          cpu: 50m
+          memory: 96Mi
+        limits:
+          memory: 256Mi
+      # `blocky healthcheck` queries healthcheck.blocky on the configured DNS
+      # port. With the default blocking init strategy the listener opens only
+      # after the lists load, so startup and readiness wait for them.
+      probes:
+        startup:
+          exec:
+            command:
+              - /app/blocky
+              - healthcheck
+          periodSeconds: 5
+          failureThreshold: 60
+        liveness:
+          exec:
+            command:
+              - /app/blocky
+              - healthcheck
+          periodSeconds: 10
+          timeoutSeconds: 3
+        readiness:
+          exec:
+            command:
+              - /app/blocky
+              - healthcheck
+          periodSeconds: 10
+          timeoutSeconds: 3
+      volumeMounts:
+        config:
+          name: config
+          mountPath: /app/config.yml
+          subPath: config.yml
+          readOnly: true
+    pod:
+      automountServiceAccountToken: false
+      # A config change rolls the pods; a subPath mount never sees updates.
+      annotations:
+        checksum/config: '{{ include "common.checksum.configMap" (list . "config") }}'
+      volumes:
+        config:
+          configMap:
+            ref: config
+      # One replica per node, so a node loss takes one resolver. In overrides
+      # because only they are templated, and the selector names the release.
+      overrides:
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: DoNotSchedule
+            nodeTaintsPolicy: Honor
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: '{{ include "common.name" . }}'
+                app.kubernetes.io/instance: '{{ .Release.Name }}'
+                app.kubernetes.io/component: main
+    # One pod at a time through drains, matching the rollout's surge of one.
+    pdb:
+      enabled: true
+      maxUnavailable: 1
+    # DNS on 53 over both protocols and metrics on 4000. An instance sets
+    # clusterIP when another resolver forwards to Blocky by address.
+    services:
+      main:
+        ports:
+          dns-udp: {}
+          dns-tcp: {}
+          http: {}
+    serviceMonitors:
+      main:
+        service: main
+        endpoints:
+          http:
+            path: /metrics

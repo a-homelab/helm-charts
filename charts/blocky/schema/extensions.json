@@ -1,0 +1,15 @@
+{
+  "properties": {
+    "blocky": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config"],
+      "properties": {
+        "config": {
+          "description": "Blocky's config.yml, rendered verbatim; Blocky validates its own keys.",
+          "type": "object"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,181 @@
+suite: blocky replicas, configuration and endpoints
+templates:
+  - templates/all.yaml
+release:
+  name: blocky
+  namespace: dns
+tests:
+  - it: runs three interchangeable replicas that never drop below three ready
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.strategy
+          value:
+            type: RollingUpdate
+            rollingUpdate:
+              maxUnavailable: 0
+              maxSurge: 1
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+        documentSelector:
+          path: kind
+          value: PodDisruptionBudget
+
+  - it: spreads replicas across nodes with a selector that matches its own pods
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].labelSelector.matchLabels
+          value:
+            app.kubernetes.io/name: blocky
+            app.kubernetes.io/instance: blocky
+            app.kubernetes.io/component: main
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.metadata.labels
+          value:
+            app.kubernetes.io/name: blocky
+            app.kubernetes.io/instance: blocky
+            app.kubernetes.io/component: main
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: binds port 53 unprivileged with only NET_BIND_SERVICE
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities
+          value:
+            drop:
+              - ALL
+            add:
+              - NET_BIND_SERVICE
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsUser
+          value: 100
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: gates startup, liveness and readiness on blocky's own healthcheck
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.exec.command
+          value: [/app/blocky, healthcheck]
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.exec.command
+          value: [/app/blocky, healthcheck]
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.exec.command
+          value: [/app/blocky, healthcheck]
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: merges an instance's settings into config.yml and mounts it at BLOCKY_CONFIG_FILE
+    set:
+      blocky:
+        config:
+          upstreams:
+            groups:
+              default:
+                - tcp-tls:1.1.1.1:853
+    asserts:
+      - equal:
+          path: data["config.yml"]
+          value: |-
+            log:
+              format: json
+            ports:
+              dns: 53
+              http: 4000
+            prometheus:
+              enable: true
+            upstreams:
+              groups:
+                default:
+                - tcp-tls:1.1.1.1:853
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /app/config.yml
+            subPath: config.yml
+            readOnly: true
+        documentSelector:
+          path: kind
+          value: Deployment
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+        documentSelector:
+          path: kind
+          value: Deployment
+
+  - it: serves DNS over UDP and TCP and metrics on one Service, at a stated address
+    set:
+      components:
+        main:
+          services:
+            main:
+              clusterIP: 10.12.100.1
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: 10.12.100.1
+        documentSelector:
+          path: kind
+          value: Service
+      - equal:
+          path: spec.ports
+          value:
+            - name: dns-tcp
+              port: 53
+              protocol: TCP
+              targetPort: dns-tcp
+            - name: dns-udp
+              port: 53
+              protocol: UDP
+              targetPort: dns-udp
+            - name: http
+              port: 4000
+              protocol: TCP
+              targetPort: http
+        documentSelector:
+          path: kind
+          value: Service
+      - equal:
+          path: spec.endpoints
+          value:
+            - port: http
+              path: /metrics
+        documentSelector:
+          path: kind
+          value: ServiceMonitor

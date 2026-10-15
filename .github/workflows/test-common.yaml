@@ -32,12 +32,15 @@ jobs:
           helm package charts/common --destination charts/blender/charts
           mkdir -p charts/opencode/charts
           helm package charts/common --destination charts/opencode/charts
+          mkdir -p charts/blocky/charts
+          helm package charts/common --destination charts/blocky/charts
       - name: Check generated schemas
         run: |-
           python scripts/common_schema.py charts/common --check
           python scripts/common_schema.py charts/common-tests --check
           python scripts/common_schema.py charts/blender --extensions charts/blender/schema/extensions.json --check
           python scripts/common_schema.py charts/opencode --extensions charts/opencode/schema/extensions.json --check
+          python scripts/common_schema.py charts/blocky --extensions charts/blocky/schema/extensions.json --check
       - name: Verify pinned output schema snapshots
         if: startsWith(matrix.helm, 'v3.')
         run: python scripts/update_common_schemas.py --cache '${{ runner.temp }}/common-schema-sources' --check
@@ -47,12 +50,13 @@ jobs:
           helm lint charts/common-tests --strict
           helm lint charts/blender --strict
           helm lint charts/opencode --strict
+          helm lint charts/blocky --strict
           helm lint charts/postgresql --strict -f charts/postgresql/examples/existing.yaml
       - name: Install helm-unittest
         # Helm 4 cannot verify plugins installed from a git repository.
         run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.2 ${{ startsWith(matrix.helm, 'v4.') && '--verify=false' || '' }}
       - name: Run chart unit tests
-        run: helm unittest charts/common-tests charts/postgresql charts/blender charts/opencode
+        run: helm unittest charts/common-tests charts/postgresql charts/blender charts/opencode charts/blocky
       - name: Test chart scripts and schema tooling
         run: python -m pytest scripts/test_common.py charts/blender/tests charts/opencode/tests -q
       - name: Validate PostgreSQL examples against pinned upstream CRDs
