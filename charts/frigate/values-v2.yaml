@@ -42,6 +42,7 @@ components:
           appProtocol: tcp
         webrtc-udp:
           port: 8555
+          protocol: UDP
           appProtocol: udp
     pod:
       annotations:
