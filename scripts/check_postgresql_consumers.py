@@ -27,11 +27,13 @@ def resources(chart, release, namespace, files=(), settings=()):
 def consumers(manifests):
     # The root ApplicationSet passes each category root the root chart's global
     # values, then sets the category's basePath and project.
-    root_values = manifests / "applications/root/charts/root/values.yaml"
-    for root in sorted(manifests.glob("applications/*/root/charts/root")):
-        category = root.parents[2].name
+    root_values = manifests / "apps/root/charts/apps/values.yaml"
+    for root in sorted(manifests.glob("apps/*/charts/apps")):
+        category = root.parents[1].name
+        if category == "root":
+            continue
         settings = [
-            f"global.argocd.basePath=applications/{category}",
+            f"global.argocd.basePath=apps/{category}",
             "global.argocd.project=chart-review",
         ]
         for app in resources(
