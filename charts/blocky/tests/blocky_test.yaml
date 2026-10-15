@@ -186,3 +186,44 @@ tests:
         documentSelector:
           path: kind
           value: ServiceMonitor
+
+  - it: ships no dashboard unless one is passed in
+    asserts:
+      - containsDocument:
+          kind: ConfigMap
+          apiVersion: v1
+          name: blocky-dashboard
+        not: true
+
+  - it: publishes a passed-in dashboard verbatim for the Grafana sidecar
+    set:
+      appResources:
+        configMap:
+          dashboard:
+            enabled: true
+      blocky:
+        dashboard:
+          json: '{"title": "Blocky", "panels": [{"legendFormat": "{{instance}}"}]}'
+    asserts:
+      - equal:
+          path: data["blocky.json"]
+          value: '{"title": "Blocky", "panels": [{"legendFormat": "{{instance}}"}]}'
+        documentSelector:
+          path: metadata.name
+          value: blocky-dashboard
+      - equal:
+          path: metadata.labels.grafana_dashboard
+          value: "1"
+        documentSelector:
+          path: metadata.name
+          value: blocky-dashboard
+
+  - it: refuses an enabled dashboard with no JSON
+    set:
+      appResources:
+        configMap:
+          dashboard:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: blocky.dashboard.json is empty

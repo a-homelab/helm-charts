@@ -27,6 +27,26 @@ blocky validate --config /tmp/config.yml
 A configuration change rolls the pods through a checksum annotation, because
 the file is a subPath mount and never sees ConfigMap updates.
 
+## Grafana dashboard
+
+Blocky publishes its dashboard as `docs/blocky-grafana.json` in each release.
+The chart ships no copy: pass the file for the release the image runs, and
+enable the ConfigMap that carries it to the Grafana sidecar
+(`grafana_dashboard: "1"`):
+
+```sh
+helm template blocky charts/blocky \
+  --set appResources.configMap.dashboard.enabled=true \
+  --set-file blocky.dashboard.json=blocky-grafana.json
+```
+
+Under Argo CD, add Blocky's repository as a `ref` source pinned to the image's
+tag and read the file with `helm.fileParameters`
+(`path: $<ref>/docs/blocky-grafana.json`). One YAML anchor for that tag and
+`components.main.container.image.tag` keeps the dashboard and the image on the
+same release. The dashboard has its own ConfigMap, so a new dashboard does not
+roll the pods.
+
 ## Availability
 
 Three replicas spread one per node, roll out with `maxUnavailable: 0`, and

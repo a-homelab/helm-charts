@@ -3,11 +3,23 @@
     "blocky": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["config"],
+      "required": [
+        "config"
+      ],
       "properties": {
         "config": {
           "description": "Blocky's config.yml, rendered verbatim; Blocky validates its own keys.",
           "type": "object"
+        },
+        "dashboard": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "json": {
+              "description": "Blocky's Grafana dashboard JSON for the deployed release; required when appResources.configMap.dashboard is enabled.",
+              "type": "string"
+            }
+          }
         }
       }
     }

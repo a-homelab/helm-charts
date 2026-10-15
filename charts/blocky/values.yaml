@@ -13,9 +13,27 @@ blocky:
       format: json
     prometheus:
       enable: true
+  # Blocky's Grafana dashboard, docs/blocky-grafana.json from the Blocky
+  # release the image runs. Pass it with --set-file blocky.dashboard.json=...;
+  # under Argo CD, helm.fileParameters can read it from a ref source pinned to
+  # the image's tag. Rendered only with appResources.configMap.dashboard
+  # enabled.
+  dashboard:
+    json: ""
 
 appResources:
   configMap:
+    # Picked up by the Grafana sidecar. Off by default because the chart ships
+    # no dashboard; enable it together with blocky.dashboard.json. Separate
+    # from config, so a dashboard change does not roll the pods.
+    dashboard:
+      enabled: false
+      labels:
+        # kube-prometheus-stack's default sidecar label.
+        grafana_dashboard: "1"
+      tpl: true
+      data:
+        blocky.json: '{{ required "blocky.dashboard.json is empty: pass docs/blocky-grafana.json with --set-file, or disable appResources.configMap.dashboard" .Values.blocky.dashboard.json }}'
     # The rendered config.yml, mounted at the image's BLOCKY_CONFIG_FILE.
     config:
       tpl: true
