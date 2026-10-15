@@ -33,6 +33,13 @@ tests:
   - it: spreads replicas across nodes with a selector that matches its own pods
     asserts:
       - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].matchLabelKeys
+          value:
+            - pod-template-hash
+        documentSelector:
+          path: kind
+          value: Deployment
+      - equal:
           path: spec.template.spec.topologySpreadConstraints[0].labelSelector.matchLabels
           value:
             app.kubernetes.io/name: blocky

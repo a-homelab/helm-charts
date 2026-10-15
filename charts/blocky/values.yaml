@@ -113,12 +113,16 @@ components:
             ref: config
       # One replica per node, so a node loss takes one resolver. In overrides
       # because only they are templated, and the selector names the release.
+      # pod-template-hash scopes the count to one ReplicaSet, so a rollout does
+      # not count the old pods it is replacing and stack new ones on a node.
       overrides:
         topologySpreadConstraints:
           - maxSkew: 1
             topologyKey: kubernetes.io/hostname
             whenUnsatisfiable: DoNotSchedule
             nodeTaintsPolicy: Honor
+            matchLabelKeys:
+              - pod-template-hash
             labelSelector:
               matchLabels:
                 app.kubernetes.io/name: '{{ include "common.name" . }}'
