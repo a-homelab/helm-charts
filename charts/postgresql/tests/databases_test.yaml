@@ -400,3 +400,15 @@ tests:
         documentSelector:
           path: kind
           value: DatabaseRole
+
+  - it: keeps authMethod out of the Database spec
+    values:
+      - ../examples/existing.yaml
+    set:
+      database.authMethod: certificate
+    asserts:
+      - notExists:
+          path: spec.authMethod
+        documentSelector:
+          path: kind
+          value: Database

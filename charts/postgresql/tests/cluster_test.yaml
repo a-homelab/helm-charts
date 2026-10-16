@@ -745,3 +745,55 @@ tests:
         documentSelector:
           path: kind
           value: Database
+
+  - it: leaves pg_hba to CNPG's password rule by default
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - notExists:
+          path: spec.postgresql.pg_hba
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: puts the owner's certificate rule ahead of pg_hba from values
+    values:
+      - ../examples/existing.yaml
+    set:
+      database.authMethod: certificate
+      postgresql:
+        parameters:
+          max_connections: "200"
+        pg_hba:
+          - hostssl app reporting all cert
+    asserts:
+      - equal:
+          path: spec.postgresql.pg_hba
+          value:
+            - hostssl all app all cert
+            - hostnossl all app all reject
+            - hostssl app reporting all cert
+        documentSelector:
+          path: kind
+          value: Cluster
+      - equal:
+          path: spec.postgresql.parameters.max_connections
+          value: "200"
+        documentSelector:
+          path: kind
+          value: Cluster
+
+  - it: renders the owner's certificate rule without other postgresql values
+    values:
+      - ../examples/existing.yaml
+    set:
+      database.authMethod: certificate
+    asserts:
+      - equal:
+          path: spec.postgresql.pg_hba
+          value:
+            - hostssl all app all cert
+            - hostnossl all app all reject
+        documentSelector:
+          path: kind
+          value: Cluster

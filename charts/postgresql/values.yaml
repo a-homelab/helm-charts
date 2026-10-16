@@ -158,6 +158,14 @@ database:
   # changes an existing database's collation.
   localeCType: C
   localeCollate: C
+  # How the owner logs in. password: CNPG's catch-all scram-sha-256 rule.
+  # certificate: renders hostssl all <owner> all cert and hostnossl all <owner>
+  # all reject ahead of postgresql.pg_hba, so the owner can log in to any
+  # database only over TLS with <cluster>-client-user-tls and its password is
+  # never accepted. PostgreSQL uses the first matching rule and never falls
+  # back, so switch only once the application sends that certificate.
+  # Requires tls.mode=certManager and tls.clientCertificate.
+  authMethod: password
   # Overrides the Database/DatabaseRole wave for this CR only.
   syncWave: ""
   # [{name, ensure, version, schema}]. Binaries must exist in the operand image.

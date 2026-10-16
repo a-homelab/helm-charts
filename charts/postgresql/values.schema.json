@@ -105,6 +105,13 @@
         "owner": {
           "type": "string"
         },
+        "authMethod": {
+          "type": "string",
+          "enum": [
+            "password",
+            "certificate"
+          ]
+        },
         "syncWave": {
           "oneOf": [
             {

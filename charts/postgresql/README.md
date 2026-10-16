@@ -368,6 +368,37 @@ request/read `postgres` certificates and which clients can reach PostgreSQL.
 See [PostgreSQL certificate authentication](https://www.postgresql.org/docs/16/auth-cert.html).
 No broad HBA rule is injected automatically.
 
+### Certificate login for the owner
+
+`database.authMethod: certificate` makes the owner log in with
+`<cluster>-client-user-tls` (CN = `database.owner`) instead of its password. The
+chart renders these rules ahead of `postgresql.pg_hba`; CNPG places user rules
+after its fixed local, replication and pooler rules and before its catch-all
+`host all all all scram-sha-256`:
+
+```text
+hostssl all <owner> all cert
+hostnossl all <owner> all reject
+```
+
+The second rule closes the non-TLS path, where the catch-all rule would
+otherwise accept the password. PostgreSQL uses the first matching rule and
+never falls back, so switch a cluster only after its application sends the
+certificate (`sslcert`/`sslkey`, or `PGSSLCERT`/`PGSSLKEY`). CNPG applies the
+change with a reload.
+
+This removes password rotation from the owner's login path. PostgreSQL keeps
+one password per role, so a rotation breaks every new connection that still
+uses the old password until the application restarts. A renewed certificate
+does not invalidate the previous one, which stays valid until it expires
+(90-day certificates renewed 15 days early), so even a restart on renewal is
+gap-free. Applications whose driver reads the certificate files on each
+connection (libpq, pgx v4) pick up a renewal from the mounted Secret; those that
+read them once (pgx v5) need a restart, for example a Reloader annotation on
+`<cluster>-client-user-tls`. Mount the Secret as a directory, not with
+`subPath`, which never receives updates. The generated password remains for
+break-glass use; its rotation no longer affects the application.
+
 ## Backups and recovery
 
 `backup.enabled`, the default, archives WAL through the Barman Cloud plugin to

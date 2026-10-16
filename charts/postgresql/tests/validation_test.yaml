@@ -381,3 +381,26 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: imageCatalogRef(\.|/)major
+
+  - it: rejects an unknown authMethod
+    set:
+      database.authMethod: cert
+    asserts:
+      - failedTemplate:
+          errorPattern: authMethod
+
+  - it: rejects certificate login without the owner's client certificate
+    set:
+      database.authMethod: certificate
+      tls.clientCertificate: false
+    asserts:
+      - failedTemplate:
+          errorPattern: database\.authMethod=certificate requires tls\.mode=certManager and tls\.clientCertificate
+
+  - it: rejects certificate login outside certManager mode
+    set:
+      database.authMethod: certificate
+      tls.mode: operator
+    asserts:
+      - failedTemplate:
+          errorPattern: database\.authMethod=certificate requires tls\.mode=certManager

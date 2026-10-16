@@ -194,6 +194,9 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- if and (ne .Values.tls.mode "external") .Values.tls.certificates -}}
 {{- fail "tls.certificates requires tls.mode=external" -}}
 {{- end -}}
+{{- if and (eq .Values.database.authMethod "certificate") (not (and (eq .Values.tls.mode "certManager") .Values.tls.clientCertificate)) -}}
+{{- fail "database.authMethod=certificate requires tls.mode=certManager and tls.clientCertificate, which issue the owner's <cluster>-client-user-tls" -}}
+{{- end -}}
 {{- if and .Values.imageCatalogRef (or .Values.image.tag .Values.image.digest) -}}
 {{- fail "imageCatalogRef replaces image.tag and image.digest; remove them so the values show the running version" -}}
 {{- end -}}

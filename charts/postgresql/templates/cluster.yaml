@@ -30,7 +30,14 @@ spec:
   {{- end }}
   instances: {{ .Values.instances }}
   enableSuperuserAccess: {{ .Values.enableSuperuserAccess }}
-  {{- with .Values.postgresql }}
+  {{- $postgresql := deepCopy .Values.postgresql }}
+  {{- if eq .Values.database.authMethod "certificate" }}
+  {{- $owner := include "postgresql.databaseOwner" . }}
+  {{- /* cert is TLS-only, so a non-TLS login would reach CNPG's catch-all scram rule; reject it. */}}
+  {{- $ownerRules := list (printf "hostssl all %s all cert" $owner) (printf "hostnossl all %s all reject" $owner) }}
+  {{- $_ := set $postgresql "pg_hba" (concat $ownerRules ($postgresql.pg_hba | default list)) }}
+  {{- end }}
+  {{- with $postgresql }}
   postgresql:
     {{- toYaml . | nindent 4 }}
   {{- end }}

@@ -1,7 +1,7 @@
 {{- $root := . -}}
 {{- $databases := deepCopy .Values.databases -}}
 {{- if hasKey $databases "app" -}}{{- fail "databases.app is reserved for the database key" -}}{{- end -}}
-{{- $app := omit .Values.database "syncWave" -}}
+{{- $app := omit .Values.database "syncWave" "authMethod" -}}
 {{- $_ := set $app "name" (include "postgresql.databaseName" .) -}}
 {{- $_ := set $app "owner" (include "postgresql.databaseOwner" .) -}}
 {{- $_ := set $databases "app" $app -}}
