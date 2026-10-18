@@ -52,7 +52,10 @@ snapshot:
   s3:
     storageClassName: rook-ceph-bucket
     maxSize: 5G
-    retentionDays: 30
+    # Dragonfly loads only the newest snapshot at startup. A 5-minute cron kept for
+    # 30 days filled the 5G quota, and failed saves then left an incomplete newest
+    # snapshot that replicas could not load.
+    retentionDays: 2
     existingSecret: {}
       # name: my-existing-secret
       # key: my-secret-key

@@ -13,7 +13,15 @@ spec:
       {
         "Rules": [
           {
-            "ID": "ExpireAfter30Days",
+            "ID": "AbortIncompleteMultipartUploads",
+            "Status": "Enabled",
+            "Prefix": "",
+            "AbortIncompleteMultipartUpload": {
+              "DaysAfterInitiation": 1
+            }
+          },
+          {
+            "ID": "ExpireSnapshots",
             "Status": "Enabled",
             "Prefix": "",
             "Expiration": {

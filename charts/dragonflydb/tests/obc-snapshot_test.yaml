@@ -1,0 +1,57 @@
+suite: dragonflydb S3 snapshot bucket lifecycle
+templates:
+  - templates/obc-snapshot.yaml
+release:
+  name: codecov-dragonflydb
+  namespace: codecov
+set:
+  snapshot:
+    enabled: true
+    type: s3
+tests:
+  - it: aborts incomplete uploads and expires snapshots after the retention period
+    asserts:
+      - equal:
+          path: spec.additionalConfig.bucketLifecycle
+          value: |
+            {
+              "Rules": [
+                {
+                  "ID": "AbortIncompleteMultipartUploads",
+                  "Status": "Enabled",
+                  "Prefix": "",
+                  "AbortIncompleteMultipartUpload": {
+                    "DaysAfterInitiation": 1
+                  }
+                },
+                {
+                  "ID": "ExpireSnapshots",
+                  "Status": "Enabled",
+                  "Prefix": "",
+                  "Expiration": {
+                    "Days": 2
+                  }
+                }
+              ]
+            }
+
+  - it: takes the expiration from snapshot.s3.retentionDays
+    set:
+      snapshot.s3.retentionDays: 7
+    asserts:
+      - matchRegex:
+          path: spec.additionalConfig.bucketLifecycle
+          pattern: '"Days": 7\n'
+
+  - it: keeps the 5G bucket quota
+    asserts:
+      - equal:
+          path: spec.additionalConfig.maxSize
+          value: 5G
+
+  - it: renders no bucket for PVC snapshots
+    set:
+      snapshot.type: pvc
+    asserts:
+      - hasDocuments:
+          count: 0
