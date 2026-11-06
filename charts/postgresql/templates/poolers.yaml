@@ -1,31 +1,45 @@
-{{- $root := . -}}
 {{- range $key, $pooler := .Values.poolers }}
-{{- $spec := deepCopy $pooler -}}
-{{- if hasKey $spec "cluster" -}}{{- fail "Pooler cluster is assigned by this chart" -}}{{- end -}}
-{{- $resourceName := include "postgresql.poolerName" (dict "root" $root "key" $key) -}}
-{{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) -}}
-{{- $pgbouncer := default (dict) $spec.pgbouncer -}}
-{{- if and (eq $root.Values.tls.mode "certManager") (not $pgbouncer.authQuerySecret) -}}
-{{- /* CNPG's automatic integration signs a client certificate with the client CA key, which cert-manager Secrets do not contain. */ -}}
-{{- $_ := set $pgbouncer "authQuerySecret" (dict "name" (include "postgresql.poolerAuthSecretName" $root)) -}}
-{{- $_ := set $pgbouncer "authQuery" ($pgbouncer.authQuery | default "SELECT usename, passwd FROM public.user_search($1)") -}}
-{{- end -}}
-{{- $_ := set $spec "pgbouncer" $pgbouncer -}}
-{{- $template := default (dict) $spec.template -}}
-{{- $templateMeta := default (dict) $template.metadata -}}
-{{- $_ := set $templateMeta "annotations" (mustMergeOverwrite (deepCopy $root.Values.inheritedAnnotations) (default (dict) $templateMeta.annotations)) -}}
-{{- $_ := set $template "metadata" $templateMeta -}}
-{{- $_ := set $spec "template" $template }}
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Pooler
 metadata:
-  name: {{ $resourceName }}
-  namespace: {{ $root.Release.Namespace | quote }}
+  name: {{ include "postgresql.poolerName" (dict "root" $ "key" $key) }}
+  namespace: {{ $.Release.Namespace | quote }}
   labels:
-    {{- include "postgresql.labels" $root | nindent 4 }}
+    {{- include "postgresql.labels" $ | nindent 4 }}
   annotations:
-    {{- mustMergeOverwrite (include "postgresql.annotations" $root | fromYaml) (dict "argocd.argoproj.io/sync-wave" (include "postgresql.databaseWave" $root)) | toYaml | nindent 4 }}
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.databaseWave" $ | quote }}
+    {{- include "postgresql.extraAnnotations" $ | nindent 4 }}
 spec:
-  {{- toYaml $spec | nindent 2 }}
+  cluster:
+    {{- if hasKey $pooler "cluster" }}{{- fail "Pooler cluster is assigned by this chart" }}{{- end }}
+    name: {{ include "postgresql.fullname" $ }}
+  pgbouncer:
+    {{- $pgbouncer := $pooler.pgbouncer | default dict }}
+    {{- if and (eq $.Values.tls.mode "certManager") (not $pgbouncer.authQuerySecret) }}
+    {{- /* CNPG's automatic integration signs a client certificate with the client CA key, which cert-manager Secrets do not contain. */}}
+    authQuerySecret:
+      name: {{ include "postgresql.poolerAuthSecretName" $ }}
+    authQuery: {{ $pgbouncer.authQuery | default "SELECT usename, passwd FROM public.user_search($1)" | quote }}
+    {{- with omit $pgbouncer "authQuerySecret" "authQuery" }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- else }}
+    {{- toYaml $pgbouncer | nindent 4 }}
+    {{- end }}
+  template:
+    {{- $template := $pooler.template | default dict }}
+    {{- $templateMetadata := $template.metadata | default dict }}
+    metadata:
+      annotations:
+        {{- mustMergeOverwrite (deepCopy $.Values.inheritedAnnotations) ($templateMetadata.annotations | default dict) | toYaml | nindent 8 }}
+      {{- with omit $templateMetadata "annotations" }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- with omit $template "metadata" }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with omit $pooler "pgbouncer" "template" }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
 {{- end }}

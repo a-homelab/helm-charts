@@ -1,15 +1,12 @@
-{{- $needed := false }}
-{{- range .Values.poolers }}
-{{- if not (dig "pgbouncer" "authQuerySecret" "" .) }}{{- $needed = true }}{{- end }}
-{{- end }}
-{{- if and (eq .Values.tls.mode "certManager") $needed }}
+{{- if include "postgresql.poolerAuthCertificateNeeded" . }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: {{ include "postgresql.poolerAuthSecretName" . | quote }}
   namespace: {{ .Release.Namespace | quote }}
   annotations:
-    {{- mustMergeOverwrite (dict "argocd.argoproj.io/sync-wave" "0") (include "postgresql.annotations" . | fromYaml) | toYaml | nindent 4 }}
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.syncWave" . | default "0" | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
 spec:
   secretName: {{ include "postgresql.poolerAuthSecretName" . | quote }}
   secretTemplate:

@@ -1,8 +1,9 @@
 {{- if and .Values.backup.enabled (not .Values.backup.objectStore.existingName) }}
+{{- $name := include "postgresql.fullname" . }}
 apiVersion: barmancloud.cnpg.io/v1
 kind: ObjectStore
 metadata:
-  name: {{ include "postgresql.fullname" . }}
+  name: {{ $name }}
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
@@ -10,7 +11,27 @@ metadata:
     {{- include "postgresql.annotations" . | nindent 4 }}
 spec:
   configuration:
-    {{- include "postgresql.backupConfiguration" . | nindent 4 }}
+    {{- if .Values.backup.configuration }}
+    destinationPath: {{ required "backup.configuration.destinationPath is required" .Values.backup.configuration.destinationPath | quote }}
+    {{- with omit .Values.backup.configuration "destinationPath" }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- else if .Values.backup.objectBucket.enabled }}
+    destinationPath: "s3://{{ $name }}-backup/"
+    endpointURL: http://rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc
+    s3Credentials:
+      accessKeyId:
+        name: "{{ $name }}-backup-bucket"
+        key: AWS_ACCESS_KEY_ID
+      secretAccessKey:
+        name: "{{ $name }}-backup-bucket"
+        key: AWS_SECRET_ACCESS_KEY
+    wal:
+      compression: gzip
+      maxParallel: 8
+    {{- else }}
+    {{- fail "backup.configuration is required without backup.objectBucket.enabled" }}
+    {{- end }}
   retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
   {{- with .Values.backup.objectStore.instanceSidecarConfiguration }}
   instanceSidecarConfiguration:

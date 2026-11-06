@@ -9,7 +9,8 @@ metadata:
     {{- include "postgresql.labels" . | nindent 4 }}
   annotations:
     {{- /* A later wave lets Argo CD wait for the Cluster rollout, so an immediate backup finds the plugin sidecar. */}}
-    {{- mustMergeOverwrite (include "postgresql.annotations" . | fromYaml) (dict "argocd.argoproj.io/sync-wave" (include "postgresql.databaseWave" .)) | toYaml | nindent 4 }}
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.databaseWave" . | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
 spec:
   cluster:
     name: {{ include "postgresql.fullname" . }}

@@ -5,7 +5,8 @@ metadata:
   name: "{{ include "postgresql.fullname" . }}-server-tls"
   namespace: {{ .Release.Namespace | quote }}
   annotations:
-    {{- mustMergeOverwrite (dict "argocd.argoproj.io/sync-wave" "0") (include "postgresql.annotations" . | fromYaml) | toYaml | nindent 4 }}
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.syncWave" . | default "0" | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
 spec:
   secretName: "{{ include "postgresql.fullname" . }}-server-tls"
   secretTemplate:
@@ -39,8 +40,9 @@ spec:
     - "{{ include "postgresql.fullname" . }}-rw.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
     - "{{ include "postgresql.fullname" . }}-r.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
     - "{{ include "postgresql.fullname" . }}-ro.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
-    {{- range concat (include "postgresql.poolerDNSNames" . | fromJsonArray) .Values.tls.serverAltDNSNames }}
-    - {{ . | quote }}
+    {{- include "postgresql.poolerDNSNames" . | nindent 4 }}
+    {{- with .Values.tls.serverAltDNSNames }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
   issuerRef:
     {{- include "postgresql.issuerRef" . | nindent 4 }}

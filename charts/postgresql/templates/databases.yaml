@@ -1,37 +1,38 @@
-{{- $root := . -}}
-{{- $databases := deepCopy .Values.databases -}}
-{{- if hasKey $databases "app" -}}{{- fail "databases.app is reserved for the database key" -}}{{- end -}}
-{{- $app := omit .Values.database "syncWave" "authMethod" -}}
-{{- $_ := set $app "name" (include "postgresql.databaseName" .) -}}
-{{- $_ := set $app "owner" (include "postgresql.databaseOwner" .) -}}
-{{- $_ := set $databases "app" $app -}}
-{{- $names := dict -}}
-{{- $resourceNames := dict -}}
-{{- range $key, $database := $databases }}
-{{- $spec := mustMergeOverwrite (dict "databaseReclaimPolicy" "retain" "ensure" "present") (deepCopy $database) -}}
-{{- $_ := required (printf "databases.%s.name is required" $key) $spec.name -}}
-{{- $_ := required (printf "databases.%s.owner is required" $key) $spec.owner -}}
-{{- if hasKey $names $spec.name -}}{{- fail (printf "duplicate database name %s" $spec.name) -}}{{- end -}}
-{{- $_ := set $names $spec.name true -}}
-{{- $resourceName := include "postgresql.sqlResourceName" (dict "root" $root "prefix" "db" "sqlName" $spec.name) -}}
-{{- if hasKey $resourceNames $resourceName -}}{{- fail (printf "duplicate Database resource name %s; database names must differ after normalization" $resourceName) -}}{{- end -}}
-{{- $_ := set $resourceNames $resourceName true -}}
-{{- if hasKey $spec "cluster" -}}{{- fail "Database cluster is assigned by this chart" -}}{{- end -}}
-{{- $_ := set $spec "cluster" (dict "name" (include "postgresql.fullname" $root)) -}}
-{{- $wave := include "postgresql.databaseWave" $root -}}
-{{- if and (eq $key "app") (ne (toString $root.Values.database.syncWave) "") -}}
-{{- $wave = toString $root.Values.database.syncWave -}}
-{{- end }}
+{{- include "postgresql.validateDatabases" . }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: {{ include "postgresql.sqlResourceName" (dict "root" . "prefix" "db" "sqlName" (include "postgresql.databaseName" .)) }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ .Values.database.syncWave | toString | default (include "postgresql.databaseWave" .) | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
+spec:
+  cluster:
+    name: {{ include "postgresql.fullname" . }}
+  name: {{ include "postgresql.databaseName" . | quote }}
+  owner: {{ include "postgresql.databaseOwner" . | quote }}
+  ensure: {{ .Values.database.ensure | default "present" }}
+  databaseReclaimPolicy: {{ .Values.database.databaseReclaimPolicy | default "retain" }}
+  {{- include "postgresql.pruneEmpty" (omit .Values.database "name" "owner" "ensure" "databaseReclaimPolicy" "syncWave" "authMethod") | nindent 2 }}
+{{- range $database := .Values.databases }}
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: {{ $resourceName }}
-  namespace: {{ $root.Release.Namespace | quote }}
+  name: {{ include "postgresql.sqlResourceName" (dict "root" $ "prefix" "db" "sqlName" $database.name) }}
+  namespace: {{ $.Release.Namespace | quote }}
   labels:
-    {{- include "postgresql.labels" $root | nindent 4 }}
+    {{- include "postgresql.labels" $ | nindent 4 }}
   annotations:
-    {{- mustMergeOverwrite (include "postgresql.annotations" $root | fromYaml) (dict "argocd.argoproj.io/sync-wave" $wave) | toYaml | nindent 4 }}
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.databaseWave" $ | quote }}
+    {{- include "postgresql.extraAnnotations" $ | nindent 4 }}
 spec:
-  {{- include "postgresql.pruneEmpty" $spec | nindent 2 }}
+  cluster:
+    name: {{ include "postgresql.fullname" $ }}
+  ensure: {{ $database.ensure | default "present" }}
+  databaseReclaimPolicy: {{ $database.databaseReclaimPolicy | default "retain" }}
+  {{- include "postgresql.pruneEmpty" (omit $database "ensure" "databaseReclaimPolicy") | nindent 2 }}
 {{- end }}

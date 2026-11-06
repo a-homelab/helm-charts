@@ -30,63 +30,89 @@ spec:
   {{- end }}
   instances: {{ .Values.instances }}
   enableSuperuserAccess: {{ .Values.enableSuperuserAccess }}
-  {{- $postgresql := deepCopy .Values.postgresql }}
-  {{- if eq .Values.database.authMethod "certificate" }}
-  {{- $owner := include "postgresql.databaseOwner" . }}
-  {{- /* cert is TLS-only, so a non-TLS login would reach CNPG's catch-all scram rule; reject it. */}}
-  {{- $ownerRules := list (printf "hostssl all %s all cert" $owner) (printf "hostnossl all %s all reject" $owner) }}
-  {{- $_ := set $postgresql "pg_hba" (concat $ownerRules ($postgresql.pg_hba | default list)) }}
-  {{- end }}
-  {{- with $postgresql }}
+  {{- $certificateLogin := eq .Values.database.authMethod "certificate" }}
+  {{- if or $certificateLogin .Values.postgresql }}
   postgresql:
+    {{- if or $certificateLogin .Values.postgresql.pg_hba }}
+    pg_hba:
+      {{- if $certificateLogin }}
+      {{- $owner := include "postgresql.databaseOwner" . }}
+      {{- /* cert is TLS-only, so a non-TLS login would reach CNPG's catch-all scram rule; reject it. */}}
+      - "hostssl all {{ $owner }} all cert"
+      - "hostnossl all {{ $owner }} all reject"
+      {{- end }}
+      {{- with .Values.postgresql.pg_hba }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+    {{- with omit .Values.postgresql "pg_hba" }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- end }}
-  {{- $managed := deepCopy .Values.managed }}
-  {{- $crRoles := dict }}
-  {{- range .Values.databaseRoles }}{{- $_ := set $crRoles .name true }}{{- end }}
-  {{- if hasKey $managed "roles" }}
-  {{- $roles := list }}
-  {{- range $managed.roles }}
-  {{- if not (hasKey $crRoles .name) }}{{- $roles = append $roles . }}{{- end }}
-  {{- end }}
-  {{- $_ := set $managed "roles" $roles }}
-  {{- end }}
-  {{- with $managed }}
+  {{- with .Values.managed }}
   managed:
+    {{- with omit . "roles" }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if hasKey . "roles" }}
+    {{- $crRoles := list }}
+    {{- range $.Values.databaseRoles }}{{- $crRoles = append $crRoles .name }}{{- end }}
+    {{- $roles := list }}
+    {{- range .roles }}
+    {{- if not (has .name $crRoles) }}{{- $roles = append $roles . }}{{- end }}
+    {{- end }}
+    roles:
+      {{- toYaml $roles | nindent 6 }}
+    {{- end }}
   {{- end }}
   bootstrap:
-    {{- if .Values.bootstrap }}
-    {{- $bootstrap := deepCopy .Values.bootstrap }}
-    {{- if eq .Values.credentials.mode "copy" }}
-    {{- $_ := set $bootstrap "recovery" (mustMergeOverwrite $bootstrap.recovery (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .) "secret" (dict "name" (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app"))))) }}
+    {{- if and .Values.bootstrap (eq .Values.credentials.mode "copy") }}
+    {{- with omit .Values.bootstrap "recovery" }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
-    {{- toYaml $bootstrap | nindent 4 }}
+    recovery:
+      database: {{ include "postgresql.databaseName" . | quote }}
+      owner: {{ include "postgresql.databaseOwner" . | quote }}
+      secret:
+        name: {{ include "postgresql.ownerSecretName" . | quote }}
+      {{- with omit .Values.bootstrap.recovery "database" "owner" "secret" }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- else if .Values.bootstrap }}
+    {{- toYaml .Values.bootstrap | nindent 4 }}
     {{- else }}
     initdb:
-      {{- $initdb := mustMergeOverwrite (deepCopy .Values.initdb) (dict "database" (include "postgresql.databaseName" .) "owner" (include "postgresql.databaseOwner" .) "localeCType" .Values.database.localeCType "localeCollate" .Values.database.localeCollate) }}
-      {{- if eq .Values.credentials.mode "existing" }}
-      {{- $_ := set $initdb "secret" (dict "name" (required "credentials.existing.userSecretName is required" (include "postgresql.userSecretName" .))) }}
-      {{- else }}
-      {{- $_ := set $initdb "secret" (dict "name" (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app"))) }}
+      database: {{ include "postgresql.databaseName" . | quote }}
+      owner: {{ include "postgresql.databaseOwner" . | quote }}
+      localeCType: {{ .Values.database.localeCType | quote }}
+      localeCollate: {{ .Values.database.localeCollate | quote }}
+      secret:
+        name: {{ include "postgresql.ownerSecretName" . | quote }}
+      {{- with .Values.initdb.postInitSQL }}
+      postInitSQL:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- range $key := list "postInitSQL" "postInitTemplateSQL" "postInitApplicationSQL" }}
-      {{- if not (get $initdb $key) }}{{- $_ := unset $initdb $key }}{{- end }}
+      {{- with .Values.initdb.postInitTemplateSQL }}
+      postInitTemplateSQL:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- toYaml $initdb | nindent 6 }}
+      {{- with .Values.initdb.postInitApplicationSQL }}
+      postInitApplicationSQL:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with omit .Values.initdb "database" "owner" "localeCType" "localeCollate" "secret" "postInitSQL" "postInitTemplateSQL" "postInitApplicationSQL" }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
     {{- end }}
   {{- with .Values.externalClusters }}
   externalClusters:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- if eq .Values.credentials.mode "existing" }}
-  {{- with (include "postgresql.superuserSecretName" .) }}
+  {{- if or .Values.enableSuperuserAccess (eq .Values.credentials.mode "existing") }}
+  {{- with include "postgresql.superuserSecretName" . }}
   superuserSecret:
     name: {{ . | quote }}
   {{- end }}
-  {{- else if .Values.enableSuperuserAccess }}
-  superuserSecret:
-    name: {{ include "postgresql.credentialResourceName" (dict "root" . "suffix" "superuser") | quote }}
   {{- end }}
   {{- if eq .Values.tls.mode "certManager" }}
   certificates:
@@ -97,33 +123,54 @@ spec:
   {{- else if eq .Values.tls.mode "external" }}
   certificates:
     {{- toYaml .Values.tls.certificates | nindent 4 }}
-  {{- else }}
-  {{- with concat (include "postgresql.poolerDNSNames" . | fromJsonArray) .Values.tls.serverAltDNSNames }}
+  {{- else if or .Values.poolers .Values.tls.serverAltDNSNames }}
   certificates:
     serverAltDNSNames:
+      {{- include "postgresql.poolerDNSNames" . | nindent 6 }}
+      {{- with .Values.tls.serverAltDNSNames }}
       {{- toYaml . | nindent 6 }}
-  {{- end }}
+      {{- end }}
   {{- end }}
   primaryUpdateStrategy: {{ .Values.primaryUpdateStrategy }}
   primaryUpdateMethod: {{ .Values.primaryUpdateMethod }}
   smartShutdownTimeout: {{ .Values.smartShutdownTimeout }}
   storage:
     {{- toYaml .Values.storage | nindent 4 }}
-  {{- $affinity := dict }}
-  {{- if .Values.storageNodesOnly }}
-  {{- $_ := set $affinity "nodeAffinity" (dict "requiredDuringSchedulingIgnoredDuringExecution" (dict "nodeSelectorTerms" (list (dict "matchExpressions" (list (dict "key" "node-role.benfu.me/storage" "operator" "In" "values" (list "true"))))))) }}
-  {{- end }}
-  {{- with mustMergeOverwrite $affinity (deepCopy .Values.affinity) }}
+  {{- $nodeAffinity := .Values.affinity.nodeAffinity | default dict }}
+  {{- if or .Values.storageNodesOnly .Values.affinity }}
   affinity:
+    {{- if or .Values.storageNodesOnly $nodeAffinity }}
+    nodeAffinity:
+      {{- if and .Values.storageNodesOnly (not $nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution) }}
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role.benfu.me/storage
+                operator: In
+                values:
+                  - "true"
+      {{- end }}
+      {{- with $nodeAffinity }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+    {{- with omit .Values.affinity "nodeAffinity" }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- end }}
-  {{- $spread := list }}
-  {{- if .Values.spreadAcrossNodes }}
-  {{- $spread = append $spread (dict "maxSkew" 1 "topologyKey" "kubernetes.io/hostname" "whenUnsatisfiable" "DoNotSchedule" "labelSelector" (dict "matchLabels" (dict "cnpg.io/cluster" $name))) }}
-  {{- end }}
-  {{- with concat $spread .Values.topologySpreadConstraints }}
+  {{- if or .Values.spreadAcrossNodes .Values.topologySpreadConstraints }}
   topologySpreadConstraints:
+    {{- if .Values.spreadAcrossNodes }}
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: {{ $name }}
+    {{- end }}
+    {{- with .Values.topologySpreadConstraints }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- end }}
   resources:
     {{- toYaml .Values.resources | nindent 4 }}
@@ -132,7 +179,7 @@ spec:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true
       parameters:
-        barmanObjectName: {{ include "postgresql.objectStoreName" . | quote }}
+        barmanObjectName: {{ default $name .Values.backup.objectStore.existingName | quote }}
         {{- with .Values.backup.serverName }}
         serverName: {{ . | quote }}
         {{- end }}
@@ -143,11 +190,22 @@ spec:
     volumeSnapshot:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+  {{- $highAvailability := .Values.replicationSlots.highAvailability | default dict }}
   replicationSlots:
-    {{- mustMergeOverwrite (dict "highAvailability" (dict "enabled" true)) (deepCopy .Values.replicationSlots) | toYaml | nindent 4 }}
+    highAvailability:
+      enabled: {{ dig "enabled" true $highAvailability }}
+      {{- with omit $highAvailability "enabled" }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- with omit .Values.replicationSlots "highAvailability" }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   monitoring:
     {{- /* Explicit false, CNPG's default: the chart owns any PodMonitor. */}}
-    {{- mustMergeOverwrite (deepCopy .Values.monitoring.configuration) (dict "enablePodMonitor" false) | toYaml | nindent 4 }}
+    enablePodMonitor: false
+    {{- with .Values.monitoring.configuration }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   {{- with .Values.extraClusterSpec }}
   {{- toYaml . | nindent 2 }}
   {{- end }}

@@ -1,14 +1,5 @@
 {{- if .Values.monitoring.podMonitor.enabled }}
 {{- $name := include "postgresql.fullname" . }}
-{{- $endpoints := .Values.monitoring.podMonitor.podMetricsEndpoints }}
-{{- if dig "tls" "enabled" false .Values.monitoring.configuration }}
-{{- $tls := dict "ca" (dict "secret" (dict "name" (include "postgresql.serverCASecretName" .) "key" "ca.crt")) "serverName" (printf "%s-rw" $name) }}
-{{- $secured := list }}
-{{- range $endpoints }}
-{{- $secured = append $secured (mustMergeOverwrite (dict "scheme" "https" "tlsConfig" (deepCopy $tls)) (deepCopy .)) }}
-{{- end }}
-{{- $endpoints = $secured }}
-{{- end }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -25,7 +16,36 @@ spec:
       # Pooler pods share cnpg.io/cluster and also expose a metrics port.
       cnpg.io/podRole: instance
   podMetricsEndpoints:
-    {{- toYaml $endpoints | nindent 4 }}
+    {{- if dig "tls" "enabled" false .Values.monitoring.configuration }}
+    {{- range .Values.monitoring.podMonitor.podMetricsEndpoints }}
+    {{- $tlsConfig := .tlsConfig | default dict }}
+    - scheme: {{ .scheme | default "https" }}
+      tlsConfig:
+        {{- if not $tlsConfig.ca }}
+        ca:
+          secret:
+            {{- if eq $.Values.tls.mode "certManager" }}
+            name: "{{ $name }}-server-tls"
+            {{- else if eq $.Values.tls.mode "external" }}
+            name: {{ dig "serverCASecret" (printf "%s-ca" $name) $.Values.tls.certificates | quote }}
+            {{- else }}
+            name: "{{ $name }}-ca"
+            {{- end }}
+            key: ca.crt
+        {{- end }}
+        {{- if not $tlsConfig.serverName }}
+        serverName: "{{ $name }}-rw"
+        {{- end }}
+        {{- with $tlsConfig }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with omit . "scheme" "tlsConfig" }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+    {{- else }}
+    {{- toYaml .Values.monitoring.podMonitor.podMetricsEndpoints | nindent 4 }}
+    {{- end }}
 {{- end }}
 {{- if and .Values.monitoring.podMonitor.enabled .Values.poolers }}
 ---

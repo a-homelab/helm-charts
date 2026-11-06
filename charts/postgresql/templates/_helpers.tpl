@@ -34,11 +34,8 @@ Create chart name and version as used by the chart label.
 Common labels
 */}}
 {{- define "postgresql.labels" -}}
-{{- $labels := mustMergeOverwrite (deepCopy .Values.labels) (include "postgresql.selectorLabels" . | fromYaml) (dict "helm.sh/chart" (include "postgresql.chart" .) "app.kubernetes.io/managed-by" .Release.Service) -}}
-{{- if .Chart.AppVersion -}}
-{{- $_ := set $labels "app.kubernetes.io/version" .Chart.AppVersion -}}
-{{- end -}}
-{{- toYaml $labels -}}
+{{ include "postgresql.podLabels" . }}
+helm.sh/chart: {{ include "postgresql.chart" . }}
 {{- end }}
 
 {{/*
@@ -52,9 +49,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- /* Pods never carry the chart version: CNPG patches inherited labels onto
 every instance, so a version label would touch every pod on each chart release. */ -}}
 {{- define "postgresql.podLabels" -}}
-{{- $labels := include "postgresql.labels" . | fromYaml -}}
-{{- $_ := unset $labels "helm.sh/chart" -}}
-{{- toYaml $labels -}}
+{{ include "postgresql.selectorLabels" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- with omit .Values.labels "app.kubernetes.io/name" "app.kubernetes.io/instance" "app.kubernetes.io/managed-by" "helm.sh/chart" }}
+{{ toYaml . }}
+{{- end }}
 {{- end -}}
 
 {{- define "postgresql.annotations" -}}
@@ -65,12 +64,22 @@ every instance, so a version label would touch every pod on each chart release. 
 {{- toYaml $annotations -}}
 {{- end -}}
 
+{{- define "postgresql.syncWave" -}}
+{{- .Values.syncWave | toString | default (get .Values.annotations "argocd.argoproj.io/sync-wave") -}}
+{{- end -}}
+
 {{- define "postgresql.databaseWave" -}}
 {{- if ne (toString .Values.databaseSyncWave) "" -}}
 {{- .Values.databaseSyncWave -}}
 {{- else -}}
-{{- $annotations := include "postgresql.annotations" . | fromYaml -}}
-{{- add 1 (int (get $annotations "argocd.argoproj.io/sync-wave" | default "0")) -}}
+{{- add 1 (int (include "postgresql.syncWave" . | default "0")) -}}
+{{- end -}}
+{{- end -}}
+
+{{- /* Annotations for resources that state their own sync wave. */ -}}
+{{- define "postgresql.extraAnnotations" -}}
+{{- with omit .Values.annotations "argocd.argoproj.io/sync-wave" -}}
+{{- toYaml . -}}
 {{- end -}}
 {{- end -}}
 
@@ -81,69 +90,63 @@ every instance, so a version label would touch every pod on each chart release. 
 {{- required "database.owner is required" .Values.database.owner -}}
 {{- end -}}
 
-{{- define "postgresql.objectStoreName" -}}
-{{- default (include "postgresql.fullname" .) .Values.backup.objectStore.existingName -}}
+{{- define "postgresql.dnsLabel" -}}
+{{- if or (gt (len .) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" .)) -}}
+{{- fail (printf "resource name %q must be a DNS label of at most 63 characters; shorten fullnameOverride or the SQL name" .) -}}
+{{- end -}}
+{{- . -}}
 {{- end -}}
 
-{{- define "postgresql.backupConfiguration" -}}
-{{- if .Values.backup.configuration -}}
-{{- $_ := required "backup.configuration.destinationPath is required" .Values.backup.configuration.destinationPath -}}
-{{- toYaml .Values.backup.configuration -}}
-{{- else -}}
-{{- if not .Values.backup.objectBucket.enabled -}}
-{{- fail "backup.configuration is required without backup.objectBucket.enabled" -}}
-{{- end -}}
-destinationPath: "s3://{{ include "postgresql.fullname" . }}-backup/"
-endpointURL: http://rook-ceph-rgw-k8s-store-ssd.rook-ceph.svc
-s3Credentials:
-  accessKeyId:
-    name: "{{ include "postgresql.fullname" . }}-backup-bucket"
-    key: AWS_ACCESS_KEY_ID
-  secretAccessKey:
-    name: "{{ include "postgresql.fullname" . }}-backup-bucket"
-    key: AWS_SECRET_ACCESS_KEY
-wal:
-  compression: gzip
-  maxParallel: 8
-{{- end -}}
-{{- end -}}
-
-{{- define "postgresql.resourceName" -}}
-{{- $name := printf "%s-%s" (include "postgresql.fullname" .root) .suffix -}}
-{{- if or (gt (len $name) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $name)) -}}
-{{- fail (printf "resource name %q must be a DNS label of at most 63 characters; shorten fullnameOverride or the SQL name" $name) -}}
-{{- end -}}
-{{- $name -}}
+{{- /* SQL names allow more than DNS labels do: lowercase, hyphenate the rest. */ -}}
+{{- define "postgresql.sqlSlug" -}}
+{{- $slug := trimAll "-" (regexReplaceAll "[^a-z0-9]+" (lower .) "-") -}}
+{{- if not $slug -}}{{- fail (printf "SQL name %q cannot form a Kubernetes resource name" .) -}}{{- end -}}
+{{- $slug -}}
 {{- end -}}
 
 {{- define "postgresql.sqlResourceName" -}}
-{{- $sqlName := trimAll "-" (regexReplaceAll "[^a-z0-9]+" (lower .sqlName) "-") -}}
-{{- if not $sqlName -}}{{- fail (printf "SQL name %q cannot form a Kubernetes resource name" .sqlName) -}}{{- end -}}
-{{- include "postgresql.resourceName" (dict "root" .root "suffix" (ternary $sqlName (printf "%s-%s" .prefix $sqlName) (empty .prefix))) -}}
+{{- printf "%s-%s-%s" (include "postgresql.fullname" .root) .prefix (include "postgresql.sqlSlug" .sqlName) | include "postgresql.dnsLabel" -}}
 {{- end -}}
 
-{{- define "postgresql.credentialResourceName" -}}
-{{- $admin := eq .suffix "superuser" -}}
-{{- /* The superuser's Secret is <cluster>-superuser, CNPG's own name for it,
-rather than <cluster>-postgres; the application role's is <cluster>-<role>. */ -}}
-{{- $sqlName := "superuser" -}}
-{{- if not $admin -}}{{- $sqlName = include "postgresql.databaseOwner" .root -}}{{- end -}}
-{{- $prefix := ternary "recovery" "" (eq .root.Values.credentials.mode "copy") -}}
-{{- $name := include "postgresql.sqlResourceName" (dict "root" .root "prefix" $prefix "sqlName" $sqlName) -}}
+{{- define "postgresql.poolerName" -}}
+{{- printf "%s-pooler-%s" (include "postgresql.fullname" .root) .key | include "postgresql.dnsLabel" -}}
+{{- end -}}
+
+{{- define "postgresql.credentialPrefix" -}}
+{{- include "postgresql.fullname" . -}}-{{- if eq .Values.credentials.mode "copy" -}}recovery-{{- end -}}
+{{- end -}}
+
+{{- define "postgresql.ownerSecretName" -}}
+{{- if eq .Values.credentials.mode "existing" -}}
+{{- required "credentials.existing.userSecretName is required" .Values.credentials.existing.userSecretName -}}
+{{- else -}}
+{{- $fullname := include "postgresql.fullname" . -}}
+{{- $slug := include "postgresql.sqlSlug" (include "postgresql.databaseOwner" .) -}}
+{{- $name := printf "%s%s" (include "postgresql.credentialPrefix" .) $slug | include "postgresql.dnsLabel" -}}
 {{- /* <cluster>-<role> shares the namespace with Secrets CNPG and this chart name
 after the cluster; a role with one of these names would take one over. */ -}}
-{{- $fullname := include "postgresql.fullname" .root -}}
 {{- range list "ca" "server" "replication" "superuser" "backup-bucket" -}}
-{{- if and (not $admin) (eq $name (printf "%s-%s" $fullname .)) -}}
+{{- if eq $name (printf "%s-%s" $fullname .) -}}
 {{- fail (printf "credential Secret %q would collide with the cluster's %s Secret; rename database.owner" $name .) -}}
 {{- end -}}
 {{- end -}}
 {{- $name -}}
 {{- end -}}
+{{- end -}}
+
+{{- /* The superuser's Secret is <cluster>-superuser, CNPG's own name for it,
+rather than <cluster>-postgres. */ -}}
+{{- define "postgresql.superuserSecretName" -}}
+{{- if eq .Values.credentials.mode "existing" -}}
+{{- default "" .Values.credentials.existing.superuserSecretName -}}
+{{- else -}}
+{{- printf "%ssuperuser" (include "postgresql.credentialPrefix" .) | include "postgresql.dnsLabel" -}}
+{{- end -}}
+{{- end -}}
 
 {{- define "postgresql.validate" -}}
 {{- if and (ne .Values.credentials.mode "existing") .Values.enableSuperuserAccess -}}
-{{- if eq (include "postgresql.credentialResourceName" (dict "root" . "suffix" "app")) (include "postgresql.credentialResourceName" (dict "root" . "suffix" "superuser")) -}}
+{{- if eq (include "postgresql.ownerSecretName" .) (include "postgresql.superuserSecretName" .) -}}
 {{- fail "database.owner superuser collides with the superuser credential Secret; rename database.owner" -}}
 {{- end -}}
 {{- end -}}
@@ -167,7 +170,7 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- $_ := required "credentials.copy.superuserSecretName is required with superuser access" .Values.credentials.copy.superuserSecretName -}}
 {{- end -}}
 {{- range $source := list .Values.credentials.copy.userSecretName .Values.credentials.copy.superuserSecretName -}}
-{{- if has $source (list (include "postgresql.credentialResourceName" (dict "root" $ "suffix" "app")) (include "postgresql.credentialResourceName" (dict "root" $ "suffix" "superuser"))) -}}
+{{- if has $source (list (include "postgresql.ownerSecretName" $) (include "postgresql.superuserSecretName" $)) -}}
 {{- fail "credential copy source must differ from its destination" -}}
 {{- end -}}
 {{- end -}}
@@ -226,6 +229,43 @@ after the cluster; a role with one of these names would take one over. */ -}}
 {{- end -}}
 {{- end -}}
 
+{{- define "postgresql.validateDatabases" -}}
+{{- if hasKey .Values.databases "app" -}}{{- fail "databases.app is reserved for the database key" -}}{{- end -}}
+{{- $cluster := include "postgresql.fullname" . -}}
+{{- $mainName := include "postgresql.databaseName" . -}}
+{{- $names := dict $mainName true -}}
+{{- $slugs := dict (include "postgresql.sqlSlug" $mainName) true -}}
+{{- range $key, $database := .Values.databases -}}
+{{- $_ := required (printf "databases.%s.name is required" $key) $database.name -}}
+{{- $_ := required (printf "databases.%s.owner is required" $key) $database.owner -}}
+{{- if hasKey $names $database.name -}}{{- fail (printf "duplicate database name %s" $database.name) -}}{{- end -}}
+{{- $_ := set $names $database.name true -}}
+{{- $slug := include "postgresql.sqlSlug" $database.name -}}
+{{- if hasKey $slugs $slug -}}{{- fail (printf "duplicate Database resource name %s-db-%s; database names must differ after normalization" $cluster $slug) -}}{{- end -}}
+{{- $_ := set $slugs $slug true -}}
+{{- if hasKey $database "cluster" -}}{{- fail "Database cluster is assigned by this chart" -}}{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "postgresql.validateDatabaseRoles" -}}
+{{- $cluster := include "postgresql.fullname" . -}}
+{{- $names := dict -}}
+{{- $slugs := dict -}}
+{{- range $key, $role := .Values.databaseRoles -}}
+{{- $_ := required (printf "databaseRoles.%s.name is required" $key) $role.name -}}
+{{- if hasKey $names $role.name -}}{{- fail (printf "duplicate DatabaseRole name %s" $role.name) -}}{{- end -}}
+{{- $_ := set $names $role.name true -}}
+{{- $slug := include "postgresql.sqlSlug" $role.name -}}
+{{- if hasKey $slugs $slug -}}{{- fail (printf "duplicate DatabaseRole resource name %s-role-%s; role names must differ after normalization" $cluster $slug) -}}{{- end -}}
+{{- $_ := set $slugs $slug true -}}
+{{- if hasKey $role "cluster" -}}{{- fail "DatabaseRole cluster is assigned by this chart" -}}{{- end -}}
+{{- if eq ($role.ensure | default "present") "absent" -}}{{- fail "DatabaseRole removal uses databaseRoleReclaimPolicy, not ensure: absent" -}}{{- end -}}
+{{- if and (dig "clientCertificate" "enabled" (hasKey $role "clientCertificate") $role) (ne $.Values.tls.mode "operator") -}}
+{{- fail "DatabaseRole clientCertificate requires tls.mode=operator; cert-manager does not expose the CA private key" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "postgresql.issuerRef" -}}
 {{- if .Values.tls.issuerRef -}}
 {{- toYaml .Values.tls.issuerRef -}}
@@ -235,57 +275,29 @@ kind: ClusterIssuer
 {{- end -}}
 {{- end -}}
 
-{{- define "postgresql.serverCASecretName" -}}
-{{- $name := include "postgresql.fullname" . -}}
-{{- if eq .Values.tls.mode "certManager" -}}
-{{- printf "%s-server-tls" $name -}}
-{{- else if eq .Values.tls.mode "external" -}}
-{{- dig "serverCASecret" (printf "%s-ca" $name) .Values.tls.certificates -}}
-{{- else -}}
-{{- printf "%s-ca" $name -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "postgresql.connectionData" -}}
-{{- $root := .root -}}
-{{- $role := .role -}}
-{{- $name := include "postgresql.fullname" $root -}}
-{{- $host := printf "%s-rw.%s" $name $root.Release.Namespace -}}
-{{- $fqdn := printf "%s.svc.%s" $host $root.Values.clusterDomain -}}
-{{- $user := $role.username | urlquery | replace "+" "%20" -}}
-{{- $db := $role.database | urlquery | replace "+" "%20" -}}
-{{- $passwordURI := `{{ .password | urlquery | replace "+" "%20" }}` -}}
-{{- $passwordQuery := `{{ .password | urlquery }}` -}}
-{{- $pgUser := $role.username | replace "\\" "\\\\" | replace ":" "\\:" -}}
-{{- $pgDB := (ternary "*" $role.database (eq $role.suffix "superuser")) | replace "\\" "\\\\" | replace ":" "\\:" -}}
-{{- $pgPassword := `{{ .password | replace "\\" "\\\\" | replace ":" "\\:" }}` -}}
-username: {{ $role.username | quote }}
-{{- if eq $root.Values.credentials.mode "copy" }}
-password: {{ printf `{{ if ne .username %q }}{{ fail "source credential username does not match the restored role" }}{{ end }}{{ .password }}` $role.username | quote }}
-{{- else }}
-password: '{{ "{{ .password }}" }}'
+{{- /* The owner, plus postgres when superuser access is on, as a YAML list. */ -}}
+{{- define "postgresql.credentialRoles" -}}
+- secretName: {{ include "postgresql.ownerSecretName" . | quote }}
+  username: {{ include "postgresql.databaseOwner" . | quote }}
+  database: {{ include "postgresql.databaseName" . | quote }}
+  pgpassDatabase: {{ include "postgresql.databaseName" . | quote }}
+  source: {{ .Values.credentials.copy.userSecretName | quote }}
+{{- if .Values.enableSuperuserAccess }}
+- secretName: {{ include "postgresql.superuserSecretName" . | quote }}
+  username: postgres
+  database: postgres
+  pgpassDatabase: "*"
+  source: {{ .Values.credentials.copy.superuserSecretName | quote }}
 {{- end }}
-host: {{ printf "%s-rw" $name | quote }}
-port: "5432"
-dbname: {{ $role.database | quote }}
-user: {{ $role.username | quote }}
-pgpass: {{ printf "%s-rw:5432:%s:%s:%s\n" $name $pgDB $pgUser $pgPassword | quote }}
-uri: {{ printf "postgresql://%s:%s@%s:5432/%s" $user $passwordURI $host $db | quote }}
-jdbc-uri: {{ printf "jdbc:postgresql://%s:5432/%s?password=%s&user=%s" $host $db $passwordQuery ($role.username | urlquery) | quote }}
-fqdn-uri: {{ printf "postgresql://%s:%s@%s:5432/%s" $user $passwordURI $fqdn $db | quote }}
-fqdn-jdbc-uri: {{ printf "jdbc:postgresql://%s:5432/%s?password=%s&user=%s" $fqdn $db $passwordQuery ($role.username | urlquery) | quote }}
 {{- end -}}
 
-{{- define "postgresql.userSecretName" -}}
-{{- default "" .Values.credentials.existing.userSecretName -}}
+{{- /* Nonempty when a Pooler relies on the chart-issued auth_query certificate. */ -}}
+{{- define "postgresql.poolerAuthCertificateNeeded" -}}
+{{- if eq .Values.tls.mode "certManager" -}}
+{{- range .Values.poolers -}}
+{{- if not (dig "pgbouncer" "authQuerySecret" "" .) -}}true{{- end -}}
 {{- end -}}
-
-{{- define "postgresql.superuserSecretName" -}}
-{{- default "" .Values.credentials.existing.superuserSecretName -}}
 {{- end -}}
-
-{{- define "postgresql.poolerName" -}}
-{{- include "postgresql.resourceName" (dict "root" .root "suffix" (printf "pooler-%s" .key)) -}}
 {{- end -}}
 
 {{- define "postgresql.poolerAuthSecretName" -}}
@@ -293,22 +305,24 @@ fqdn-jdbc-uri: {{ printf "jdbc:postgresql://%s:5432/%s?password=%s&user=%s" $fqd
 {{- end -}}
 
 {{/*
-Pooler Service DNS names. CNPG serves pooler client TLS with the cluster's server
-certificate unless a Pooler sets clientTLSSecret.
+Pooler Service DNS names as YAML list items. CNPG serves pooler client TLS with
+the cluster's server certificate unless a Pooler sets clientTLSSecret.
 */}}
 {{- define "postgresql.poolerDNSNames" -}}
-{{- $names := list -}}
-{{- range $key, $pooler := .Values.poolers -}}
-{{- $name := include "postgresql.poolerName" (dict "root" $ "key" $key) -}}
-{{- $names = concat $names (list $name (printf "%s.%s" $name $.Release.Namespace) (printf "%s.%s.svc" $name $.Release.Namespace) (printf "%s.%s.svc.%s" $name $.Release.Namespace $.Values.clusterDomain)) -}}
-{{- end -}}
-{{- toJson $names -}}
+{{- range $key, $_ := .Values.poolers }}
+{{- $name := include "postgresql.poolerName" (dict "root" $ "key" $key) }}
+- {{ $name }}
+- {{ $name }}.{{ $.Release.Namespace }}
+- {{ $name }}.{{ $.Release.Namespace }}.svc
+- {{ $name }}.{{ $.Release.Namespace }}.svc.{{ $.Values.clusterDomain }}
+{{- end }}
 {{- end -}}
 
 {{/*
 CNPG serializes spec lists and maps with omitempty, so the operator's own writes
 (for example adding a finalizer) drop empty ones and Argo CD reports drift.
-Render Database and DatabaseRole specs without empty top-level lists and maps.
+Render the native fields of Database and DatabaseRole specs without empty
+top-level lists and maps.
 */}}
 {{- define "postgresql.pruneEmpty" -}}
 {{- $out := dict -}}
@@ -317,5 +331,7 @@ Render Database and DatabaseRole specs without empty top-level lists and maps.
 {{- $_ := set $out $key $value -}}
 {{- end -}}
 {{- end -}}
-{{- toYaml $out -}}
+{{- with $out -}}
+{{- toYaml . -}}
+{{- end -}}
 {{- end -}}
