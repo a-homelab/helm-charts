@@ -3,7 +3,7 @@ The Issuer every client certificate names (postgresql.clientIssuerRef). Namespac
 in this namespace can request from it; its policy narrows that to the identities the chart issues, so a
 Certificate in this namespace still cannot mint CN=<any role>.
 */}}
-{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") }}
+{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") (not .Values.tls.clientCAOwner) }}
 {{- $name := include "postgresql.fullname" . }}
 apiVersion: cert-manager.io/v1
 kind: Issuer

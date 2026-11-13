@@ -12,7 +12,7 @@ rotationPolicy Never: a renewal must re-sign the same key, or every leaf signed 
 until it renews (up to 75 days). PostgreSQL holds the copy in <cluster>-client-replica-tls, refreshed
 when that leaf renews, so renewing a year early keeps the anchor it holds from ever expiring.
 */}}
-{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") }}
+{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") (not .Values.tls.clientCAOwner) }}
 {{- $name := include "postgresql.fullname" . }}
 apiVersion: cert-manager.io/v1
 kind: Certificate

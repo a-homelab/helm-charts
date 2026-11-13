@@ -363,6 +363,9 @@
             "issuer"
           ]
         },
+        "clientCAOwner": {
+          "type": "string"
+        },
         "issuerRef": {
           "type": "object"
         },
@@ -377,7 +380,27 @@
           }
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "clientCAOwner": {
+            "minLength": 1
+          }
+        },
+        "required": [
+          "clientCAOwner"
+        ]
+      },
+      "then": {
+        "properties": {
+          "mode": {
+            "const": "certManager"
+          },
+          "clientCA": {
+            "const": "cluster"
+          }
+        }
+      }
     },
     "backup": {
       "type": "object",

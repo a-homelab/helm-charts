@@ -394,6 +394,16 @@ is the one scoped exception to that runbook's "CA certificates only in
 cert-manager". Policies are cluster-scoped and named after their Issuer, so two
 releases with the same fullname in different namespaces would collide.
 
+An application that sends one client certificate to several clusters, as
+Codecov does through libpq's global `PGSSLCERT`, needs those clusters to share
+one root. Set `tls.clientCAOwner` on each of the others to the fullname of the
+release that owns the CA, in the same namespace. Those releases create no CA of
+their own and issue from `<owner>-client-ca`. Their servers then trust each
+other's client certificates, including `streaming_replica`, so share a root only
+between clusters of the same application. The owner's policy approves only the
+owner's identities, so each sharing release must issue the same ones (owner,
+superuser, pooler); a request for any other identity stays unapproved.
+
 A client certificate issued outside this chart (for example a debug client's
 `CN=<owner>`) must name `<cluster>-client-ca`, kind `Issuer`, from the release
 namespace. Clients still verify the server against the estate root; that

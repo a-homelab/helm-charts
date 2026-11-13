@@ -4,7 +4,7 @@ with its own key, which is how a root comes to exist. Namespaced, so only this n
 and its policy approves exactly one request: this cluster's client CA. It is the one exception to
 docs/runbooks/pki-issuers.md's "CA certificates only in cert-manager", scoped to this release.
 */}}
-{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") }}
+{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") (not .Values.tls.clientCAOwner) }}
 {{- $name := include "postgresql.fullname" . }}
 apiVersion: cert-manager.io/v1
 kind: Issuer

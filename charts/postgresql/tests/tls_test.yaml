@@ -401,3 +401,42 @@ tests:
       - isKind:
           of: Issuer
         not: true
+
+  - it: issues client Certificates from the client CA owner's Issuer and creates no CA of its own
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.clientCAOwner: shared-postgres
+    asserts:
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: shared-postgres-client-ca
+            kind: Issuer
+            group: cert-manager.io
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-replica-tls
+      - equal:
+          path: spec.issuerRef.name
+          value: shared-postgres-client-ca
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-user-tls
+      - equal:
+          path: spec.issuerRef.name
+          value: cnpg-ca
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-server-tls
+      - isKind:
+          of: CertificateRequestPolicy
+        not: true
+      - isKind:
+          of: Issuer
+        not: true
+      - containsDocument:
+          kind: Certificate
+          apiVersion: cert-manager.io/v1
+          name: example-postgres-client-ca
+        not: true

@@ -308,6 +308,13 @@ tls:
   # Switching an existing cluster re-issues every client certificate; a client
   # still holding the old one fails until it reads the new one.
   clientCA: cluster
+  # clientCA=cluster only: the fullname of another release of this chart, in
+  # the same namespace, whose client CA this cluster uses instead of creating
+  # its own. For an application that sends one client certificate to several
+  # clusters; those clusters then trust each other's client certificates. The
+  # owner's policy approves only the owner's identities, so this release must
+  # issue the same ones (owner, superuser, pooler).
+  clientCAOwner: ""
   # tls.mode=external: native Cluster.spec.certificates.
   certificates: {}
   # Extra server certificate SANs, e.g. for managed.services.additional or a

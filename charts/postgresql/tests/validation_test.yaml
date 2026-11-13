@@ -14,6 +14,21 @@ tests:
       - failedTemplate:
           errorPattern: instances
 
+  - it: rejects a client CA owner without the cluster's own client CA mode
+    set:
+      tls.clientCA: issuer
+      tls.clientCAOwner: shared-postgres
+    asserts:
+      - failedTemplate:
+          errorPattern: tls(\.|/)clientCA
+
+  - it: rejects a client CA owner that names this release
+    set:
+      tls.clientCAOwner: example-postgres
+    asserts:
+      - failedTemplate:
+          errorPattern: tls.clientCAOwner names this release
+
   - it: rejects a misspelled top-level key
     set:
       backpu: {}

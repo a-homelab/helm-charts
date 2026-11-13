@@ -185,6 +185,9 @@ rather than <cluster>-postgres. */ -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
+{{- if eq .Values.tls.clientCAOwner (include "postgresql.fullname" .) -}}
+{{- fail "tls.clientCAOwner names this release; leave it empty for the cluster's own client CA" -}}
+{{- end -}}
 {{- if and .Values.tls.superuserCertificate (ne .Values.tls.mode "certManager") -}}
 {{- fail "tls.superuserCertificate requires tls.mode=certManager" -}}
 {{- end -}}
@@ -282,7 +285,7 @@ kind: ClusterIssuer
 
 {{- define "postgresql.clientIssuerRef" -}}
 {{- if eq .Values.tls.clientCA "cluster" -}}
-name: "{{ include "postgresql.fullname" . }}-client-ca"
+name: "{{ .Values.tls.clientCAOwner | default (include "postgresql.fullname" .) }}-client-ca"
 kind: Issuer
 group: cert-manager.io
 {{- else -}}
