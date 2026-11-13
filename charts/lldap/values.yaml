@@ -41,6 +41,11 @@ externalDatabase:
 
 replicaCount: 1
 
+# Deployment strategy. Empty keeps the Kubernetes default (RollingUpdate).
+# Recreate stops the old pod before the new one starts, so an upgrade's schema
+# migrations never run beside an older lldap on the same database.
+strategy: {}
+
 image:
   repository: nitnelave/lldap
   pullPolicy: IfNotPresent
