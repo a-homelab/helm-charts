@@ -24,11 +24,19 @@ metadata:
     {{- include "postgresql.extraAnnotations" . | nindent 4 }}
 spec:
   isCA: true
-  commonName: "Ben Fu Homelab PostgreSQL Client CA {{ .Release.Namespace }}/{{ $name }}"
+  commonName: Ben Fu Homelab PostgreSQL Client CA
   secretName: "{{ $name }}-client-ca"
+  {{- /*
+  The cluster's identity goes in organizational units, not the commonName: X.509 caps a commonName at
+  64 bytes (RFC 5280 ub-common-name), which cert-manager's webhook enforces, while a namespace and a
+  fullname may each be 63.
+  */}}
   subject:
     organizations:
       - Ben Fu Homelab
+    organizationalUnits:
+      - {{ .Release.Namespace | quote }}
+      - {{ $name | quote }}
   duration: 87600h0m0s # 10y
   renewBefore: 8760h0m0s # 1y
   revisionHistoryLimit: 10
