@@ -397,7 +397,11 @@ releases with the same fullname in different namespaces would collide.
 A client certificate issued outside this chart (for example a debug client's
 `CN=<owner>`) must name `<cluster>-client-ca`, kind `Issuer`, from the release
 namespace. Clients still verify the server against the estate root; that
-direction is unchanged.
+direction is unchanged. Take that root from the `homelab-root-ca` bundle, never
+from a client Secret's `ca.crt`: under `clientCA: cluster` that file is the
+cluster's client root, which signs no server certificate, so `verify-full` and
+`verify-ca` fail. Move every client off it before switching a cluster.
+Vaultwarden lost new connections for 22 minutes on 2026-11-13 this way.
 
 Switching an existing cluster re-issues every client certificate under the new
 root, and the server stops trusting the old ones as soon as
