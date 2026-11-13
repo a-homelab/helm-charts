@@ -50,5 +50,13 @@
   "eso-2.11.0-passwords.yaml": {
     "url": "https://raw.githubusercontent.com/external-secrets/external-secrets/v2.11.0/config/crds/bases/generators.external-secrets.io_passwords.yaml",
     "sha256": "72ef666dcd0e24b71a2a8fe122ed01c86203f7a3a323ea90dc77a604b6a263da"
+  },
+  "cert-manager-1.21.2-issuers.yaml": {
+    "url": "https://raw.githubusercontent.com/cert-manager/cert-manager/v1.21.2/deploy/crds/cert-manager.io_issuers.yaml",
+    "sha256": "05e37efb02777e0362d24269fa103c2fc11419f9c85e31854ef873e5d9e5c5cc"
+  },
+  "approver-policy-0.28.0-certificaterequestpolicies.yaml": {
+    "url": "https://raw.githubusercontent.com/cert-manager/approver-policy/v0.28.0/deploy/crds/policy.cert-manager.io_certificaterequestpolicies.yaml",
+    "sha256": "759e9567e18a2cbd742081e561315fc7d06c560da7654782f6d8bba82f671674"
   }
 }

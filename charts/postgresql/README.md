@@ -329,10 +329,11 @@ it did not issue a `postgres` superuser client certificate. Set
 CN `postgres` and client-auth usage. Password-based superuser access remains
 independent and disabled by default.
 
-Certificates come from ClusterIssuer `cnpg-ca`, declared in homelab's
-cert-issuers chart under the estate's `k8s-clusters-ca`, so replica clusters on
-other Kubernetes clusters share its root. The server certificate includes full
-service FQDN SANs. `tls.issuerRef` explicitly overrides the issuer.
+The server certificate comes from ClusterIssuer `cnpg-ca`, declared in homelab's
+cert-issuers chart under the estate's `k8s-clusters-ca`, and includes full
+service FQDN SANs. `tls.issuerRef` explicitly overrides that issuer. Client
+certificates come from the cluster's own client CA by default; see
+[Client trust domain per cluster](#client-trust-domain-per-cluster).
 
 Sync the new CA first and verify its Certificate and ClusterIssuer are Ready.
 Before moving an existing cluster to another issuer, distribute the new root
@@ -341,16 +342,6 @@ migration. Verify the
 issued leaf chains and client connections before retiring old trust. Server
 clients can mount the existing `homelab-root-ca` bundle in namespaces
 labelled `bundle.benfu.me/inject: "true"`. No additional root bundle is needed.
-
-The CNPG intermediate provides a dedicated signer, **not an isolated client-auth
-trust domain**. cert-manager puts the shared estate root in leaf `ca.crt`,
-which the chart exposes to CNPG. Stock PostgreSQL does not enable partial-chain
-verification, so replacing that root with only an intermediate breaks validation;
-retaining it accepts valid client chains from every estate CA on every cluster,
-subject to HBA checks.
-See [cert-manager CA chains](https://cert-manager.io/docs/configuration/ca/) and
-[PostgreSQL's TLS verification implementation](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/libpq/be-secure-openssl.c).
-A separately rooted CNPG domain would be a distinct PKI design change.
 
 Issuing a superuser certificate does not enable certificate login. Add a scoped
 HBA rule through `postgresql.pg_hba`, for example the following documentation
@@ -367,6 +358,53 @@ client certificate/key with appropriate private-key permissions. Restrict who ca
 request/read `postgres` certificates and which clients can reach PostgreSQL.
 See [PostgreSQL certificate authentication](https://www.postgresql.org/docs/16/auth-cert.html).
 No broad HBA rule is injected automatically.
+
+### Client trust domain per cluster
+
+`tls.clientCA: cluster`, the default, gives each cluster its own client CA:
+
+| Resource | Purpose | Sync wave |
+| --- | --- | --- |
+| Issuer and policy `<cluster>-client-ca-selfsigned` | Signs the root and nothing else | release wave - 2 |
+| Certificate `<cluster>-client-ca` | Self-signed root: 10 years, renewed a year early, same key (`rotationPolicy: Never`) | release wave - 1 |
+| Issuer `<cluster>-client-ca` | Signs every client certificate: replication, owner, superuser, pooler | release wave - 1 |
+| CertificateRequestPolicy `<cluster>-client-ca` | Approves only those identities, in the release namespace | release wave - 2 |
+
+The server trusts only this root for client authentication: `clientCASecret`
+is `<cluster>-client-replica-tls`, whose `ca.crt` is the root. The Cluster never
+names `<cluster>-client-ca`, which holds the CA key, because CNPG's instance
+Role can read every Secret the Cluster names.
+
+Why: PostgreSQL never verifies against an intermediate alone (no partial-chain
+verification), so with `clientCA: issuer` the server trusts `cnpg-ca`'s whole
+chain up to the estate root. Any certificate under that root with `CN=<role>`
+then logs in, including another cluster's replication certificate, because
+CNPG always writes `hostssl replication streaming_replica all cert` and that
+rule cannot be removed. CNPG's own default and its cert-manager sample use a
+per-cluster CA behind a namespaced Issuer, and Percona's operator moved from a
+shared root to per-cluster roots in 2.5.0. See
+[CNPG certificates](https://cloudnative-pg.io/docs/1.30/certificates/) and
+[PostgreSQL's TLS verification](https://github.com/postgres/postgres/blob/REL_18_STABLE/src/backend/libpq/be-secure-openssl.c).
+
+The namespaced Issuer is the main boundary: only Certificates in the release
+namespace can request from it. The policies narrow that further, as
+approver-policy requires a policy for every issuer (gitops
+`docs/runbooks/pki-issuers.md`, "Certificate approval"). The bootstrap policy
+is the one scoped exception to that runbook's "CA certificates only in
+cert-manager". Policies are cluster-scoped and named after their Issuer, so two
+releases with the same fullname in different namespaces would collide.
+
+A client certificate issued outside this chart (for example a debug client's
+`CN=<owner>`) must name `<cluster>-client-ca`, kind `Issuer`, from the release
+namespace. Clients still verify the server against the estate root; that
+direction is unchanged.
+
+Switching an existing cluster re-issues every client certificate under the new
+root, and the server stops trusting the old ones as soon as
+`<cluster>-client-replica-tls` renews. Until a client reads its new certificate
+(the kubelet refreshes mounted Secrets within about a minute; drivers that read
+it only at startup need a restart), its new connections fail. Plan the switch
+per cluster, and restart clients that read the certificate once.
 
 ### Certificate login for the owner
 

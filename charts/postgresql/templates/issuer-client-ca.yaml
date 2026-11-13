@@ -1,0 +1,64 @@
+{{- /*
+The Issuer every client certificate names (postgresql.clientIssuerRef). Namespaced, so only Certificates
+in this namespace can request from it; its policy narrows that to the identities the chart issues, so a
+Certificate in this namespace still cannot mint CN=<any role>.
+*/}}
+{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") }}
+{{- $name := include "postgresql.fullname" . }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ $name }}-client-ca"
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.syncWaveBefore" (dict "root" . "by" 1) | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
+spec:
+  ca:
+    secretName: "{{ $name }}-client-ca"
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: "{{ $name }}-client-ca"
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.syncWaveBefore" (dict "root" . "by" 2) | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
+spec:
+  {{- $identities := list "streaming_replica" (include "postgresql.databaseOwner" .) }}
+  {{- if .Values.tls.superuserCertificate }}
+  {{- $identities = append $identities "postgres" }}
+  {{- end }}
+  {{- if include "postgresql.poolerAuthCertificateNeeded" . }}
+  {{- $identities = append $identities "cnpg_pooler_pgbouncer" }}
+  {{- end }}
+  allowed:
+    commonName:
+      value: "*"
+      required: true
+      validations:
+        - rule: {{ printf "self in %s" ($identities | toJson) | quote }}
+          message: "commonName must be one of this cluster's client identities"
+    dnsNames:
+      values:
+        {{- toYaml $identities | nindent 8 }}
+    subject:
+      organizations:
+        values:
+          - benfu-me
+    usages:
+      - digital signature
+      - key encipherment
+      - client auth
+    isCA: false
+  constraints:
+    maxDuration: 2160h # 90d, the leaves' duration
+  selector:
+    issuerRef:
+      name: "{{ $name }}-client-ca"
+      kind: Issuer
+      group: cert-manager.io
+    namespace:
+      matchNames:
+        - {{ .Release.Namespace | quote }}
+{{- end }}

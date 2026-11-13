@@ -1,0 +1,49 @@
+{{- /*
+The bootstrap Issuer for <cluster>-client-ca and nothing else: a SelfSigned Issuer signs a Certificate
+with its own key, which is how a root comes to exist. Namespaced, so only this namespace can use it,
+and its policy approves exactly one request: this cluster's client CA. It is the one exception to
+docs/runbooks/pki-issuers.md's "CA certificates only in cert-manager", scoped to this release.
+*/}}
+{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") }}
+{{- $name := include "postgresql.fullname" . }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ $name }}-client-ca-selfsigned"
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.syncWaveBefore" (dict "root" . "by" 2) | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: "{{ $name }}-client-ca-selfsigned"
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.syncWaveBefore" (dict "root" . "by" 2) | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
+spec:
+  allowed:
+    commonName:
+      value: "Ben Fu Homelab PostgreSQL Client CA {{ .Release.Namespace }}/{{ $name }}"
+      required: true
+    subject:
+      organizations:
+        values:
+          - Ben Fu Homelab
+    usages:
+      - digital signature
+      - cert sign
+      - crl sign
+    isCA: true
+  selector:
+    issuerRef:
+      name: "{{ $name }}-client-ca-selfsigned"
+      kind: Issuer
+      group: cert-manager.io
+    namespace:
+      matchNames:
+        - {{ .Release.Namespace | quote }}
+{{- end }}

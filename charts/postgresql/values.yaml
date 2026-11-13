@@ -297,6 +297,17 @@ tls:
   # certManager issuer. Empty uses the ClusterIssuer cnpg-ca, whose clients must
   # trust the estate root (bundle homelab-root-ca).
   issuerRef: {}
+  # Which CA signs the client certificates (replication, owner, superuser,
+  # pooler) and is the only one the server trusts for client authentication.
+  # cluster: <cluster>-client-ca, a self-signed root this chart creates in the
+  #          release namespace, so a certificate from any other issuer cannot
+  #          log in. Its CertificateRequestPolicies allow only the identities
+  #          the chart issues.
+  # issuer:  issuerRef. PostgreSQL then trusts that issuer's whole chain, so any
+  #          certificate under the estate root with CN=<role> can log in.
+  # Switching an existing cluster re-issues every client certificate; a client
+  # still holding the old one fails until it reads the new one.
+  clientCA: cluster
   # tls.mode=external: native Cluster.spec.certificates.
   certificates: {}
   # Extra server certificate SANs, e.g. for managed.services.additional or a

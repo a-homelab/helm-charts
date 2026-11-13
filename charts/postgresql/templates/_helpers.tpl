@@ -68,6 +68,11 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- .Values.syncWave | toString | default (get .Values.annotations "argocd.argoproj.io/sync-wave") -}}
 {{- end -}}
 
+{{- /* The release sync wave minus .by, for resources that must exist before the release's own Certificates. Takes a dict with root and by. */ -}}
+{{- define "postgresql.syncWaveBefore" -}}
+{{- sub (int (include "postgresql.syncWave" .root | default "0")) .by -}}
+{{- end -}}
+
 {{- define "postgresql.databaseWave" -}}
 {{- if ne (toString .Values.databaseSyncWave) "" -}}
 {{- .Values.databaseSyncWave -}}
@@ -272,6 +277,16 @@ rather than <cluster>-postgres. */ -}}
 {{- else -}}
 name: cnpg-ca
 kind: ClusterIssuer
+{{- end -}}
+{{- end -}}
+
+{{- define "postgresql.clientIssuerRef" -}}
+{{- if eq .Values.tls.clientCA "cluster" -}}
+name: "{{ include "postgresql.fullname" . }}-client-ca"
+kind: Issuer
+group: cert-manager.io
+{{- else -}}
+{{- include "postgresql.issuerRef" . -}}
 {{- end -}}
 {{- end -}}
 

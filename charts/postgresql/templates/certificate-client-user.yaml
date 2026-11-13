@@ -27,5 +27,5 @@ spec:
   dnsNames:
     - {{ include "postgresql.databaseOwner" . | quote }}
   issuerRef:
-    {{- include "postgresql.issuerRef" . | nindent 4 }}
+    {{- include "postgresql.clientIssuerRef" . | nindent 4 }}
 {{- end }}

@@ -94,6 +94,10 @@ def main():
                 keys = ["barman-0.15.1-objectstores.yaml"]
             elif kind in {"ExternalSecret", "SecretStore", "Password"}:
                 keys = [f"eso-2.11.0-{kind.lower()}s.yaml"]
+            elif kind == "Issuer":
+                keys = ["cert-manager-1.21.2-issuers.yaml"]
+            elif kind == "CertificateRequestPolicy":
+                keys = ["approver-policy-0.28.0-certificaterequestpolicies.yaml"]
             else:
                 keys = [f"{doc['apiVersion']}/{kind}"]
             for key in keys:

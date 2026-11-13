@@ -31,5 +31,5 @@ spec:
   dnsNames:
     - cnpg_pooler_pgbouncer
   issuerRef:
-    {{- include "postgresql.issuerRef" . | nindent 4 }}
+    {{- include "postgresql.clientIssuerRef" . | nindent 4 }}
 {{- end }}

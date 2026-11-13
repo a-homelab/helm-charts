@@ -52,9 +52,11 @@ tests:
           path: kind
           value: Cluster
 
-  - it: issues every Certificate from the cnpg-ca ClusterIssuer by default
+  - it: issues every Certificate from the cnpg-ca ClusterIssuer with clientCA issuer
     values:
       - ../examples/snapshot.yaml
+    set:
+      tls.clientCA: issuer
     asserts:
       - equal:
           path: spec.issuerRef
@@ -115,6 +117,7 @@ tests:
       - ../examples/existing.yaml
     set:
       tls.superuserCertificate: true
+      tls.clientCA: issuer
     asserts:
       - matchRegex:
           path: metadata.name
@@ -174,12 +177,13 @@ tests:
           path: kind
           value: Cluster
 
-  - it: issues every Certificate from an overridden issuer
+  - it: issues every Certificate from an overridden issuer with clientCA issuer
     values:
       - ../examples/existing.yaml
     set:
       tls.issuerRef.name: custom
       tls.issuerRef.kind: Issuer
+      tls.clientCA: issuer
     asserts:
       - equal:
           path: spec.issuerRef
@@ -190,3 +194,198 @@ tests:
           path: kind
           value: Certificate
           matchMany: true
+
+  - it: issues client Certificates from the cluster's own CA and the server Certificate from cnpg-ca
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.superuserCertificate: true
+    asserts:
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: example-postgres-client-ca
+            kind: Issuer
+            group: cert-manager.io
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-replica-tls
+      - equal:
+          path: spec.issuerRef.name
+          value: example-postgres-client-ca
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-user-tls
+      - equal:
+          path: spec.issuerRef.name
+          value: example-postgres-client-ca
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-superuser-tls
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: cnpg-ca
+            kind: ClusterIssuer
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-server-tls
+
+  - it: makes the client CA a self-signed root whose key renewals keep
+    values:
+      - ../examples/existing.yaml
+    template: templates/certificate-client-ca.yaml
+    asserts:
+      - equal:
+          path: spec.isCA
+          value: true
+      - equal:
+          path: spec.commonName
+          value: Ben Fu Homelab PostgreSQL Client CA test/example-postgres
+      - equal:
+          path: spec.privateKey.rotationPolicy
+          value: Never
+      - equal:
+          path: spec.secretName
+          value: example-postgres-client-ca
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: example-postgres-client-ca-selfsigned
+            kind: Issuer
+            group: cert-manager.io
+
+  - it: keeps the CA key out of every Secret the Cluster names
+    values:
+      - ../examples/existing.yaml
+    template: templates/cluster.yaml
+    asserts:
+      - equal:
+          path: spec.certificates
+          value:
+            serverTLSSecret: example-postgres-server-tls
+            serverCASecret: example-postgres-server-tls
+            clientCASecret: example-postgres-client-replica-tls
+            replicationTLSSecret: example-postgres-client-replica-tls
+
+  - it: lets the bootstrap Issuer's policy approve only this cluster's CA in its namespace
+    values:
+      - ../examples/existing.yaml
+    template: templates/issuer-client-ca-selfsigned.yaml
+    documentSelector:
+      path: kind
+      value: CertificateRequestPolicy
+    asserts:
+      - equal:
+          path: spec.allowed.commonName
+          value:
+            value: Ben Fu Homelab PostgreSQL Client CA test/example-postgres
+            required: true
+      - equal:
+          path: spec.allowed.isCA
+          value: true
+      - equal:
+          path: spec.selector
+          value:
+            issuerRef:
+              name: example-postgres-client-ca-selfsigned
+              kind: Issuer
+              group: cert-manager.io
+            namespace:
+              matchNames:
+                - test
+
+  - it: lets the client CA's policy approve only the identities the chart issues
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.superuserCertificate: true
+    template: templates/issuer-client-ca.yaml
+    documentSelector:
+      path: kind
+      value: CertificateRequestPolicy
+    asserts:
+      - equal:
+          path: spec.allowed.commonName.validations[0].rule
+          value: self in ["streaming_replica","app","postgres"]
+      - equal:
+          path: spec.allowed.dnsNames.values
+          value:
+            - streaming_replica
+            - app
+            - postgres
+      - equal:
+          path: spec.allowed.isCA
+          value: false
+      - equal:
+          path: spec.selector.namespace.matchNames
+          value:
+            - test
+
+  - it: adds the pooler identity to the client CA's policy when a Pooler needs it
+    values:
+      - ../examples/existing.yaml
+    set:
+      poolers:
+        rw:
+          instances: 1
+          type: rw
+          pgbouncer:
+            poolMode: transaction
+    template: templates/issuer-client-ca.yaml
+    documentSelector:
+      path: kind
+      value: CertificateRequestPolicy
+    asserts:
+      - contains:
+          path: spec.allowed.dnsNames.values
+          content: cnpg_pooler_pgbouncer
+
+  - it: orders the policies before the CA and the CA before the client Certificates
+    values:
+      - ../examples/existing.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-7"
+        documentSelector:
+          path: kind
+          value: CertificateRequestPolicy
+          matchMany: true
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-7"
+        template: templates/issuer-client-ca-selfsigned.yaml
+        documentSelector:
+          path: kind
+          value: Issuer
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-6"
+        template: templates/certificate-client-ca.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-6"
+        template: templates/issuer-client-ca.yaml
+        documentSelector:
+          path: kind
+          value: Issuer
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-5"
+        documentSelector:
+          path: metadata.name
+          value: example-postgres-client-user-tls
+
+  - it: renders no client CA without certManager
+    values:
+      - ../examples/existing.yaml
+    set:
+      tls.mode: operator
+    asserts:
+      - isKind:
+          of: CertificateRequestPolicy
+        not: true
+      - isKind:
+          of: Issuer
+        not: true

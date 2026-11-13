@@ -1,0 +1,48 @@
+{{- /*
+THIS CLUSTER'S CLIENT TRUST DOMAIN: a self-signed root that signs every client certificate the chart
+issues, and the only CA the server trusts for client authentication. PostgreSQL never verifies against
+an intermediate alone (no partial-chain verification), so trusting cnpg-ca meant trusting the estate
+root above it and every issuer under it. Chained to nothing, on purpose.
+
+The Cluster never names this Secret: its clientCASecret is <cluster>-client-replica-tls, whose ca.crt
+is this certificate, because CNPG's instance Role can read every Secret the Cluster names and this one
+holds the CA key.
+
+rotationPolicy Never: a renewal must re-sign the same key, or every leaf signed by the old key fails
+until it renews (up to 75 days). PostgreSQL holds the copy in <cluster>-client-replica-tls, refreshed
+when that leaf renews, so renewing a year early keeps the anchor it holds from ever expiring.
+*/}}
+{{- if and (eq .Values.tls.mode "certManager") (eq .Values.tls.clientCA "cluster") }}
+{{- $name := include "postgresql.fullname" . }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{{ $name }}-client-ca"
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "postgresql.syncWaveBefore" (dict "root" . "by" 1) | quote }}
+    {{- include "postgresql.extraAnnotations" . | nindent 4 }}
+spec:
+  isCA: true
+  commonName: "Ben Fu Homelab PostgreSQL Client CA {{ .Release.Namespace }}/{{ $name }}"
+  secretName: "{{ $name }}-client-ca"
+  subject:
+    organizations:
+      - Ben Fu Homelab
+  duration: 87600h0m0s # 10y
+  renewBefore: 8760h0m0s # 1y
+  revisionHistoryLimit: 10
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    encoding: PKCS8
+    rotationPolicy: Never
+  usages:
+    - digital signature
+    - cert sign
+    - crl sign
+  issuerRef:
+    name: "{{ $name }}-client-ca-selfsigned"
+    kind: Issuer
+    group: cert-manager.io
+{{- end }}

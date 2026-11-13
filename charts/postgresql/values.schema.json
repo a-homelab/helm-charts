@@ -356,6 +356,13 @@
         "clientCertificate": {
           "type": "boolean"
         },
+        "clientCA": {
+          "type": "string",
+          "enum": [
+            "cluster",
+            "issuer"
+          ]
+        },
         "issuerRef": {
           "type": "object"
         },
