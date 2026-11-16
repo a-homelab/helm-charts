@@ -24,6 +24,8 @@ Skip this for charts that only call `common.all`.
 
 - [ ] Each template reaches `apiVersion` after at most its guards or `range`, a
       validation include and one alias.
+- [ ] Each alias and variable is used enough to earn it. Inline any used once
+      or twice, and write out a value built only to fill one key.
 - [ ] No resource is built in variables and serialized with `toYaml`.
 - [ ] Each variable sits in the smallest block that uses it.
 - [ ] Every helper has two or more callers, or fits an allowed exception. Count

@@ -57,7 +57,14 @@ At most these may come before `apiVersion`:
 - One alias for a value the file uses throughout, such as
   `{{- $name := include "postgresql.fullname" . }}`.
 
-Variables that exist for a single block belong inside that block.
+An alias earns its place by repetition: `charts/kafka`'s cluster CA policy
+builds a dozen names from `$name`. A value the file uses once or twice is
+clearer written where it is used, because the reader then sees what the key
+holds without looking up.
+
+Variables that exist for a single block belong inside that block. A variable
+that only feeds one key, such as a list serialized into a single string, is
+usually clearer written out as the string it renders.
 
 # Where logic goes
 
