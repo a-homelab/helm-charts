@@ -16,7 +16,7 @@ spec:
       value: "*"
       required: true
       validations:
-        - rule: {{ printf "self in %s" (include "kafka.userNames" (dict "root" . "authMethod" "certificate") | fromYamlArray | toJson) | quote }}
+        - rule: {{ printf "self in %s" (include "kafka.certificateUserNames" . | fromYamlArray | toJson) | quote }}
           message: "commonName must be one of this Kafka cluster's users"
     usages:
       - digital signature

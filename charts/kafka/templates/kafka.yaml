@@ -60,7 +60,7 @@ spec:
         networkPolicyPeers:
           {{- toYaml . | nindent 10 }}
         {{- end }}
-      {{- with include "kafka.userNames" (dict "root" . "authMethod" "password") | fromYamlArray }}
+      {{- with include "kafka.passwordUserNames" . | fromYamlArray }}
       # SASL PLAIN without TLS, for users whose client cannot do TLS. Each broker resolves the
       # strimzisecrets references at start through Strimzi's KubernetesSecretConfigProvider, so no
       # password is in this resource.

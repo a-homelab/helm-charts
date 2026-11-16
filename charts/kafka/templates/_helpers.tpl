@@ -58,14 +58,27 @@ certificates. Takes a dict with root and by.
 {{- end }}
 
 {{- /*
-The sorted names of the users whose authMethod is .authMethod ("certificate" or "password"), as a
-YAML list for fromYamlArray. authMethod defaults to certificate. Takes a dict with root and
-authMethod.
+The sorted names of the users that log in with a certificate, authMethod's default, as a YAML list
+for fromYamlArray.
 */ -}}
-{{- define "kafka.userNames" -}}
+{{- define "kafka.certificateUserNames" -}}
 {{- $names := list }}
-{{- range $user, $spec := .root.Values.users }}
-{{- if eq ($spec.authMethod | default "certificate") $.authMethod }}
+{{- range $user, $spec := .Values.users }}
+{{- if eq ($spec.authMethod | default "certificate") "certificate" }}
+{{- $names = append $names $user }}
+{{- end }}
+{{- end }}
+{{- toYaml $names }}
+{{- end }}
+
+{{- /*
+The sorted names of the users that log in with a password (authMethod password), as a YAML list for
+fromYamlArray.
+*/ -}}
+{{- define "kafka.passwordUserNames" -}}
+{{- $names := list }}
+{{- range $user, $spec := .Values.users }}
+{{- if eq $spec.authMethod "password" }}
 {{- $names = append $names $user }}
 {{- end }}
 {{- end }}
