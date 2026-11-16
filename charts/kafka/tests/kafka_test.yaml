@@ -125,3 +125,40 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: kafka.metadataVersion is required
+
+  - it: bounds the entity operators' memory, which also bounds their JVM heap
+    asserts:
+      - equal:
+          path: spec.entityOperator
+          value:
+            topicOperator:
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 512Mi
+                limits:
+                  memory: 512Mi
+            userOperator:
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 512Mi
+                limits:
+                  memory: 512Mi
+
+  - it: lets a release raise one operator's memory
+    set:
+      entityOperator.topicOperator.resources.requests.memory: 1Gi
+      entityOperator.topicOperator.resources.limits.memory: 1Gi
+    asserts:
+      - equal:
+          path: spec.entityOperator.topicOperator.resources
+          value:
+            requests:
+              cpu: 25m
+              memory: 1Gi
+            limits:
+              memory: 1Gi
+      - equal:
+          path: spec.entityOperator.userOperator.resources.limits.memory
+          value: 512Mi

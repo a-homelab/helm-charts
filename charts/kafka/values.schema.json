@@ -85,6 +85,30 @@
     "spreadAcrossNodes": {
       "type": "boolean"
     },
+    "entityOperator": {
+      "type": "object",
+      "properties": {
+        "topicOperator": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        },
+        "userOperator": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "topics": {
       "type": "object",
       "propertyNames": {
