@@ -110,9 +110,21 @@ A variable that one block needs sits inside that block:
       annotations:
 ```
 
-# Exceptions
+# One resource per file
 
-Helm's guide puts each resource in its own file.[^helm-templates] A template
-may render several resources when they come from one loop or form one pair,
-such as the `Password` and `ExternalSecret` for each role in
-`charts/postgresql/templates/credentials.yaml`.
+Helm's guide puts each resource in its own file.[^helm-templates] This
+repository follows it without exceptions: each template renders one kind of
+resource, so its file name tells the reader what it holds.
+
+- Split resources that belong together, such as an `Issuer` and the
+  `CertificateRequestPolicy` that limits it, into two files, and name the
+  partner file in each one's comment.
+- A `range` over entries the user sets in values, such as node pools or users,
+  may render many resources of that one kind.
+- Do not `range` over a fixed list such as `list "cluster" "clients"` to save
+  lines. Write each resource out, so its fields read as literal YAML.
+
+`charts/kafka` follows this rule. `charts/postgresql` predates it, and four of
+its templates still render more than one kind: `credentials.yaml`,
+`issuer-client-ca-selfsigned.yaml`, `issuer-client-ca.yaml` and
+`recovery-secretstore.yaml`. Split them at that chart's next change.
