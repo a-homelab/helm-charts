@@ -1,0 +1,43 @@
+{{- /*
+Approves exactly two requests to issuer-ca-selfsigned.yaml: this cluster's cluster CA and clients CA,
+identified by commonName and by organizational units naming this namespace and cluster.
+*/}}
+{{- $name := include "kafka.fullname" . }}
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: "{{ $name }}-ca-selfsigned"
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "kafka.syncWaveBefore" (dict "root" . "by" 2) | quote }}
+spec:
+  allowed:
+    commonName:
+      value: "*"
+      required: true
+      validations:
+        - rule: 'self in ["Ben Fu Homelab Strimzi Cluster CA", "Ben Fu Homelab Strimzi Clients CA"]'
+          message: "commonName must be this Kafka cluster's cluster CA or clients CA"
+    subject:
+      organizations:
+        values:
+          - Ben Fu Homelab
+      organizationalUnits:
+        values:
+          - {{ .Release.Namespace | quote }}
+          - {{ $name | quote }}
+        required: true
+    usages:
+      - digital signature
+      - cert sign
+      - crl sign
+    isCA: true
+  selector:
+    issuerRef:
+      name: "{{ $name }}-ca-selfsigned"
+      kind: Issuer
+      group: cert-manager.io
+    namespace:
+      matchNames:
+        - {{ .Release.Namespace | quote }}

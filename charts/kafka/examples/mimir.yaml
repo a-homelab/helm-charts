@@ -1,0 +1,63 @@
+# Mimir's ingest storage cluster in gitops (values-files/mimir-kafka), released as mimir-kafka in
+# namespace mimir.
+fullnameOverride: mimir-kafka
+syncWave: "-1"
+
+kafka:
+  version: 4.3.2
+  metadataVersion: 4.3-IV0
+  clientPeers:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/instance: mimir
+  config:
+    # Mimir batches records up to about 15.2 MB; Kafka's 1 MB default rejects them.
+    message.max.bytes: 16000000
+
+nodePools:
+  controller:
+    roles: [controller]
+    replicas: 3
+    storage:
+      size: 10Gi
+      class: rook-ceph-block-nvme-ssd
+    resources:
+      requests:
+        cpu: 250m
+        memory: 2Gi
+      limits:
+        memory: 2Gi
+  broker:
+    roles: [broker]
+    replicas: 3
+    storage:
+      size: 150Gi
+      class: rook-ceph-block-nvme-ssd
+    resources:
+      requests:
+        cpu: "1"
+        memory: 6Gi
+      limits:
+        memory: 6Gi
+
+topics:
+  mimir-ingest:
+    partitions: 4
+    config:
+      max.message.bytes: 16000000
+      retention.ms: 259200000
+      retention.bytes: 32212254720
+
+users:
+  mimir:
+    acls:
+      - resource:
+          type: topic
+          name: mimir-ingest
+          patternType: literal
+        operations: [Describe, DescribeConfigs, Read, Write]
+      - resource:
+          type: group
+          name: "*"
+          patternType: literal
+        operations: [Describe, Read]

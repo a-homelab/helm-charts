@@ -1,0 +1,26 @@
+{{- /*
+Each user, authenticated by the client certificate in certificate-client.yaml. tls-external:
+cert-manager issues that certificate, so the User Operator manages only the ACLs. Shaped after
+Strimzi 1.3.1's tls-external example.
+*/}}
+{{- range $user, $spec := .Values.users }}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaUser
+metadata:
+  name: {{ $user | quote }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    strimzi.io/cluster: {{ include "kafka.fullname" $ | quote }}
+  {{- with include "kafka.syncWaveAnnotation" $ }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  authentication:
+    type: tls-external
+  authorization:
+    type: simple
+    acls:
+      {{- required (printf "users.%s.acls is required" $user) $spec.acls | toYaml | nindent 6 }}
+{{- end }}

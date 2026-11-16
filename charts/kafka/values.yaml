@@ -1,0 +1,106 @@
+# One Strimzi Kafka cluster per release, in KRaft mode, with its node pools, topics, TLS users, and a
+# cluster CA and clients CA of its own. Start from examples/mimir.yaml; README.md lists the
+# prerequisites.
+#
+# Strimzi 1.3.1 API reference: https://strimzi.io/docs/operators/1.3.1/configuring.html
+# The cluster name, and the prefix of every name Strimzi derives from it, is the release name, or
+# fullnameOverride when set.
+
+# Sets the cluster name. Changing it on an existing release creates a new, empty Kafka cluster; it
+# never renames one.
+fullnameOverride: ""
+
+# Argo CD sync wave of the Kafka cluster, its pools, topics, users and client certificates. The
+# cluster's CA chain renders one and two waves earlier. Empty leaves the annotation off, which is
+# wave 0.
+syncWave: ""
+
+# Kubernetes cluster DNS domain, as Strimzi's KUBERNETES_SERVICE_DNS_DOMAIN. The cluster CA's policy
+# admits broker and controller DNS names under it.
+clusterDomain: cluster.local
+
+# --- Kafka ----------------------------------------------------------------------------------------
+
+kafka:
+  # Kafka.spec.kafka.version and metadataVersion. Both are required, so a release never moves to a
+  # Kafka version by accident. Strimzi 1.3.1 supports Kafka 4.2 and 4.3.
+  version: ""
+  metadataVersion: ""
+  # Strimzi's networkPolicyPeers for the TLS client listener on 9093: the pods allowed to dial it.
+  # Empty lets every pod in every namespace reach the listener, which still requires a certificate
+  # from this cluster's clients CA.
+  clientPeers: []
+  # Kafka.spec.kafka.config, merged over these defaults. Replication factor 3 with
+  # min.insync.replicas 2 keeps writes going while one broker is down. Set a key to null to drop
+  # a default.
+  config:
+    offsets.topic.replication.factor: 3
+    transaction.state.log.replication.factor: 3
+    transaction.state.log.min.isr: 2
+    default.replication.factor: 3
+    # Strimzi falls back to 1 when this is unset.
+    min.insync.replicas: 2
+    # The Topic Operator owns every topic; see topics below.
+    auto.create.topics.enable: false
+
+# --- Node pools -----------------------------------------------------------------------------------
+
+# KafkaNodePools keyed by pool name. Pod names are <cluster>-<pool>-<id>. Each pool has one
+# persistent volume per node, shared with the KRaft metadata log.
+#
+# A controller pool is a static quorum: Strimzi 1.3.1 cannot later add, rename, scale, or change the
+# storage of a controller pool. Choose its replicas and size before the first sync.
+#
+# nodePools:
+#   controller:
+#     roles: [controller]
+#     replicas: 3
+#     storage:
+#       size: 10Gi
+#       class: rook-ceph-block-nvme-ssd
+#     resources: {}
+#   broker:
+#     roles: [broker]
+#     replicas: 3
+#     storage:
+#       size: 150Gi
+#       class: rook-ceph-block-nvme-ssd
+#     resources: {}
+nodePools: {}
+
+# Spreads each pool's pods across nodes (maxSkew 1, DoNotSchedule). nodeTaintsPolicy Honor lets two
+# pods share a node while a third node is down or tainted, rather than stay Pending.
+spreadAcrossNodes: true
+
+# --- Topics and users -----------------------------------------------------------------------------
+
+# KafkaTopics keyed by topic name. replicas defaults to 3. config is KafkaTopic.spec.config.
+# Kafka can add partitions to a topic but never remove them.
+#
+# topics:
+#   mimir-ingest:
+#     partitions: 4
+#     config:
+#       retention.ms: 259200000
+topics: {}
+
+# KafkaUsers keyed by user name, each authenticated by a client certificate from this cluster's
+# clients CA (tls-external): the chart issues Certificate <user>-kafka-client, whose CN is the user
+# name, into Secret <user>-kafka-client. acls is KafkaUser.spec.authorization.acls.
+#
+# users:
+#   mimir:
+#     acls:
+#       - resource:
+#           type: topic
+#           name: mimir-ingest
+#           patternType: literal
+#         operations: [Describe, Read, Write]
+users: {}
+
+# --- Monitoring -----------------------------------------------------------------------------------
+
+# Strimzi's Kafka and Entity Operator PodMonitors from its 1.3.1 examples, scoped to this namespace.
+# The Kafka pods export through the Strimzi Metrics Reporter either way.
+podMonitors:
+  enabled: true

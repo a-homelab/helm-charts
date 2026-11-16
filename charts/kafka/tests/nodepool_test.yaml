@@ -1,0 +1,95 @@
+suite: KafkaNodePool
+templates:
+  - templates/nodepool.yaml
+release:
+  name: mimir-kafka
+  namespace: mimir
+values:
+  - ../examples/mimir.yaml
+tests:
+  - it: renders one pool per entry, joined to the cluster by label alone
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.labels
+          value:
+            strimzi.io/cluster: mimir-kafka
+        documentSelector:
+          path: metadata.name
+          value: broker
+
+  - it: gives each node one persistent volume shared with the KRaft metadata log
+    asserts:
+      - equal:
+          path: spec.storage
+          value:
+            type: jbod
+            volumes:
+              - id: 0
+                type: persistent-claim
+                size: 10Gi
+                class: rook-ceph-block-nvme-ssd
+                deleteClaim: false
+                kraftMetadata: shared
+        documentSelector:
+          path: metadata.name
+          value: controller
+
+  - it: omits the storage class when none is set
+    set:
+      nodePools.broker.storage.class: ""
+    asserts:
+      - notExists:
+          path: spec.storage.volumes[0].class
+        documentSelector:
+          path: metadata.name
+          value: broker
+
+  - it: spreads each pool's pods across nodes
+    asserts:
+      - equal:
+          path: spec.template.pod.topologySpreadConstraints
+          value:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: DoNotSchedule
+              nodeTaintsPolicy: Honor
+              labelSelector:
+                matchLabels:
+                  strimzi.io/cluster: mimir-kafka
+                  strimzi.io/pool-name: broker
+        documentSelector:
+          path: metadata.name
+          value: broker
+
+  - it: leaves the pod template off without spreadAcrossNodes
+    set:
+      spreadAcrossNodes: false
+    asserts:
+      - notExists:
+          path: spec.template
+        documentSelector:
+          path: metadata.name
+          value: controller
+
+  - it: passes resources through unchanged
+    asserts:
+      - equal:
+          path: spec.resources
+          value:
+            requests:
+              cpu: "1"
+              memory: 6Gi
+            limits:
+              memory: 6Gi
+        documentSelector:
+          path: metadata.name
+          value: broker
+
+  - it: renders no pools when none are declared
+    set:
+      nodePools: null
+    asserts:
+      - hasDocuments:
+          count: 0

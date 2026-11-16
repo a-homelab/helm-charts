@@ -1,0 +1,36 @@
+{{- /*
+Admits only the users this release declares, so a Certificate in this namespace still cannot mint
+CN=<any principal>. With no users it admits nothing.
+*/}}
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "kafka.syncWaveBefore" (dict "root" . "by" 1) | quote }}
+spec:
+  allowed:
+    commonName:
+      value: "*"
+      required: true
+      validations:
+        - rule: {{ printf "self in %s" (keys (.Values.users | default dict) | sortAlpha | toJson) | quote }}
+          message: "commonName must be one of this Kafka cluster's users"
+    usages:
+      - digital signature
+      - client auth
+    isCA: false
+  constraints:
+    maxDuration: 2160h # 90d, the client certificates' duration
+    privateKey:
+      algorithm: Ed25519
+  selector:
+    issuerRef:
+      name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+      kind: Issuer
+      group: cert-manager.io
+    namespace:
+      matchNames:
+        - {{ .Release.Namespace | quote }}

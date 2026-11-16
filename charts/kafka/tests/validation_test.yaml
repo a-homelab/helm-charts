@@ -1,0 +1,64 @@
+# Helm 4 prints schema error paths as JSON pointers (/kafka/version) and Helm 3 as dotted paths
+# (kafka.version); (\.|/) matches either.
+suite: validation
+templates:
+  - templates/kafka.yaml
+release:
+  name: mimir-kafka
+  namespace: mimir
+values:
+  - ../examples/mimir.yaml
+tests:
+  - it: accepts the Mimir example
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects a misspelled top-level key
+    set:
+      nodePool: {}
+    asserts:
+      - failedTemplate:
+          errorPattern: nodePool
+
+  - it: rejects a pool role Strimzi does not have
+    set:
+      nodePools.broker.roles: [worker]
+    asserts:
+      - failedTemplate:
+          errorPattern: nodePools(\.|/)broker(\.|/)roles
+
+  - it: requires a pool's storage size
+    set:
+      nodePools.broker.storage.size: null
+    asserts:
+      - failedTemplate:
+          errorPattern: size
+
+  - it: rejects an unknown pool field
+    set:
+      nodePools.broker.deleteClaim: true
+    asserts:
+      - failedTemplate:
+          errorPattern: deleteClaim
+
+  - it: requires a user's ACLs
+    set:
+      users.tempo: {}
+    asserts:
+      - failedTemplate:
+          errorPattern: acls
+
+  - it: rejects a user name that cannot be a certificate name
+    set:
+      users.Tempo_Writer.acls:
+        - operations: [Write]
+    asserts:
+      - failedTemplate:
+          errorPattern: Tempo_Writer
+
+  - it: rejects a malformed Kafka version
+    set:
+      kafka.version: "4.3"
+    asserts:
+      - failedTemplate:
+          errorPattern: kafka(\.|/)version

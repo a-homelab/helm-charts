@@ -1,0 +1,174 @@
+suite: CA chain
+templates:
+  - templates/issuer-ca-selfsigned.yaml
+  - templates/certificaterequestpolicy-ca-selfsigned.yaml
+  - templates/certificate-cluster-ca.yaml
+  - templates/certificate-clients-ca.yaml
+  - templates/issuer-cluster-ca.yaml
+  - templates/certificaterequestpolicy-cluster-ca.yaml
+  - templates/issuer-clients-ca.yaml
+  - templates/certificaterequestpolicy-clients-ca.yaml
+release:
+  name: mimir-kafka
+  namespace: mimir
+values:
+  - ../examples/mimir.yaml
+tests:
+  - it: mints the cluster CA as a self-signed root, identified by namespace and cluster
+    template: templates/certificate-cluster-ca.yaml
+    asserts:
+      - equal:
+          path: spec.commonName
+          value: Ben Fu Homelab Strimzi Cluster CA
+      - equal:
+          path: spec.secretName
+          value: mimir-kafka-cluster-ca-root
+      - equal:
+          path: spec.subject
+          value:
+            organizations:
+              - Ben Fu Homelab
+            organizationalUnits:
+              - mimir
+              - mimir-kafka
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: mimir-kafka-ca-selfsigned
+            kind: Issuer
+            group: cert-manager.io
+      - equal:
+          path: spec.privateKey.rotationPolicy
+          value: Never
+
+  - it: mints the clients CA as a separate self-signed root
+    template: templates/certificate-clients-ca.yaml
+    asserts:
+      - equal:
+          path: spec.commonName
+          value: Ben Fu Homelab Strimzi Clients CA
+      - equal:
+          path: spec.secretName
+          value: mimir-kafka-clients-ca-root
+      - equal:
+          path: spec.issuerRef.name
+          value: mimir-kafka-ca-selfsigned
+      - equal:
+          path: spec.privateKey.rotationPolicy
+          value: Never
+
+  - it: orders the chain two and one waves before the cluster
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-3"
+        template: templates/issuer-ca-selfsigned.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-2"
+        template: templates/certificate-cluster-ca.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-2"
+        template: templates/certificate-clients-ca.yaml
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-2"
+        template: templates/issuer-cluster-ca.yaml
+
+  - it: counts the waves from 0 without a release sync wave
+    set:
+      syncWave: ""
+    template: templates/issuer-ca-selfsigned.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "-2"
+
+  - it: lets the bootstrap Issuer sign only this cluster's two CAs
+    template: templates/certificaterequestpolicy-ca-selfsigned.yaml
+    asserts:
+      - equal:
+          path: spec.allowed.commonName.validations[0].rule
+          value: self in ["Ben Fu Homelab Strimzi Cluster CA", "Ben Fu Homelab Strimzi Clients CA"]
+      - equal:
+          path: spec.allowed.subject.organizationalUnits.values
+          value:
+            - mimir
+            - mimir-kafka
+      - equal:
+          path: spec.selector.namespace.matchNames
+          value:
+            - mimir
+
+  - it: admits only this cluster's Strimzi components on the cluster CA
+    template: templates/certificaterequestpolicy-cluster-ca.yaml
+    asserts:
+      - equal:
+          path: spec.allowed.commonName.validations[0].rule
+          value: self in ["mimir-kafka-kafka","cluster-operator","mimir-kafka-entity-topic-operator","mimir-kafka-entity-user-operator"]
+      - equal:
+          path: spec.allowed.dnsNames.values
+          value:
+            - mimir-kafka-kafka-bootstrap
+            - mimir-kafka-kafka-bootstrap.mimir
+            - mimir-kafka-kafka-bootstrap.mimir.svc
+            - mimir-kafka-kafka-bootstrap.mimir.svc.cluster.local
+            - mimir-kafka-kafka-brokers
+            - mimir-kafka-kafka-brokers.mimir
+            - mimir-kafka-kafka-brokers.mimir.svc
+            - mimir-kafka-kafka-brokers.mimir.svc.cluster.local
+            - mimir-kafka-*.mimir-kafka-kafka-brokers.mimir.svc
+            - mimir-kafka-*.mimir-kafka-kafka-brokers.mimir.svc.cluster.local
+      - equal:
+          path: spec.allowed.subject.organizations
+          value:
+            values:
+              - io.strimzi
+            required: true
+      - equal:
+          path: spec.allowed.isCA
+          value: false
+
+  - it: follows clusterDomain in the cluster CA's DNS names
+    template: templates/certificaterequestpolicy-cluster-ca.yaml
+    set:
+      clusterDomain: homelab.internal
+    asserts:
+      - contains:
+          path: spec.allowed.dnsNames.values
+          content: mimir-kafka-*.mimir-kafka-kafka-brokers.mimir.svc.homelab.internal
+
+  - it: admits only the declared users on the clients CA
+    template: templates/certificaterequestpolicy-clients-ca.yaml
+    set:
+      users.tempo.acls:
+        - resource:
+            type: topic
+            name: tempo-ingest
+            patternType: literal
+          operations: [Write]
+    asserts:
+      - equal:
+          path: spec.allowed.commonName.validations[0].rule
+          value: self in ["mimir","tempo"]
+      - equal:
+          path: spec.constraints
+          value:
+            maxDuration: 2160h
+            privateKey:
+              algorithm: Ed25519
+      - equal:
+          path: spec.allowed.usages
+          value:
+            - digital signature
+            - client auth
+
+  - it: admits no client certificate without users
+    template: templates/certificaterequestpolicy-clients-ca.yaml
+    set:
+      users: null
+    asserts:
+      - equal:
+          path: spec.allowed.commonName.validations[0].rule
+          value: self in []

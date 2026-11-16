@@ -1,0 +1,96 @@
+suite: Topics and users
+templates:
+  - templates/kafkatopic.yaml
+  - templates/kafkauser.yaml
+  - templates/certificate-client.yaml
+release:
+  name: mimir-kafka
+  namespace: mimir
+values:
+  - ../examples/mimir.yaml
+tests:
+  - it: renders each topic with three replicas by default
+    template: templates/kafkatopic.yaml
+    asserts:
+      - equal:
+          path: spec
+          value:
+            partitions: 4
+            replicas: 3
+            config:
+              max.message.bytes: 16000000
+              retention.ms: 259200000
+              retention.bytes: 32212254720
+      - equal:
+          path: metadata.labels
+          value:
+            strimzi.io/cluster: mimir-kafka
+
+  - it: keeps a topic's own replica count
+    template: templates/kafkatopic.yaml
+    set:
+      topics.mimir-ingest.replicas: 2
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: authenticates each user by an externally issued certificate
+    template: templates/kafkauser.yaml
+    asserts:
+      - equal:
+          path: spec.authentication.type
+          value: tls-external
+      - equal:
+          path: spec.authorization.acls[1]
+          value:
+            resource:
+              type: group
+              name: "*"
+              patternType: literal
+            operations: [Describe, Read]
+
+  - it: issues the user's certificate from this cluster's clients CA, CN the user name
+    template: templates/certificate-client.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: mimir-kafka-client
+      - equal:
+          path: spec.secretName
+          value: mimir-kafka-client
+      - equal:
+          path: spec.commonName
+          value: mimir
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: mimir-kafka-clients-ca-root
+            kind: Issuer
+            group: cert-manager.io
+      - equal:
+          path: spec.usages
+          value:
+            - digital signature
+            - client auth
+      - equal:
+          path: spec.privateKey
+          value:
+            algorithm: Ed25519
+            encoding: PKCS8
+
+  - it: renders one user and one certificate per user
+    set:
+      users.tempo.acls:
+        - resource:
+            type: topic
+            name: tempo-ingest
+            patternType: literal
+          operations: [Write]
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: templates/kafkauser.yaml
+      - hasDocuments:
+          count: 2
+        template: templates/certificate-client.yaml

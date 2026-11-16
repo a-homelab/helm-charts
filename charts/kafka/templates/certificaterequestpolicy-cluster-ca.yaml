@@ -1,0 +1,57 @@
+{{- /*
+Admits only the identities Strimzi gives this cluster's components, in organization io.strimzi, with
+DNS names under this cluster's own Services. cluster-operator is the same CN in every Kafka cluster;
+it is admitted here because this CA is trusted by no other cluster.
+*/}}
+{{- $name := include "kafka.fullname" . }}
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: {{ include "kafka.caName" (dict "root" . "ca" "cluster") | quote }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "kafka.syncWaveBefore" (dict "root" . "by" 1) | quote }}
+spec:
+  {{- $identities := list (printf "%s-kafka" $name) "cluster-operator" (printf "%s-entity-topic-operator" $name) (printf "%s-entity-user-operator" $name) }}
+  allowed:
+    commonName:
+      value: "*"
+      required: true
+      validations:
+        - rule: {{ printf "self in %s" ($identities | toJson) | quote }}
+          message: "commonName must be one of this Kafka cluster's Strimzi components"
+    dnsNames:
+      values:
+        - "{{ $name }}-kafka-bootstrap"
+        - "{{ $name }}-kafka-bootstrap.{{ .Release.Namespace }}"
+        - "{{ $name }}-kafka-bootstrap.{{ .Release.Namespace }}.svc"
+        - "{{ $name }}-kafka-bootstrap.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+        - "{{ $name }}-kafka-brokers"
+        - "{{ $name }}-kafka-brokers.{{ .Release.Namespace }}"
+        - "{{ $name }}-kafka-brokers.{{ .Release.Namespace }}.svc"
+        - "{{ $name }}-kafka-brokers.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+        # Each broker and controller pod, <cluster>-<pool>-<id>, under the headless brokers Service.
+        - "{{ $name }}-*.{{ $name }}-kafka-brokers.{{ .Release.Namespace }}.svc"
+        - "{{ $name }}-*.{{ $name }}-kafka-brokers.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}"
+    subject:
+      organizations:
+        values:
+          - io.strimzi
+        required: true
+    usages:
+      - digital signature
+      - key encipherment
+      - server auth
+      - client auth
+    isCA: false
+  constraints:
+    maxDuration: 8760h # 365d, Strimzi's certificate validity
+  selector:
+    issuerRef:
+      name: {{ include "kafka.caName" (dict "root" . "ca" "cluster") | quote }}
+      kind: Issuer
+      group: cert-manager.io
+    namespace:
+      matchNames:
+        - {{ .Release.Namespace | quote }}

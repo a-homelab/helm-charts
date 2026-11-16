@@ -1,0 +1,36 @@
+suite: PodMonitors
+templates:
+  - templates/podmonitor-kafka.yaml
+  - templates/podmonitor-entity-operator.yaml
+release:
+  name: mimir-kafka
+  namespace: mimir
+values:
+  - ../examples/mimir.yaml
+tests:
+  - it: renders Strimzi's Kafka and Entity Operator PodMonitors in the release namespace
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.namespace
+          value: mimir
+      - equal:
+          path: spec.selector.matchExpressions
+          value:
+            - key: strimzi.io/kind
+              operator: In
+              values: ["Kafka"]
+        template: templates/podmonitor-kafka.yaml
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: entity-operator
+        template: templates/podmonitor-entity-operator.yaml
+
+  - it: renders none when disabled
+    set:
+      podMonitors.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0

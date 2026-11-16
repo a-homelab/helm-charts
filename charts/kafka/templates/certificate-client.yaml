@@ -1,0 +1,35 @@
+{{- /*
+Each user's client certificate, from this cluster's clients CA. Kafka takes the principal from the
+CN, User:CN=<user>, so the CN is the KafkaUser name (kafkauser.yaml).
+*/}}
+{{- range $user, $spec := .Values.users }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{{ $user }}-kafka-client"
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "kafka.labels" $ | nindent 4 }}
+  {{- with include "kafka.syncWaveAnnotation" $ }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  secretName: "{{ $user }}-kafka-client"
+  commonName: {{ $user | quote }}
+  duration: 2160h0m0s # 90d
+  renewBefore: 360h0m0s # 15d
+  isCA: false
+  # An Ed25519 key only signs, so key encipherment does not apply.
+  usages:
+    - digital signature
+    - client auth
+  privateKey:
+    algorithm: Ed25519
+    encoding: PKCS8
+  issuerRef:
+    name: {{ include "kafka.caName" (dict "root" $ "ca" "clients") | quote }}
+    kind: Issuer
+    group: cert-manager.io
+{{- end }}

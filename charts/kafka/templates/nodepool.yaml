@@ -1,0 +1,46 @@
+{{- range $pool, $spec := .Values.nodePools }}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: {{ $pool | quote }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    strimzi.io/cluster: {{ include "kafka.fullname" $ | quote }}
+  {{- with include "kafka.syncWaveAnnotation" $ }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ required (printf "nodePools.%s.replicas is required" $pool) $spec.replicas }}
+  roles:
+    {{- required (printf "nodePools.%s.roles is required" $pool) $spec.roles | toYaml | nindent 4 }}
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: {{ required (printf "nodePools.%s.storage.size is required" $pool) (dig "storage" "size" "" $spec) | quote }}
+        {{- with dig "storage" "class" "" $spec }}
+        class: {{ . | quote }}
+        {{- end }}
+        deleteClaim: false
+        kraftMetadata: shared
+  {{- with $spec.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if $.Values.spreadAcrossNodes }}
+  template:
+    pod:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          labelSelector:
+            matchLabels:
+              strimzi.io/cluster: {{ include "kafka.fullname" $ | quote }}
+              strimzi.io/pool-name: {{ $pool | quote }}
+  {{- end }}
+{{- end }}

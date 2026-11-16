@@ -1,0 +1,47 @@
+{{- /*
+THIS CLUSTER'S CLIENT TRUST BOUNDARY: a self-signed root chained to nothing. It signs the users'
+certificates (certificate-client.yaml, through issuer-clients-ca.yaml), and is the only CA the client
+listener trusts. Sharing it with another Kafka cluster would let that cluster's users log in here.
+
+The cluster's identity goes in organizational units, not the commonName: X.509 caps a commonName at
+64 bytes (RFC 5280 ub-common-name), while a namespace and a fullname may each be 63.
+
+rotationPolicy Never: a renewal must re-sign the same key, or every leaf signed by the old key fails
+until it renews. Renewing a year early keeps the copy Strimzi holds from ever expiring.
+*/}}
+{{- $name := include "kafka.fullname" . }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ include "kafka.syncWaveBefore" (dict "root" . "by" 1) | quote }}
+spec:
+  isCA: true
+  commonName: Ben Fu Homelab Strimzi Clients CA
+  secretName: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+  subject:
+    organizations:
+      - Ben Fu Homelab
+    organizationalUnits:
+      - {{ .Release.Namespace | quote }}
+      - {{ $name | quote }}
+  duration: 87600h0m0s # 10y
+  renewBefore: 8760h0m0s # 1y
+  revisionHistoryLimit: 10
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    encoding: PKCS8
+    rotationPolicy: Never
+  usages:
+    - digital signature
+    - cert sign
+    - crl sign
+  issuerRef:
+    name: "{{ $name }}-ca-selfsigned"
+    kind: Issuer
+    group: cert-manager.io

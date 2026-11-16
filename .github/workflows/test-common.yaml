@@ -52,15 +52,18 @@ jobs:
           helm lint charts/opencode --strict
           helm lint charts/blocky --strict
           helm lint charts/postgresql --strict -f charts/postgresql/examples/existing.yaml
+          helm lint charts/kafka --strict -f charts/kafka/examples/mimir.yaml
       - name: Install helm-unittest
         # Helm 4 cannot verify plugins installed from a git repository.
         run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.2 ${{ startsWith(matrix.helm, 'v4.') && '--verify=false' || '' }}
       - name: Run chart unit tests
-        run: helm unittest charts/common-tests charts/postgresql charts/blender charts/opencode charts/blocky
+        run: helm unittest charts/common-tests charts/postgresql charts/kafka charts/blender charts/opencode charts/blocky
       - name: Test chart scripts and schema tooling
         run: python -m pytest scripts/test_common.py charts/blender/tests charts/opencode/tests -q
       - name: Validate PostgreSQL examples against pinned upstream CRDs
         run: python scripts/validate_postgresql_schemas.py --cache '${{ runner.temp }}/postgresql-schema-sources'
+      - name: Validate Kafka examples against pinned upstream CRDs
+        run: python scripts/validate_kafka_schemas.py --cache '${{ runner.temp }}/kafka-schema-sources'
       - name: Render harness fixtures
         run: |-
           helm template t charts/common-tests > /dev/null

@@ -1,0 +1,7 @@
+apiVersion: v2
+name: kafka
+description: A Strimzi Kafka cluster with its node pools, topics, TLS users and a CA pair of its own
+type: application
+version: 0.1.0
+# The Strimzi release whose kafka.strimzi.io/v1 API the templates are written and validated against.
+appVersion: "1.3.1"

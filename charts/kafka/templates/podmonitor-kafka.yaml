@@ -1,0 +1,37 @@
+{{- /*
+Strimzi 1.3.1's Kafka PodMonitor, scoped to this release's namespace instead of the example's
+"myproject", and to Kafka pods alone (no Connect or MirrorMaker 2):
+https://github.com/strimzi/strimzi-kafka-operator/blob/1.3.1/packaging/examples/metrics/prometheus-install/pod-monitors/kafka-resources-metrics.yaml
+The strimzi_io_* and kubernetes_pod_name labels are what upstream's Kafka rules and dashboards select
+on.
+*/}}
+{{- if .Values.podMonitors.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kafka-resources-metrics
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchExpressions:
+      - key: strimzi.io/kind
+        operator: In
+        values: ["Kafka"]
+  podMetricsEndpoints:
+    - path: /metrics
+      port: tcp-prometheus
+      relabelings:
+        - regex: __meta_kubernetes_pod_label_(strimzi_io_.+)
+          replacement: $1
+          action: labelmap
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: kubernetes_pod_name
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node_name
+        - sourceLabels: [__meta_kubernetes_pod_host_ip]
+          targetLabel: node_ip
+{{- end }}

@@ -1,0 +1,4 @@
+# Helm drops a key set to null from the defaults it merges over; --set in helm-unittest does not.
+kafka:
+  config:
+    min.insync.replicas: null

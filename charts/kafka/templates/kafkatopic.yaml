@@ -1,0 +1,21 @@
+{{- range $topic, $spec := .Values.topics }}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: {{ $topic | quote }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    strimzi.io/cluster: {{ include "kafka.fullname" $ | quote }}
+  {{- with include "kafka.syncWaveAnnotation" $ }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+spec:
+  partitions: {{ required (printf "topics.%s.partitions is required" $topic) $spec.partitions }}
+  replicas: {{ $spec.replicas | default 3 }}
+  {{- with $spec.config }}
+  config:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
