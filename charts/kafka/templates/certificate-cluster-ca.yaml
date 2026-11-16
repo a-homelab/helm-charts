@@ -11,7 +11,6 @@ The cluster's identity goes in organizational units, not the commonName: X.509 c
 rotationPolicy Never: a renewal must re-sign the same key, or every leaf signed by the old key fails
 until it renews. Renewing a year early keeps the copy Strimzi holds from ever expiring.
 */}}
-{{- $name := include "kafka.fullname" . }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -30,7 +29,7 @@ spec:
       - Ben Fu Homelab
     organizationalUnits:
       - {{ .Release.Namespace | quote }}
-      - {{ $name | quote }}
+      - {{ include "kafka.fullname" . | quote }}
   duration: 87600h0m0s # 10y
   renewBefore: 8760h0m0s # 1y
   revisionHistoryLimit: 10
@@ -44,6 +43,6 @@ spec:
     - cert sign
     - crl sign
   issuerRef:
-    name: "{{ $name }}-ca-selfsigned"
+    name: "{{ include "kafka.fullname" . }}-ca-selfsigned"
     kind: Issuer
     group: cert-manager.io

@@ -2,11 +2,10 @@
 Approves exactly two requests to issuer-ca-selfsigned.yaml: this cluster's cluster CA and clients CA,
 identified by commonName and by organizational units naming this namespace and cluster.
 */}}
-{{- $name := include "kafka.fullname" . }}
 apiVersion: policy.cert-manager.io/v1alpha1
 kind: CertificateRequestPolicy
 metadata:
-  name: "{{ $name }}-ca-selfsigned"
+  name: "{{ include "kafka.fullname" . }}-ca-selfsigned"
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
   annotations:
@@ -26,7 +25,7 @@ spec:
       organizationalUnits:
         values:
           - {{ .Release.Namespace | quote }}
-          - {{ $name | quote }}
+          - {{ include "kafka.fullname" . | quote }}
         required: true
     usages:
       - digital signature
@@ -35,7 +34,7 @@ spec:
     isCA: true
   selector:
     issuerRef:
-      name: "{{ $name }}-ca-selfsigned"
+      name: "{{ include "kafka.fullname" . }}-ca-selfsigned"
       kind: Issuer
       group: cert-manager.io
     namespace:

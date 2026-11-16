@@ -13,13 +13,12 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: {{ include "kafka.syncWaveBefore" (dict "root" . "by" 1) | quote }}
 spec:
-  {{- $identities := list (printf "%s-kafka" $name) "cluster-operator" (printf "%s-entity-topic-operator" $name) (printf "%s-entity-user-operator" $name) }}
   allowed:
     commonName:
       value: "*"
       required: true
       validations:
-        - rule: {{ printf "self in %s" ($identities | toJson) | quote }}
+        - rule: 'self in ["{{ $name }}-kafka","cluster-operator","{{ $name }}-entity-topic-operator","{{ $name }}-entity-user-operator"]'
           message: "commonName must be one of this Kafka cluster's Strimzi components"
     dnsNames:
       values:

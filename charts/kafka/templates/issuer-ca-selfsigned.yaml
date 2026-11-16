@@ -3,11 +3,10 @@ The bootstrap Issuer for the cluster's two CAs and nothing else: a SelfSigned Is
 Certificate with its own key, which is how a root comes to exist. Namespaced, so only this namespace
 can use it; certificaterequestpolicy-ca-selfsigned.yaml limits it to this cluster's two CAs.
 */}}
-{{- $name := include "kafka.fullname" . }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: "{{ $name }}-ca-selfsigned"
+  name: "{{ include "kafka.fullname" . }}-ca-selfsigned"
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
