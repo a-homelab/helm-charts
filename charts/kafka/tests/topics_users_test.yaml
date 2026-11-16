@@ -37,6 +37,9 @@ tests:
 
   - it: authenticates each user by an externally issued certificate
     template: templates/kafkauser.yaml
+    documentSelector:
+      path: metadata.name
+      value: mimir-ingester
     asserts:
       - equal:
           path: spec.authentication.type
@@ -46,22 +49,22 @@ tests:
           value:
             resource:
               type: group
-              name: "*"
-              patternType: literal
+              name: mimir-ingester-
+              patternType: prefix
             operations: [Describe, Read]
 
   - it: issues the user's certificate from this cluster's clients CA, CN the user name
     template: templates/certificate-client.yaml
+    documentSelector:
+      path: metadata.name
+      value: mimir-distributor-kafka-client
     asserts:
       - equal:
-          path: metadata.name
-          value: mimir-kafka-client
-      - equal:
           path: spec.secretName
-          value: mimir-kafka-client
+          value: mimir-distributor-kafka-client
       - equal:
           path: spec.commonName
-          value: mimir
+          value: mimir-distributor
       - equal:
           path: spec.issuerRef
           value:
@@ -89,8 +92,8 @@ tests:
           operations: [Write]
     asserts:
       - hasDocuments:
-          count: 2
+          count: 6
         template: templates/kafkauser.yaml
       - hasDocuments:
-          count: 2
+          count: 6
         template: templates/certificate-client.yaml

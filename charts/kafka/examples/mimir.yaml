@@ -48,16 +48,48 @@ topics:
       retention.ms: 259200000
       retention.bytes: 32212254720
 
+# One certificate user per Mimir component that connects, each with only the operations it uses.
 users:
-  mimir:
+  mimir-distributor:
     acls:
       - resource:
           type: topic
           name: mimir-ingest
           patternType: literal
-        operations: [Describe, DescribeConfigs, Read, Write]
+        operations: [Describe, Write]
+  # The ruler writes recording rule results through its own distributor.
+  mimir-ruler:
+    acls:
       - resource:
-          type: group
-          name: "*"
+          type: topic
+          name: mimir-ingest
+          patternType: literal
+        operations: [Describe, Write]
+  mimir-ingester:
+    acls:
+      - resource:
+          type: topic
+          name: mimir-ingest
           patternType: literal
         operations: [Describe, Read]
+      # Each ingester commits its offsets to a consumer group named after its pod
+      # (ingest_storage.kafka.consumer_group defaults to the instance ID).
+      - resource:
+          type: group
+          name: mimir-ingester-
+          patternType: prefix
+        operations: [Describe, Read]
+  mimir-query-frontend:
+    acls:
+      - resource:
+          type: topic
+          name: mimir-ingest
+          patternType: literal
+        operations: [Describe]
+  mimir-ruler-query-frontend:
+    acls:
+      - resource:
+          type: topic
+          name: mimir-ingest
+          patternType: literal
+        operations: [Describe]

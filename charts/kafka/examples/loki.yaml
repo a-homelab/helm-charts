@@ -44,17 +44,28 @@ topics:
       retention.ms: 259200000
       retention.bytes: 32212254720
 
+# One password user per Loki component that connects, each with only the operations it uses.
 users:
-  loki:
+  loki-distributor:
     authMethod: password
     acls:
       - resource:
           type: topic
           name: loki-ingest
           patternType: literal
-        operations: [Describe, DescribeConfigs, Read, Write]
+        operations: [Describe, Write]
+  loki-ingester:
+    authMethod: password
+    acls:
+      - resource:
+          type: topic
+          name: loki-ingest
+          patternType: literal
+        operations: [Describe, Read]
+      # Each ingester commits its offsets to a consumer group named after its pod
+      # (kafka_config.consumer_group defaults to the instance ID).
       - resource:
           type: group
-          name: "*"
-          patternType: literal
+          name: loki-ingester-
+          patternType: prefix
         operations: [Describe, Read]

@@ -151,7 +151,7 @@ tests:
     asserts:
       - equal:
           path: spec.allowed.commonName.validations[0].rule
-          value: self in ["mimir","tempo"]
+          value: self in ["mimir-distributor","mimir-ingester","mimir-query-frontend","mimir-ruler","mimir-ruler-query-frontend","tempo"]
       - equal:
           path: spec.constraints
           value:
