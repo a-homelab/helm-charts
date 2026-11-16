@@ -6,13 +6,17 @@ listener trusts. Sharing it with another Kafka cluster would let that cluster's 
 The cluster's identity goes in organizational units, not the commonName: X.509 caps a commonName at
 64 bytes (RFC 5280 ub-common-name), while a namespace and a fullname may each be 63.
 
+The name, <cluster>-clients-ca-root, is shared by this Certificate, its Secret and its Issuer
+(issuer-clients-ca.yaml). The -root suffix keeps it apart from Strimzi's own <cluster>-clients-ca and
+<cluster>-clients-ca-cert Secrets.
+
 rotationPolicy Never: a renewal must re-sign the same key, or every leaf signed by the old key fails
 until it renews. Renewing a year early keeps the copy Strimzi holds from ever expiring.
 */}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+  name: "{{ include "kafka.fullname" . }}-clients-ca-root"
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
@@ -21,7 +25,7 @@ metadata:
 spec:
   isCA: true
   commonName: Ben Fu Homelab Strimzi Clients CA
-  secretName: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+  secretName: "{{ include "kafka.fullname" . }}-clients-ca-root"
   subject:
     organizations:
       - Ben Fu Homelab

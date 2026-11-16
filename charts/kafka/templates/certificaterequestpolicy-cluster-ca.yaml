@@ -7,7 +7,7 @@ it is admitted here because this CA is trusted by no other cluster.
 apiVersion: policy.cert-manager.io/v1alpha1
 kind: CertificateRequestPolicy
 metadata:
-  name: {{ include "kafka.caName" (dict "root" . "ca" "cluster") | quote }}
+  name: "{{ $name }}-cluster-ca-root"
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
   annotations:
@@ -48,7 +48,7 @@ spec:
     maxDuration: 8760h # 365d, Strimzi's certificate validity
   selector:
     issuerRef:
-      name: {{ include "kafka.caName" (dict "root" . "ca" "cluster") | quote }}
+      name: "{{ $name }}-cluster-ca-root"
       kind: Issuer
       group: cert-manager.io
     namespace:

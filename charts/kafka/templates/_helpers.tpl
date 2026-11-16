@@ -71,12 +71,3 @@ authMethod.
 {{- end }}
 {{- toYaml $names }}
 {{- end }}
-
-{{- /*
-The Secret, Certificate and Issuer of one of the cluster's two CAs. Strimzi's own Secrets are
-<cluster>-cluster-ca, <cluster>-cluster-ca-cert and the clients equivalents, so these names keep a
--root suffix. Takes a dict with root and ca ("cluster" or "clients").
-*/ -}}
-{{- define "kafka.caName" -}}
-{{- printf "%s-%s-ca-root" (include "kafka.fullname" .root) .ca -}}
-{{- end }}

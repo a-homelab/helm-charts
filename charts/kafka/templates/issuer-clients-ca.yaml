@@ -6,7 +6,7 @@ release's users.
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+  name: "{{ include "kafka.fullname" . }}-clients-ca-root"
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
@@ -14,4 +14,4 @@ metadata:
     argocd.argoproj.io/sync-wave: {{ include "kafka.syncWaveBefore" (dict "root" . "by" 1) | quote }}
 spec:
   ca:
-    secretName: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+    secretName: "{{ include "kafka.fullname" . }}-clients-ca-root"

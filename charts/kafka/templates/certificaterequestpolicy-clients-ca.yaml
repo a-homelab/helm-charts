@@ -5,7 +5,7 @@ cannot mint CN=<any principal>. With no certificate users it admits nothing.
 apiVersion: policy.cert-manager.io/v1alpha1
 kind: CertificateRequestPolicy
 metadata:
-  name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+  name: "{{ include "kafka.fullname" . }}-clients-ca-root"
   labels:
     {{- include "kafka.labels" . | nindent 4 }}
   annotations:
@@ -28,7 +28,7 @@ spec:
       algorithm: Ed25519
   selector:
     issuerRef:
-      name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+      name: "{{ include "kafka.fullname" . }}-clients-ca-root"
       kind: Issuer
       group: cert-manager.io
     namespace:

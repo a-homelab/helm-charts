@@ -29,7 +29,7 @@ spec:
     algorithm: Ed25519
     encoding: PKCS8
   issuerRef:
-    name: {{ include "kafka.caName" (dict "root" $ "ca" "clients") | quote }}
+    name: "{{ include "kafka.fullname" $ }}-clients-ca-root"
     kind: Issuer
     group: cert-manager.io
 {{- end }}

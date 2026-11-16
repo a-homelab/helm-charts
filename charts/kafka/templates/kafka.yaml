@@ -28,22 +28,22 @@ spec:
     type: cert-manager
     certManager:
       issuerRef:
-        name: {{ include "kafka.caName" (dict "root" . "ca" "cluster") | quote }}
+        name: "{{ include "kafka.fullname" . }}-cluster-ca-root"
         kind: Issuer
         group: cert-manager.io
       caCertRef:
-        secretName: {{ include "kafka.caName" (dict "root" . "ca" "cluster") | quote }}
+        secretName: "{{ include "kafka.fullname" . }}-cluster-ca-root"
         certificate: ca.crt
   clientsCa:
     generateCertificateAuthority: false
     type: cert-manager
     certManager:
       issuerRef:
-        name: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+        name: "{{ include "kafka.fullname" . }}-clients-ca-root"
         kind: Issuer
         group: cert-manager.io
       caCertRef:
-        secretName: {{ include "kafka.caName" (dict "root" . "ca" "clients") | quote }}
+        secretName: "{{ include "kafka.fullname" . }}-clients-ca-root"
         certificate: ca.crt
   kafka:
     version: {{ required "kafka.version is required" .Values.kafka.version | quote }}
