@@ -1,8 +1,8 @@
 {{- /*
-Each certificate user's client certificate, from this cluster's clients CA. Kafka takes the
+Each mTLS user's client certificate, from this cluster's clients CA. Kafka takes the
 principal from the CN, User:CN=<user>, so the CN is the KafkaUser name (kafkauser.yaml).
 */}}
-{{- range $user := include "kafka.certificateUserNames" . | fromYamlArray }}
+{{- range $user := include "kafka.mtlsUserNames" . | fromYamlArray }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

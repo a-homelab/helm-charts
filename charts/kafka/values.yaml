@@ -109,14 +109,18 @@ topics: {}
 # KafkaUsers keyed by user name. acls is KafkaUser.spec.authorization.acls.
 #
 # authMethod is how the user logs in:
-# - certificate (the default): a client certificate from this cluster's clients CA, on the TLS
-#   listener, port 9093 (tls-external). The chart issues Certificate <user>-kafka-client, whose CN
-#   is the user name, into Secret <user>-kafka-client. The principal is User:CN=<user>.
-# - password: SASL PLAIN on a plaintext listener, port 9092, for clients that cannot do TLS, such as
-#   Loki 3.7. External Secrets generates the password once into Secret <user>-kafka-password, keys
-#   username and password. The principal is User:<user>. The password and every record cross the
-#   network unencrypted. The brokers read the passwords when they start, so adding a password user
-#   rolls the brokers, and a password never rotates.
+# - mtls (the default): mTLS authentication, Strimzi's type tls, with a client certificate from this
+#   cluster's clients CA, on the tls listener, port 9093 (KafkaUser tls-external). The chart issues
+#   Certificate <user>-kafka-client, whose CN is the user name, into Secret <user>-kafka-client. The
+#   principal is User:CN=<user>.
+# - password: SASL PLAIN over TLS on the sasltls listener, port 9094. External Secrets generates the
+#   password once into Secret <user>-kafka-password, keys username and password. The principal is
+#   User:<user>. The brokers read the passwords when they start, so adding a password user rolls the
+#   brokers, and a password never rotates.
+#
+# plaintext: true also lets a password user log in on the plain listener, port 9092, with SASL PLAIN
+# and no TLS, for a client that cannot do TLS, such as Loki 3.7. Its password and every record
+# cross the network unencrypted. Only a password user may set it.
 #
 # users:
 #   mimir:
@@ -128,6 +132,7 @@ topics: {}
 #         operations: [Describe, Read, Write]
 #   loki:
 #     authMethod: password
+#     plaintext: true
 #     acls:
 #       - resource:
 #           type: topic

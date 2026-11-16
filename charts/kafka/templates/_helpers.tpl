@@ -58,13 +58,13 @@ certificates. Takes a dict with root and by.
 {{- end }}
 
 {{- /*
-The sorted names of the users that log in with a certificate, authMethod's default, as a YAML list
-for fromYamlArray.
+The sorted names of the users that log in with a client certificate (authMethod mtls, the default),
+as a YAML list for fromYamlArray.
 */ -}}
-{{- define "kafka.certificateUserNames" -}}
+{{- define "kafka.mtlsUserNames" -}}
 {{- $names := list }}
 {{- range $user, $spec := .Values.users }}
-{{- if eq ($spec.authMethod | default "certificate") "certificate" }}
+{{- if eq ($spec.authMethod | default "mtls") "mtls" }}
 {{- $names = append $names $user }}
 {{- end }}
 {{- end }}
@@ -83,4 +83,31 @@ fromYamlArray.
 {{- end }}
 {{- end }}
 {{- toYaml $names }}
+{{- end }}
+
+{{- /*
+The sorted names of the password users also allowed on the plaintext listener (plaintext true), as a
+YAML list for fromYamlArray.
+*/ -}}
+{{- define "kafka.plaintextUserNames" -}}
+{{- $names := list }}
+{{- range $user, $spec := .Values.users }}
+{{- if and (eq $spec.authMethod "password") $spec.plaintext }}
+{{- $names = append $names $user }}
+{{- end }}
+{{- end }}
+{{- toYaml $names }}
+{{- end }}
+
+{{- /*
+A SASL PLAIN listener's JAAS config admitting .users. Each password is a strimzisecrets reference
+that the brokers resolve at start through Strimzi's KubernetesSecretConfigProvider, so no password
+is in the Kafka resource. Takes a dict with root and users.
+*/ -}}
+{{- define "kafka.plainJaasConfig" -}}
+{{- $entries := "" }}
+{{- range .users }}
+{{- $entries = printf "%s user_%s=\"${strimzisecrets:%s/%s-kafka-password:password}\"" $entries . $.root.Release.Namespace . }}
+{{- end }}
+{{- printf "org.apache.kafka.common.security.plain.PlainLoginModule required%s;" $entries }}
 {{- end }}

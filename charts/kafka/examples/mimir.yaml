@@ -48,7 +48,7 @@ topics:
       retention.ms: 259200000
       retention.bytes: 32212254720
 
-# One certificate user per Mimir component that connects, each with only the operations it uses.
+# One mTLS user per Mimir component that connects, each with only the operations it uses.
 users:
   mimir-distributor:
     acls:

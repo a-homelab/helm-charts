@@ -1,5 +1,6 @@
 # Loki's ingest cluster in gitops (values-files/loki-kafka), released as loki-kafka in namespace
-# loki. Loki 3.7's Kafka client speaks only SASL PLAIN without TLS, so its user logs in by password.
+# loki. Loki 3.7's Kafka client speaks only SASL PLAIN without TLS, so its users log in by password
+# on the plaintext listener.
 fullnameOverride: loki-kafka
 syncWave: "-1"
 
@@ -48,6 +49,7 @@ topics:
 users:
   loki-distributor:
     authMethod: password
+    plaintext: true
     acls:
       - resource:
           type: topic
@@ -56,6 +58,7 @@ users:
         operations: [Describe, Write]
   loki-ingester:
     authMethod: password
+    plaintext: true
     acls:
       - resource:
           type: topic

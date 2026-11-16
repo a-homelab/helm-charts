@@ -8,7 +8,10 @@
       "maxLength": 40
     },
     "syncWave": {
-      "type": ["string", "integer"],
+      "type": [
+        "string",
+        "integer"
+      ],
       "pattern": "^(-?[0-9]+)?$"
     },
     "clusterDomain": {
@@ -53,7 +56,10 @@
             "uniqueItems": true,
             "items": {
               "type": "string",
-              "enum": ["broker", "controller"]
+              "enum": [
+                "broker",
+                "controller"
+              ]
             }
           },
           "replicas": {
@@ -71,14 +77,20 @@
                 "type": "string"
               }
             },
-            "required": ["size"],
+            "required": [
+              "size"
+            ],
             "additionalProperties": false
           },
           "resources": {
             "type": "object"
           }
         },
-        "required": ["roles", "replicas", "storage"],
+        "required": [
+          "roles",
+          "replicas",
+          "storage"
+        ],
         "additionalProperties": false
       }
     },
@@ -130,7 +142,9 @@
             "type": "object"
           }
         },
-        "required": ["partitions"],
+        "required": [
+          "partitions"
+        ],
         "additionalProperties": false
       }
     },
@@ -145,7 +159,13 @@
         "properties": {
           "authMethod": {
             "type": "string",
-            "enum": ["certificate", "password"]
+            "enum": [
+              "mtls",
+              "password"
+            ]
+          },
+          "plaintext": {
+            "type": "boolean"
           },
           "acls": {
             "type": "array",
@@ -155,8 +175,30 @@
             }
           }
         },
-        "required": ["acls"],
-        "additionalProperties": false
+        "required": [
+          "acls"
+        ],
+        "additionalProperties": false,
+        "if": {
+          "properties": {
+            "plaintext": {
+              "const": true
+            }
+          },
+          "required": [
+            "plaintext"
+          ]
+        },
+        "then": {
+          "properties": {
+            "authMethod": {
+              "const": "password"
+            }
+          },
+          "required": [
+            "authMethod"
+          ]
+        }
       }
     },
     "podMonitors": {

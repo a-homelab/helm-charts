@@ -4,7 +4,7 @@ One Strimzi Kafka cluster per release, in KRaft mode: the `Kafka` resource, its 
 `KafkaTopic`s and `KafkaUser`s, a client certificate or a generated password per user, a cluster
 CA and clients CA of its own, and Strimzi's PodMonitors. Start from
 [examples/mimir.yaml](examples/mimir.yaml), or [examples/loki.yaml](examples/loki.yaml) for a client
-without TLS; [values.yaml](values.yaml) documents every key.
+that logs in by password without TLS; [values.yaml](values.yaml) documents every key.
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ without TLS; [values.yaml](values.yaml) documents every key.
 | KafkaNodePool | each key of `nodePools`; pods are `<cluster>-<pool>-<id>` |
 | KafkaTopic | each key of `topics` |
 | KafkaUser | each key of `users` |
-| Certificate | each certificate user; the certificate and its Secret are `<user>-kafka-client` |
+| Certificate | each mTLS user; the certificate and its Secret are `<user>-kafka-client` |
 | Password generator and ExternalSecret | each password user; both and the Secret are `<user>-kafka-password` |
 | Role and RoleBinding | `<cluster>-kafka-user-passwords`, when any user has a password |
 | CA Certificates and Issuers | `<cluster>-cluster-ca-root`, `<cluster>-clients-ca-root`, bootstrapped by `<cluster>-ca-selfsigned` |
@@ -46,9 +46,9 @@ Each cluster has two CAs, both self-signed roots chained to nothing:
   Strimzi identities (`<cluster>-kafka`, `cluster-operator`, `<cluster>-entity-topic-operator`,
   `<cluster>-entity-user-operator`), organization `io.strimzi`, with DNS names under this cluster's
   Services.
-- The **clients CA** signs each certificate user's certificate. The client listener on 9093 trusts only it,
+- The **clients CA** signs each mTLS user's certificate. The `tls` listener on 9093 trusts only it,
   and Kafka takes the principal from the certificate's CN, `User:CN=<user>`. Its policy admits only
-  the users this release declares.
+  the mTLS users this release declares.
 
 A CA per cluster is what keeps one cluster's certificates out of another. Strimzi's
 `cluster-operator` certificate has the same CN in every cluster and is a super user, so with a
@@ -75,35 +75,41 @@ certificate. Plan it as a rollout of its own.
 
 ## Password users
 
-`authMethod: password` is for clients that cannot do TLS. Loki 3.7's Kafka client, for example,
-supports only SASL PLAIN and has no TLS settings. Such a user logs in on a second listener,
-`plain` on port 9092, with SASL PLAIN and no TLS:
+`authMethod: password` is for clients that cannot present a client certificate. Such a user logs in
+with SASL PLAIN on the `sasltls` listener, port 9094, over TLS with the brokers' cluster-CA
+certificate.
+
+`plaintext: true` also admits a password user on the `plain` listener, port 9092, with SASL PLAIN
+and no TLS, for a client that cannot do TLS at all. Loki 3.7's Kafka client, for example, supports
+only SASL PLAIN and has no TLS settings. Kafka ACLs cannot limit a user to a listener, so each
+listener's JAAS config lists only the users allowed on it, and `plain` renders only while some user
+sets `plaintext`.
 
 - External Secrets generates the password once into Secret `<user>-kafka-password`, with keys
   `username` and `password`. The ExternalSecret is `CreatedOnce` and the Secret is immutable and
   orphaned, so deleting or recreating the ExternalSecret never changes the password.
-- The listener's JAAS config names each password user with a reference,
+- Each listener's JAAS config names its users with a reference,
   `${strimzisecrets:<namespace>/<user>-kafka-password:password}`, which each broker resolves at start
   through Strimzi's `KubernetesSecretConfigProvider`. No password is in the `Kafka` resource. Role
   and RoleBinding `<cluster>-kafka-user-passwords` let the brokers' ServiceAccount, `<cluster>-kafka`,
   read those Secrets and no others.
-- The principal is `User:<user>`, and the user's ACLs apply as for a certificate user. Its
-  `KafkaUser` has no authentication type, so the User Operator manages only the ACLs.
+- The principal is `User:<user>` on either listener, and the user's ACLs apply as for an mTLS
+  user. Its `KafkaUser` has no authentication type, so the User Operator manages only the ACLs.
 
 Weigh the costs before choosing it:
 
-- The password and every record cross the network in plain text. Limit the listener with
-  `kafka.clientPeers`, which applies to both client listeners.
+- With `plaintext`, the password and every record cross the network in plain text. Limit the
+  listeners with `kafka.clientPeers`, which applies to every client listener.
 - The brokers read the passwords only at start. Adding or removing a password user changes the
-  listener and rolls the brokers. Changing a password needs a broker restart and a client restart,
+  listeners and rolls the brokers. Changing a password needs a broker restart and a client restart,
   and the chart has no rotation.
 
 ## Not supported
 
 - Kafka Exporter and Cruise Control: their certificates' CNs are not in the cluster CA's policy.
-- Listeners other than the internal TLS listener and the plaintext SASL PLAIN listener, and
-  authentication other than client certificates and passwords. SCRAM would suit a TLS-capable
-  client better than PLAIN, but no client here needs it yet.
+- Listeners other than the internal `tls`, `sasltls` and `plain` listeners, and SASL mechanisms
+  other than PLAIN. SCRAM would keep the password off the wire even inside TLS, but no client here
+  needs it yet.
 - Password rotation.
 - Changing a controller pool after the first sync: Strimzi 1.3.1 cannot add, rename, scale, or
   resize one.

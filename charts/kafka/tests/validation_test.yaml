@@ -63,6 +63,27 @@ tests:
       - failedTemplate:
           errorPattern: kafka(\.|/)version
 
+  - it: rejects plaintext on a user that does not log in by password
+    set:
+      users.mimir.plaintext: true
+    asserts:
+      - failedTemplate:
+          errorPattern: authMethod
+
+  - it: rejects the old certificate authMethod, now mtls
+    set:
+      users.mimir.authMethod: certificate
+    asserts:
+      - failedTemplate:
+          errorPattern: authMethod
+
+  - it: rejects tls, Strimzi's CRD value, as an authMethod
+    set:
+      users.mimir.authMethod: tls
+    asserts:
+      - failedTemplate:
+          errorPattern: authMethod
+
   - it: rejects an authMethod the chart does not have
     set:
       users.mimir.authMethod: scram
