@@ -58,6 +58,21 @@ certificates. Takes a dict with root and by.
 {{- end }}
 
 {{- /*
+The sorted names of the users whose authMethod is .authMethod ("certificate" or "password"), as a
+YAML list for fromYamlArray. authMethod defaults to certificate. Takes a dict with root and
+authMethod.
+*/ -}}
+{{- define "kafka.userNames" -}}
+{{- $names := list }}
+{{- range $user, $spec := .root.Values.users }}
+{{- if eq ($spec.authMethod | default "certificate") $.authMethod }}
+{{- $names = append $names $user }}
+{{- end }}
+{{- end }}
+{{- toYaml $names }}
+{{- end }}
+
+{{- /*
 The Secret, Certificate and Issuer of one of the cluster's two CAs. Strimzi's own Secrets are
 <cluster>-cluster-ca, <cluster>-cluster-ca-cert and the clients equivalents, so these names keep a
 -root suffix. Takes a dict with root and ca ("cluster" or "clients").

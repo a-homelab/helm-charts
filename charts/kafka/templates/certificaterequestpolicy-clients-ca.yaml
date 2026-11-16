@@ -1,6 +1,6 @@
 {{- /*
-Admits only the users this release declares, so a Certificate in this namespace still cannot mint
-CN=<any principal>. With no users it admits nothing.
+Admits only the certificate users this release declares, so a Certificate in this namespace still
+cannot mint CN=<any principal>. With no certificate users it admits nothing.
 */}}
 apiVersion: policy.cert-manager.io/v1alpha1
 kind: CertificateRequestPolicy
@@ -16,7 +16,7 @@ spec:
       value: "*"
       required: true
       validations:
-        - rule: {{ printf "self in %s" (keys (.Values.users | default dict) | sortAlpha | toJson) | quote }}
+        - rule: {{ printf "self in %s" (include "kafka.userNames" (dict "root" . "authMethod" "certificate") | fromYamlArray | toJson) | quote }}
           message: "commonName must be one of this Kafka cluster's users"
     usages:
       - digital signature

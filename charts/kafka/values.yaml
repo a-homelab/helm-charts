@@ -1,4 +1,4 @@
-# One Strimzi Kafka cluster per release, in KRaft mode, with its node pools, topics, TLS users, and a
+# One Strimzi Kafka cluster per release, in KRaft mode, with its node pools, topics, users, and a
 # cluster CA and clients CA of its own. Start from examples/mimir.yaml; README.md lists the
 # prerequisites.
 #
@@ -26,9 +26,9 @@ kafka:
   # Kafka version by accident. Strimzi 1.3.1 supports Kafka 4.2 and 4.3.
   version: ""
   metadataVersion: ""
-  # Strimzi's networkPolicyPeers for the TLS client listener on 9093: the pods allowed to dial it.
-  # Empty lets every pod in every namespace reach the listener, which still requires a certificate
-  # from this cluster's clients CA.
+  # Strimzi's networkPolicyPeers for the client listeners, TLS on 9093 and, with a password user,
+  # plaintext on 9092: the pods allowed to dial them. Empty lets every pod in every namespace reach
+  # them, which still requires a certificate from this cluster's clients CA or a user's password.
   clientPeers: []
   # Kafka.spec.kafka.config, merged over these defaults. Replication factor 3 with
   # min.insync.replicas 2 keeps writes going while one broker is down. Set a key to null to drop
@@ -84,9 +84,17 @@ spreadAcrossNodes: true
 #       retention.ms: 259200000
 topics: {}
 
-# KafkaUsers keyed by user name, each authenticated by a client certificate from this cluster's
-# clients CA (tls-external): the chart issues Certificate <user>-kafka-client, whose CN is the user
-# name, into Secret <user>-kafka-client. acls is KafkaUser.spec.authorization.acls.
+# KafkaUsers keyed by user name. acls is KafkaUser.spec.authorization.acls.
+#
+# authMethod is how the user logs in:
+# - certificate (the default): a client certificate from this cluster's clients CA, on the TLS
+#   listener, port 9093 (tls-external). The chart issues Certificate <user>-kafka-client, whose CN
+#   is the user name, into Secret <user>-kafka-client. The principal is User:CN=<user>.
+# - password: SASL PLAIN on a plaintext listener, port 9092, for clients that cannot do TLS, such as
+#   Loki 3.7. External Secrets generates the password once into Secret <user>-kafka-password, keys
+#   username and password. The principal is User:<user>. The password and every record cross the
+#   network unencrypted. The brokers read the passwords when they start, so adding a password user
+#   rolls the brokers, and a password never rotates.
 #
 # users:
 #   mimir:
@@ -94,6 +102,14 @@ topics: {}
 #       - resource:
 #           type: topic
 #           name: mimir-ingest
+#           patternType: literal
+#         operations: [Describe, Read, Write]
+#   loki:
+#     authMethod: password
+#     acls:
+#       - resource:
+#           type: topic
+#           name: loki-ingest
 #           patternType: literal
 #         operations: [Describe, Read, Write]
 users: {}

@@ -119,6 +119,10 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "authMethod": {
+            "type": "string",
+            "enum": ["certificate", "password"]
+          },
           "acls": {
             "type": "array",
             "minItems": 1,

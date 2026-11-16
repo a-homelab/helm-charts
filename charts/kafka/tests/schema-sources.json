@@ -26,5 +26,13 @@
   "approver-policy-0.28.0-certificaterequestpolicies.yaml": {
     "url": "https://raw.githubusercontent.com/cert-manager/approver-policy/v0.28.0/deploy/crds/policy.cert-manager.io_certificaterequestpolicies.yaml",
     "sha256": "759e9567e18a2cbd742081e561315fc7d06c560da7654782f6d8bba82f671674"
+  },
+  "eso-2.11.0-externalsecrets.yaml": {
+    "url": "https://raw.githubusercontent.com/external-secrets/external-secrets/v2.11.0/config/crds/bases/external-secrets.io_externalsecrets.yaml",
+    "sha256": "5044be5a610ca90a075f34f03ed20b462695c43387ba9410db7f4250e47b1e2f"
+  },
+  "eso-2.11.0-passwords.yaml": {
+    "url": "https://raw.githubusercontent.com/external-secrets/external-secrets/v2.11.0/config/crds/bases/generators.external-secrets.io_passwords.yaml",
+    "sha256": "72ef666dcd0e24b71a2a8fe122ed01c86203f7a3a323ea90dc77a604b6a263da"
   }
 }

@@ -23,6 +23,11 @@ SOURCE_KEYS = {
         "policy.cert-manager.io/v1alpha1",
         "CertificateRequestPolicy",
     ): "approver-policy-0.28.0-certificaterequestpolicies.yaml",
+    ("external-secrets.io/v1", "ExternalSecret"): "eso-2.11.0-externalsecrets.yaml",
+    (
+        "generators.external-secrets.io/v1alpha1",
+        "Password",
+    ): "eso-2.11.0-passwords.yaml",
 }
 
 
@@ -48,6 +53,15 @@ def load_schemas(cache):
     schema = other["monitoring.coreos.com/v1/PodMonitor"]
     strict_objects(schema)
     registry["monitoring.coreos.com/v1/PodMonitor"] = schema
+    # Role and RoleBinding for password users, at the Kubernetes version the clusters run.
+    kubernetes = json.loads(
+        (ROOT / "charts/common/schema/vendor/kubernetes-1.32.0.json").read_text()
+    )
+    for kind, definition in kubernetes["resourceIndex"].items():
+        registry[kind] = {
+            "$ref": f"#/definitions/{definition}",
+            "definitions": kubernetes["definitions"],
+        }
     return registry
 
 
@@ -91,7 +105,8 @@ def main():
                 raise ValueError(f"{example.name}: {kind} against {key}:\n{details}")
             count += 1
         print(
-            f"OK {example.name}: Strimzi 1.3.1, cert-manager 1.21.2, approver-policy 0.28.0"
+            f"OK {example.name}: Strimzi 1.3.1, cert-manager 1.21.2, approver-policy 0.28.0,"
+            " External Secrets 2.11.0, Kubernetes 1.32"
         )
     print(
         f"Passed {count} resource/schema validations; CEL and admission webhooks require separate cluster validation"

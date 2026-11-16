@@ -1,0 +1,60 @@
+# Loki's ingest cluster in gitops (values-files/loki-kafka), released as loki-kafka in namespace
+# loki. Loki 3.7's Kafka client speaks only SASL PLAIN without TLS, so its user logs in by password.
+fullnameOverride: loki-kafka
+syncWave: "-1"
+
+kafka:
+  version: 4.3.2
+  metadataVersion: 4.3-IV0
+  config:
+    # Loki splits pushes into records of up to about 15.2 MB; Kafka's 1 MB default rejects them.
+    message.max.bytes: 16000000
+
+nodePools:
+  controller:
+    roles: [controller]
+    replicas: 3
+    storage:
+      size: 10Gi
+      class: rook-ceph-block-nvme-ssd
+    resources:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        memory: 2Gi
+  broker:
+    roles: [broker]
+    replicas: 3
+    storage:
+      size: 150Gi
+      class: rook-ceph-block-nvme-ssd
+    resources:
+      requests:
+        cpu: 250m
+        memory: 4Gi
+      limits:
+        memory: 4Gi
+
+topics:
+  loki-ingest:
+    partitions: 4
+    config:
+      max.message.bytes: 16000000
+      retention.ms: 259200000
+      retention.bytes: 32212254720
+
+users:
+  loki:
+    authMethod: password
+    acls:
+      - resource:
+          type: topic
+          name: loki-ingest
+          patternType: literal
+        operations: [Describe, DescribeConfigs, Read, Write]
+      - resource:
+          type: group
+          name: "*"
+          patternType: literal
+        operations: [Describe, Read]

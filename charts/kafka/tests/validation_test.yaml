@@ -62,3 +62,10 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: kafka(\.|/)version
+
+  - it: rejects an authMethod the chart does not have
+    set:
+      users.mimir.authMethod: scram
+    asserts:
+      - failedTemplate:
+          errorPattern: authMethod

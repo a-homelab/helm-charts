@@ -1,8 +1,8 @@
 {{- /*
-Each user's client certificate, from this cluster's clients CA. Kafka takes the principal from the
-CN, User:CN=<user>, so the CN is the KafkaUser name (kafkauser.yaml).
+Each certificate user's client certificate, from this cluster's clients CA. Kafka takes the
+principal from the CN, User:CN=<user>, so the CN is the KafkaUser name (kafkauser.yaml).
 */}}
-{{- range $user, $spec := .Values.users }}
+{{- range $user := include "kafka.userNames" (dict "root" . "authMethod" "certificate") | fromYamlArray }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

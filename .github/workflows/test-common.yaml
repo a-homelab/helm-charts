@@ -53,6 +53,7 @@ jobs:
           helm lint charts/blocky --strict
           helm lint charts/postgresql --strict -f charts/postgresql/examples/existing.yaml
           helm lint charts/kafka --strict -f charts/kafka/examples/mimir.yaml
+          helm lint charts/kafka --strict -f charts/kafka/examples/loki.yaml
       - name: Install helm-unittest
         # Helm 4 cannot verify plugins installed from a git repository.
         run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.2 ${{ startsWith(matrix.helm, 'v4.') && '--verify=false' || '' }}
