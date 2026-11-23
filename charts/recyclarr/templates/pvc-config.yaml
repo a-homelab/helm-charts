@@ -1,1 +1,0 @@
-{{- include "common.pvc" (dict "rootCtx" $ "pvcValues" $.Values.persistentVolumeClaims.data ) -}}

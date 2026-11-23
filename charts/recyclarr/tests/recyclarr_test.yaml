@@ -1,0 +1,190 @@
+suite: recyclarr schedule, configuration and storage
+templates:
+  - templates/all.yaml
+release:
+  name: recyclarr
+  namespace: media
+set:
+  recyclarr:
+    config: |
+      radarr:
+        movies:
+          base_url: !secret radarr_url
+          api_key: !secret radarr_apikey
+tests:
+  - it: runs hourly, never overlapping, with one retry in a fresh pod
+    asserts:
+      - equal:
+          path: spec.schedule
+          value: 0 * * * *
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.backoffLimit
+          value: 1
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.restartPolicy
+          value: Never
+        documentSelector:
+          path: kind
+          value: CronJob
+
+  - it: syncs through the image's entrypoint at the chart's appVersion
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].args
+          value:
+            - sync
+        documentSelector:
+          path: kind
+          value: CronJob
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.containers[0].command
+        documentSelector:
+          path: kind
+          value: CronJob
+      - matchRegex:
+          path: spec.jobTemplate.spec.template.spec.containers[0].image
+          pattern: ^ghcr\.io/recyclarr/recyclarr:\S+$
+        documentSelector:
+          path: kind
+          value: CronJob
+
+  - it: renders recyclarr.yml verbatim, keeping its !secret tags, at the config path
+    asserts:
+      - equal:
+          path: data["recyclarr.yml"]
+          value: |
+            radarr:
+              movies:
+                base_url: !secret radarr_url
+                api_key: !secret radarr_apikey
+        documentSelector:
+          path: kind
+          value: ConfigMap
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: config
+            mountPath: /config/recyclarr.yml
+            subPath: recyclarr.yml
+            readOnly: true
+        documentSelector:
+          path: kind
+          value: CronJob
+
+  - it: refuses an empty configuration
+    set:
+      recyclarr:
+        config: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: recyclarr.config is empty
+
+  - it: keeps Recyclarr's data directory on the release's claim
+    asserts:
+      - equal:
+          path: metadata.name
+          value: recyclarr-data
+        documentSelector:
+          path: kind
+          value: PersistentVolumeClaim
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.volumes
+          content:
+            name: data
+            persistentVolumeClaim:
+              claimName: recyclarr-data
+        documentSelector:
+          path: kind
+          value: CronJob
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: data
+            mountPath: /config
+        documentSelector:
+          path: kind
+          value: CronJob
+
+  - it: mounts no secrets.yml unless a Secret is named
+    asserts:
+      - notContains:
+          path: spec.jobTemplate.spec.template.spec.volumes
+          content:
+            name: secrets
+          any: true
+        documentSelector:
+          path: kind
+          value: CronJob
+      - notContains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: secrets
+          any: true
+        documentSelector:
+          path: kind
+          value: CronJob
+
+  - it: mounts the named Secret's secrets.yml beside recyclarr.yml
+    set:
+      recyclarr:
+        secretName: arr-credentials
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.volumes
+          content:
+            name: secrets
+            secret:
+              secretName: arr-credentials
+              defaultMode: 0400
+        documentSelector:
+          path: kind
+          value: CronJob
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: secrets
+            mountPath: /config/secrets.yml
+            subPath: secrets.yml
+            readOnly: true
+        documentSelector:
+          path: kind
+          value: CronJob
+
+  - it: runs as the image's user with a read-only root and no service account token
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.runAsUser
+          value: 1000
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.securityContext.fsGroup
+          value: 1000
+        documentSelector:
+          path: kind
+          value: CronJob
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.automountServiceAccountToken
+          value: false
+        documentSelector:
+          path: kind
+          value: CronJob

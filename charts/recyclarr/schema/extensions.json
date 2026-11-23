@@ -1,0 +1,18 @@
+{
+  "properties": {
+    "recyclarr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "description": "Recyclarr's recyclarr.yml, rendered verbatim. A string rather than a map, so Recyclarr's !secret and !env_var tags survive; Recyclarr validates its own keys.",
+          "type": "string"
+        },
+        "secretName": {
+          "description": "An existing Secret whose secrets.yml key is mounted as Recyclarr's secrets.yml, which !secret tags read. Empty mounts none.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}
